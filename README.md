@@ -1,0 +1,29 @@
+# AgentDisc
+
+AgentDisc is a Chrome extension that makes Discord in the browser calmer and easier when you work with AI agents. It was made by Stephane Franceschini on top of Vencord.
+
+- **Typing signs:** dots and small photos show which channel or thread an agent is working in, even inside threads.
+- **Grouped threads:** each channel's threads sit on a card under it, with one click to fold them.
+- **Panels you can hide:** the server list, the channel header, the account bar and more, each with its own switch.
+- **Read aloud:** a play button on every message reads it in a natural Google voice, and the words light up as they are read.
+- **Midnight theme and left-hand shortcuts:** a calm dark theme, and Alt with Z Q S D (or W A S D) to move between channels.
+
+The full tour is in `WHAT-AGENTDISC-DOES.md`.
+
+## Install
+
+Download `AgentDisc.zip` from the latest release on the right of this page, unzip it, and give the folder to your AI agent with this sentence: "Read START-HERE-FOR-YOUR-AGENT.md and install AgentDisc for me." The guide walks the agent through everything: your own Google voice key, a small free Cloudflare service that keeps the key out of your browser, and loading the app in Chrome. Your part is a few minutes of clicks.
+
+You can also follow `START-HERE-FOR-YOUR-AGENT.md` yourself; every step is written out.
+
+## What is in here
+
+- `extension/`: the finished app, ready to load in Chrome.
+- `voice-service/`: the small Cloudflare service for the voice.
+- `source/`: the full source of the app.
+
+Every update is published as a new release with its own notes.
+
+## Credits and license
+
+Built on Vencord by Vendicated and contributors (https://github.com/Vendicated/Vencord), under the GNU General Public License v3.0, like this project (see `LICENSE`). AgentDisc is not made by or affiliated with Discord or the Vencord team. Changing the Discord client is against Discord's terms of service; use it at your own risk.

@@ -1,0 +1,170 @@
+.agentdisc-voice-bar {
+    position: fixed;
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: var(--background-base-lower, var(--background-secondary, #2b2d31));
+    border: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+    box-shadow: 0 4px 14px rgb(0 0 0 / 35%);
+    color: var(--text-default, var(--text-normal, #dbdee1));
+    font-size: 14px;
+}
+
+.agentdisc-voice-row {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.agentdisc-voice-agent {
+    max-width: 150px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+}
+
+.agentdisc-voice-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.agentdisc-voice-btn:hover:not(:disabled) {
+    background: var(--background-modifier-hover, rgb(255 255 255 / 6%));
+}
+
+.agentdisc-voice-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.agentdisc-voice-main {
+    background: #5865f2;
+    color: #fff;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+}
+
+.agentdisc-voice-main:hover:not(:disabled) {
+    background: #4752c4;
+}
+
+.agentdisc-voice-line {
+    flex: 1;
+    min-width: 60px;
+    accent-color: #5865f2;
+    cursor: pointer;
+}
+
+.agentdisc-voice-time {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    opacity: 0.8;
+    white-space: nowrap;
+}
+
+.agentdisc-voice-rate {
+    min-width: 40px;
+    justify-content: center;
+}
+
+/* A short note (waiting, browser voice) hangs just under the bar. */
+.agentdisc-voice-note {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 8px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--background-base-lower, var(--background-secondary, #2b2d31));
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.agentdisc-voice-pass {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.agentdisc-voice-pass input {
+    flex: 1;
+    min-width: 200px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle, rgb(255 255 255 / 12%));
+    background: var(--input-background, var(--background-base-lowest, #1e1f22));
+    color: inherit;
+}
+
+/* The small play button beside a message's name and time: purple, white triangle. */
+.agentdisc-voice-play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-left: 6px;
+    padding: 0 0 0 1px;
+    border: 0;
+    border-radius: 50%;
+    background: #5865f2;
+    color: #fff;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.agentdisc-voice-play:hover {
+    background: #4752c4;
+}
+
+/* The word being read, lit in the message itself. */
+::highlight(agentdisc-reading) {
+    background-color: rgb(88 101 242 / 55%);
+    color: #fff;
+}
+
+/* While the play bar is open: the word under the pointer can be clicked to read from there. */
+::highlight(agentdisc-hover) {
+    background-color: rgb(88 101 242 / 28%);
+    text-decoration: underline;
+    text-decoration-color: #5865f2;
+    text-decoration-thickness: 2px;
+}
+
+html.agentdisc-word-hover,
+html.agentdisc-word-hover * {
+    cursor: pointer !important;
+}
+
+/* Turning ring while the voice is being made. */
+.agentdisc-voice-spin {
+    animation: agentdisc-voice-spin 0.8s linear infinite;
+}
+
+@keyframes agentdisc-voice-spin {
+    to { transform: rotate(360deg); }
+}
+
+.agentdisc-voice-play-loading {
+    padding: 0;
+}

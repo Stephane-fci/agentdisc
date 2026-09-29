@@ -1,0 +1,28 @@
+{
+    "about": "AgentDisc ships only the plugins named here from src/plugins. The engine parts in src/plugins/_api and src/plugins/_core always ship. To bring a Vencord plugin back, add its name (the name in its definePlugin call) and rebuild.",
+    "keep": [
+        "TypingIndicator",
+        "ChannelListTidy",
+        "ChannelGroups",
+        "LeftHandKeys",
+        "VencordToolbox",
+        "PanelSwitches",
+        "AgentDiscTheme",
+        "AgentDiscHealth",
+        "DisableDeepLinks",
+        "WebContextMenus",
+        "WebKeybinds",
+        "WebScreenShareFixes",
+        "CrashHandler",
+        "AgentDiscVoice"
+    ],
+    "offHelpers_about": "Engine helpers that stay switched off in his Discord because no kept plugin uses them. The update check reports a failure in one of them but still lets the update through. Remove a name here when a kept plugin starts using it.",
+    "offHelpers": [
+        "ChatInputButtonAPI",
+        "DynamicImageModalAPI",
+        "MessageEventsAPI",
+        "MessageUpdaterAPI",
+        "ServerListAPI",
+        "MemberListDecoratorsAPI"
+    ]
+}

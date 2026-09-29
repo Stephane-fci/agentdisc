@@ -1,0 +1,25 @@
+# AgentDisc voice service (a Cloudflare Worker). Setup steps: ../START-HERE-FOR-YOUR-AGENT.md, step 2.
+name = "agentdisc-voice"
+main = "src/index.js"
+compatibility_date = "2026-09-15"
+workers_dev = true
+
+[vars]
+# New audio stops for the day once this many US dollars are spent (resets at midnight UTC).
+DAILY_LIMIT_USD = "5"
+
+[[kv_namespaces]]
+binding = "VOICE"
+id = "PUT-THE-KV-NAMESPACE-ID-HERE"
+
+[[durable_objects.bindings]]
+name = "SPEND"
+class_name = "SpendMeter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SpendMeter"]
+
+# Secrets, set with `npx wrangler secret put <NAME>`, never written in a file:
+#   GEMINI_API_KEY  the Google voice key
+#   PASS_SHA256     the SHA-256 (hex) of the private pass the extension sends

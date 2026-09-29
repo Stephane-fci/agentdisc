@@ -1,0 +1,66 @@
+/* The fold arrow sits where Discord's white unread mark was, left of the channel icon. */
+.vc-channel-fold {
+    position: absolute;
+    top: 50%;
+    inset-inline-start: calc(var(--space-xs, 8px) * -1);
+    width: 14px;
+    height: 20px;
+    margin-top: -10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: var(--channels-default);
+    cursor: pointer;
+    z-index: 1;
+}
+
+.vc-channel-fold:hover {
+    color: var(--interactive-text-active);
+    background: var(--interactive-background-hover);
+}
+
+.vc-channel-fold svg {
+    transition: transform 0.12s ease;
+}
+
+.vc-channel-fold-closed svg {
+    transform: rotate(-90deg);
+}
+
+/* Folded, with an unread thread inside: the arrow turns white, like the old mark did. */
+.vc-channel-fold-unread {
+    color: var(--interactive-text-active);
+}
+
+/* One button above the channel list: open or fold every channel's threads. */
+.vc-threads-all-row {
+    flex: 0 0 auto;
+    padding: 8px 8px 4px;
+}
+
+.vc-threads-all {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 28px;
+    padding: 0 10px;
+    border: none;
+    border-radius: var(--radius-sm, 8px);
+    background: color-mix(in oklab, #5865f2 14%, transparent);
+    color: var(--channels-default);
+    font-family: var(--font-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vc-threads-all:hover {
+    background: color-mix(in oklab, #5865f2 28%, transparent);
+    color: var(--interactive-text-active);
+}
+
+.vc-threads-all-closed svg {
+    transform: rotate(-90deg);
+}

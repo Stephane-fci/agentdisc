@@ -18,12 +18,14 @@
 
 import "./styles.css";
 
+import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
+import { ChannelSectionStore, isHidden, settings as panelSettings, startSearch, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
 import { findComponentByCodeLazy } from "@webpack";
-import { Popout, useRef, useState } from "@webpack/common";
+import { ChannelStore, Popout, SelectedChannelStore, useRef, useState, useStateFromStores } from "@webpack/common";
 import type { PropsWithChildren } from "react";
 
 import { renderPopout } from "./menu";
@@ -55,6 +57,60 @@ function Icon({ isShown }: { isShown: boolean; }) {
                 <rect x="8.2" y="16.8" width="7.6" height="1.9" rx="0.95" />
             </g>
         </svg>
+    );
+}
+
+// Three buttons before the inbox (Stephane, 30 Sept): search, the server list, and
+// Discord's own member list switch, drawn like the top bar's other icons.
+function TopIcon({ children }: PropsWithChildren) {
+    return (
+        <svg viewBox="0 0 24 24" width={20} height={20} className="vc-toolbox-icon" aria-hidden="true">{children}</svg>
+    );
+}
+
+const SearchIcon = () => (
+    <TopIcon>
+        <circle cx="10.5" cy="10.5" r="6.3" fill="none" stroke="currentColor" strokeWidth="2.2" />
+        <path d="M15.3 15.3 20.6 20.6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </TopIcon>
+);
+
+const ServersIcon = () => (
+    <TopIcon>
+        <rect x="2.5" y="3.5" width="19" height="17" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path d="M9 4v16" stroke="currentColor" strokeWidth="2" />
+        <circle cx="5.8" cy="7.6" r="1.4" fill="currentColor" />
+        <circle cx="5.8" cy="12" r="1.4" fill="currentColor" />
+        <circle cx="5.8" cy="16.4" r="1.4" fill="currentColor" />
+    </TopIcon>
+);
+
+const MembersIcon = () => (
+    <TopIcon>
+        <circle cx="9" cy="8" r="3.5" fill="currentColor" />
+        <path d="M2 19.2c0-3.4 3.1-5.9 7-5.9s7 2.5 7 5.9V20H2z" fill="currentColor" />
+        <path d="M16.3 5.2a3 3 0 1 1 .9 5.8a5 5 0 0 0-.9-5.8zM17.4 13.5c2.7.4 4.6 2.5 4.6 5.3V20h-4.1v-.8c0-2.2-.9-4.2-2.5-5.6z" fill="currentColor" />
+    </TopIcon>
+);
+
+// Discord shows its member switch in server channels, threads and group chats; a
+// one-to-one chat and a voice channel have none.
+const NO_MEMBER_LIST = new Set([1, 2, 13]);
+
+function PanelButtons() {
+    // Read the settings through the hook, so the buttons redraw when a switch changes.
+    panelSettings.use(["hideServerList", "chatOnly", "chatOnlyHides", "hideChannelHeader"]);
+    const membersShown = useStateFromStores([ChannelSectionStore as any], () => ChannelSectionStore.getState().isMembersOpen);
+    const channelType = useStateFromStores([SelectedChannelStore, ChannelStore], () => ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.type);
+    const serversShown = !isHidden("serverList");
+    return (
+        <>
+            <HeaderBarIcon className="vc-toolbox-btn" onClick={startSearch} tooltip="Search" icon={SearchIcon} selected={false} />
+            <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
+            {channelType != null && !NO_MEMBER_LIST.has(channelType) && (
+                <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide Member List" : "Show Member List"} icon={MembersIcon} selected={membersShown} />
+            )}
+        </>
     );
 }
 
@@ -107,6 +163,11 @@ export default definePlugin({
     TrailingWrapper({ children }: PropsWithChildren) {
         return (
             <>
+                {isPluginEnabled("PanelSwitches") && (
+                    <ErrorBoundary key="agentdisc-panel-buttons" noop>
+                        <PanelButtons />
+                    </ErrorBoundary>
+                )}
                 {children}
                 <ErrorBoundary key="vc-toolbox" noop>
                     <VencordPopoutButton />

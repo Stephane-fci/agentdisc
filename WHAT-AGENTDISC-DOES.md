@@ -2,6 +2,10 @@
 
 AgentDisc makes Discord in the browser calmer and easier when you work with AI agents. It starts with Stephane's own setup; everything below can be switched on or off.
 
+## Buttons in the top bar
+
+Three buttons sit in the top bar, just before the inbox. Search opens Discord's search; when the channel header is hidden, it comes back while you search and goes away after (Ctrl+F does the same). The server list button shows or hides the servers. The member list button is Discord's own member list switch, lit while the list is open; it shows in server channels, threads and group chats.
+
 ## The AgentDisc button
 
 A small purple robot at the top of Discord opens one simple menu with three groups: Theme, Panels and Channel signs. While a message is being read, it also offers "Stop reading". Every choice is saved and stays after a restart.
@@ -25,6 +29,8 @@ A channel's threads sit together on a soft purple card right under it. Where Dis
 ## Panels you can hide
 
 From the Panels group of the menu, each part of Discord can be hidden on its own: the server list, the channel list, the top bar, the channel header, notice banners, the server name bar, the Events and Server Boosts lines, the account bar at the bottom (with the call buttons), the add server and Discover buttons, the gift, GIF, sticker, emoji and apps buttons of the message box, and the member list. A hidden channel list slides back while the mouse sits at the left edge of the window; a hidden top bar slides back at the top edge.
+
+The server list and member list also have their own buttons in the top bar (see above).
 
 Ctrl+Alt+F switches "chat only" on and off: it hides the server list, channel list and member list at once (or everything except the chat, a choice in the settings, on the PanelSwitches cog).
 

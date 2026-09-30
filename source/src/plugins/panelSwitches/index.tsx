@@ -9,7 +9,7 @@ import { redrawChannelList } from "@plugins/channelGroups";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
-import { FluxDispatcher, Menu, useStateFromStores } from "@webpack/common";
+import { ComponentDispatch, FluxDispatcher, Menu, useStateFromStores } from "@webpack/common";
 
 // AgentDisc panel switches: hide Discord's panels one by one, from tick boxes in
 // the AgentDisc button menu, and "chat only" on Ctrl+Alt+F. A hidden channel list
@@ -21,7 +21,7 @@ import { FluxDispatcher, Menu, useStateFromStores } from "@webpack/common";
 
 const logger = new Logger("PanelSwitches");
 
-const ChannelSectionStore = findStoreLazy("ChannelSectionStore") as {
+export const ChannelSectionStore = findStoreLazy("ChannelSectionStore") as {
     getState(): { isMembersOpen: boolean; };
 };
 
@@ -42,7 +42,7 @@ const MESSAGE_BUTTONS = new Set(["gift", "gif", "sticker", "emoji", "expression"
 type Part = keyof typeof PARTS;
 const classes: Partial<Record<Part, Record<string, string>>> = {};
 
-const settings = definePluginSettings({
+export const settings = definePluginSettings({
     chatOnly: {
         type: OptionType.BOOLEAN,
         description: "Chat only: hide the panels below at once (Ctrl+Alt+F)",
@@ -131,7 +131,7 @@ const settings = definePluginSettings({
 
 type Panel = "serverList" | "channelList" | "topBar" | "channelHeader" | "notices";
 
-function isHidden(panel: Panel) {
+export function isHidden(panel: Panel) {
     const s = settings.store;
     const own = {
         serverList: s.hideServerList,
@@ -198,7 +198,7 @@ function buildCss() {
     }
 
     if (C && isHidden("channelHeader")) {
-        rules.push(`${sel(C.chat)} ${sel(C.title)}{display:none!important}`);
+        rules.push(`html:not(.agentdisc-searching) ${sel(C.chat)} ${sel(C.title)}{display:none!important}`);
     }
 
     if (isHidden("notices")) {
@@ -281,14 +281,53 @@ function lookUp(part: Part, attempt = 1) {
     }
 }
 
+// Search lives in the channel header. When the header is hidden, it comes back while a
+// search is going on (the search box has the focus or search results are open) and goes
+// away again a moment after (Stephane, 30 Sept: a search button in the top bar).
+let searchTimer: ReturnType<typeof setInterval> | null = null;
+
+function setSearching(on: boolean) {
+    document.documentElement.classList.toggle("agentdisc-searching", on);
+    if (searchTimer) clearInterval(searchTimer);
+    searchTimer = null;
+    if (!on) return;
+    let quiet = 0;
+    searchTimer = setInterval(() => {
+        const title = classes.chat?.title?.split(" ").map(c => "." + c).join("");
+        const inHeader = title && document.activeElement?.closest(title);
+        const results = document.querySelector('[class*="searchResultsWrap_"]');
+        if (inHeader || results) quiet = 0;
+        else if (++quiet >= 3) setSearching(false);
+    }, 500);
+}
+
+export function startSearch() {
+    if (isHidden("channelHeader")) setSearching(true);
+    requestAnimationFrame(() => ComponentDispatch?.dispatch("FOCUS_SEARCH", { prefillCurrentChannel: true }));
+}
+
+// The server list button: shows the list when it is hidden (also when chat only hid
+// it), hides it when it is shown.
+export function toggleServerList() {
+    const s = settings.store;
+    if (isHidden("serverList")) {
+        s.hideServerList = false;
+        if (s.chatOnly) s.chatOnly = false;
+    } else {
+        s.hideServerList = true;
+    }
+}
+
 function onKeyDown(e: KeyboardEvent) {
+    // Discord's own search shortcut also brings a hidden channel header back.
+    if (e.code === "KeyF" && (e.ctrlKey || e.metaKey) && !e.altKey && isHidden("channelHeader")) setSearching(true);
     if (e.code !== "KeyF" || !e.ctrlKey || !e.altKey || e.shiftKey || e.metaKey || e.repeat) return;
     e.preventDefault();
     e.stopPropagation();
     settings.store.chatOnly = !settings.store.chatOnly;
 }
 
-function toggleMembers() {
+export function toggleMembers() {
     FluxDispatcher.dispatch({ type: "CHANNEL_TOGGLE_MEMBERS_SECTION" });
 }
 
@@ -356,6 +395,7 @@ export default definePlugin({
 
     stop() {
         document.removeEventListener("keydown", onKeyDown, true);
+        setSearching(false);
         style?.remove();
         style = null;
     }

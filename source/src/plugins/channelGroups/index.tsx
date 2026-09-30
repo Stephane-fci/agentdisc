@@ -6,12 +6,13 @@
 
 import "./style.css";
 
+import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings, Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, mapMangledCssClasses, waitFor } from "@webpack";
-import { ChannelStore, ReadStateStore, SelectedChannelStore, useEffect, useReducer, useStateFromStores } from "@webpack/common";
+import { ActiveJoinedThreadsStore, ChannelStore, ReadStateStore, SelectedChannelStore, useEffect, useReducer, useStateFromStores } from "@webpack/common";
 
 import { buildGroupCss, GROUP_SPACE, GroupClasses, THREAD_TRIM } from "./css";
 
@@ -58,6 +59,24 @@ function notify() {
 
 function isFolded(channelId: string) {
     return settings.store.folded?.[channelId] === true;
+}
+
+const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((id, i) => id === b[i]);
+
+// The open threads of a channel that its fold hides right now (all but the thread being
+// read). The channel line shows who is typing in them, so a folded channel still says
+// which agents are at work (Stephane, 30 Sept).
+export function useHiddenThreads(channelId: string, guildId: string | null | undefined): string[] {
+    const { folded } = settings.use(["folded"]);
+    const selected = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
+    const threads = useStateFromStores(
+        [ActiveJoinedThreadsStore],
+        () => guildId ? Object.keys(ActiveJoinedThreadsStore.getActiveJoinedThreadsForParent(guildId, channelId) ?? {}).sort() : NONE,
+        [guildId, channelId],
+        sameIds
+    );
+    if (!folded?.[channelId] || !isPluginEnabled("ChannelGroups")) return NONE;
+    return threads.filter(id => id !== selected);
 }
 
 // Only the thread being read stays under a folded channel, like Discord's folded categories.

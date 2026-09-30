@@ -20,7 +20,7 @@ Links are read as "a link to" plus the site, and code blocks are skipped. Playin
 
 ## Typing signs
 
-Three moving dots, with the small photos of who is typing, appear beside every channel and every thread where someone is writing, so you see at a glance which agent is working. When a channel's threads are busy, the channel itself shows a small thread sign with the number of busy threads; hover it to see their names. The red mention badge sits before the dots, so the dots always line up on the right.
+Three moving dots, with the small photos of who is typing, appear beside every channel and every thread where someone is writing, so you see at a glance which agent is working. When a channel's threads are busy, the channel itself shows a small thread sign with the number of busy threads; hover it to see their names. When a channel's threads are folded away, the photos and dots of whoever is typing in them move onto the channel line, just right of the thread sign. The red mention badge sits before the dots, so the dots always line up on the right.
 
 ## Threads grouped under their channel
 

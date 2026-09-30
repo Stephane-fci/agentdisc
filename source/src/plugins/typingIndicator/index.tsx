@@ -21,6 +21,7 @@ import "./style.css";
 import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { useHiddenThreads } from "@plugins/channelGroups";
 import TypingTweaksPlugin, { buildSeveralUsers } from "@plugins/typingTweaks";
 import { Devs } from "@utils/constants";
 import { getIntlMessage } from "@utils/discord";
@@ -41,10 +42,17 @@ function getDisplayName(guildId: string, userId: string) {
 }
 
 function TypingIndicator({ channelId, guildId }: { channelId: string; guildId: string; }) {
+    // A folded channel also shows who is typing in its hidden threads; the thread sign
+    // sits just left of it.
+    const hidden = useHiddenThreads(channelId, guildId);
     const typingUsers: Record<string, number> = useStateFromStores(
         [TypingStore],
-        () => ({ ...TypingStore.getTypingUsers(channelId) }),
-        null,
+        () => {
+            const all = { ...TypingStore.getTypingUsers(channelId) };
+            for (const id of hidden) Object.assign(all, TypingStore.getTypingUsers(id));
+            return all;
+        },
+        [channelId, hidden.join()],
         (old, current) => {
             const oldKeys = Object.keys(old);
             const currentKeys = Object.keys(current);

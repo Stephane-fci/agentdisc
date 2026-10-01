@@ -276,15 +276,16 @@ function apply() {
     if (list) stripes((list as any).props?.guildChannels);
 }
 
-// Which channels get the lighter shade: every other channel line, counted in the list's
-// own order and starting again under each category, skipping category lines.
+// Which card colour each channel gets: the two alternate line by line, counted in the
+// list's own order and starting again under each category, skipping category lines.
 let stripeStyle: HTMLStyleElement | null = null;
 let stripeKey = "";
 const CATEGORY = 4;
 
 function stripes(guildChannels: any) {
     if (!stripeStyle || !guildChannels) return;
-    const shaded: string[] = [];
+    const a: string[] = [];
+    const b: string[] = [];
     let sections: number[];
     try {
         sections = guildChannels.getSections(true) ?? [];
@@ -305,13 +306,13 @@ function stripes(guildChannels: any) {
                 continue;
             }
             if (!record || record.type === CATEGORY) continue;
-            if (n++ % 2 === 0) shaded.push(record.id);
+            (n++ % 2 === 0 ? a : b).push(record.id);
         }
     }
-    const key = shaded.join() + "|" + (classes.group?.container ?? "");
+    const key = a.join() + "|" + b.join() + "|" + (classes.group?.container ?? "");
     if (key === stripeKey) return;
     stripeKey = key;
-    stripeStyle.textContent = buildStripeCss(shaded, classes.group?.container);
+    stripeStyle.textContent = buildStripeCss(a, b, classes.group?.container);
 }
 
 function lookUp(part: keyof typeof LOOKUPS, attempt = 1) {

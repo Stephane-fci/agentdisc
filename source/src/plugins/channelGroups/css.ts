@@ -22,16 +22,42 @@ export interface GroupClasses {
 const sel = (cls: string) => cls.split(" ").map(c => "." + c).join("");
 
 export const SELECTED = "#5865f2";
-export const STRIPE = "rgb(255 255 255 / 4.5%)";
+// Two soft purples, both lighter than the background, close to the old thread card.
+export const CARD_A = "color-mix(in oklab,#5865f2 22%,transparent)";
+export const CARD_B = "color-mix(in oklab,#5865f2 12%,transparent)";
+const CARD_RADIUS = 8;
+const CARD_GAP = 2; // space kept free above and below a card, inside its own line
 
-// Channel lines alternate like the rows of a sheet, and a channel's threads take its
-// shade (Stephane, 1 Oct). The shaded channels come from the list's own order, so the
-// pattern stays the same while scrolling and whether threads are open or folded.
-export function buildStripeCss(shadedIds: string[], container?: string) {
-    if (!shadedIds.length) return "";
-    const rows = shadedIds.map(id => `li[data-dnd-name]:has([data-list-item-id="channels___${id}"])`);
-    const all = container ? rows.flatMap(r => [r, `${r}+${sel(container)}`]) : rows;
-    return `${all.join(",")}{background:${STRIPE}}`;
+// Every channel sits on a rounded card, the cards alternating between two soft purples
+// like the rows of a sheet, with a little space between them; a channel's threads sit
+// on the same card (Stephane, 1 Oct). The colours come from the list's own order, so
+// they stay the same while scrolling and whether threads are open or folded. The cards
+// are drawn inside each line's own box, so no line changes height.
+export function buildStripeCss(aIds: string[], bIds: string[], container?: string) {
+    if (!aIds.length && !bIds.length) return "";
+    const row = (id: string) => `li[data-dnd-name]:has([data-list-item-id="channels___${id}"])`;
+    const g = container ? sel(container) : null;
+    const rules: string[] = [];
+    for (const [ids, colour] of [[aIds, CARD_A], [bIds, CARD_B]] as const) {
+        if (!ids.length) continue;
+        const rows = ids.map(row);
+        rules.push(
+            `${rows.join(",")}{position:relative;isolation:isolate}`,
+            `${rows.map(r => r + ":before").join(",")}{content:"";position:absolute;inset:${CARD_GAP}px 0 ${CARD_GAP}px var(--space-xs,8px);border-radius:${CARD_RADIUS}px;background:${colour};z-index:-1;pointer-events:none}`
+        );
+        if (g) {
+            const lists = rows.map(r => `${r}+${g}>ul`);
+            rules.push(
+                `${lists.join(",")}{position:relative;isolation:isolate}`,
+                `${lists.map(l => l + ":before").join(",")}{content:"";position:absolute;inset:0 0 0 var(--space-xs,8px);border-radius:0 0 ${CARD_RADIUS}px ${CARD_RADIUS}px;background:${colour};z-index:-1;pointer-events:none}`
+            );
+        }
+    }
+    if (g) {
+        // A channel with threads showing: its card runs on into the threads' part.
+        rules.push(`li[data-dnd-name]:has(+${g}):before{top:${GAP_ABOVE}px!important;bottom:0!important;border-radius:${CARD_RADIUS}px ${CARD_RADIUS}px 0 0!important}`);
+    }
+    return rules.join("\n");
 }
 
 export function buildGroupCss({ line, group }: GroupClasses) {

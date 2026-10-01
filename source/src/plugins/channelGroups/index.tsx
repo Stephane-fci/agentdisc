@@ -285,21 +285,28 @@ const CATEGORY = 4;
 function stripes(guildChannels: any) {
     if (!stripeStyle || !guildChannels) return;
     const shaded: string[] = [];
+    let sections: number[];
     try {
-        const sections: number[] = guildChannels.getSections(true) ?? [];
-        for (let s = 0; s < sections.length; s++) {
-            let n = 0;
-            for (let r = 0; r < sections[s]; r++) {
-                if (guildChannels.isPlaceholderRow?.(s, r)) continue;
-                const found = guildChannels.getChannelFromSectionRow?.(s, r);
-                const record = found?.channel?.record;
-                if (!record || record.type === CATEGORY) continue;
-                if (n++ % 2 === 0) shaded.push(record.id);
-            }
-        }
+        sections = guildChannels.getSections(true) ?? [];
     } catch (e) {
         logger.warn("Could not read the channel order", e);
         return;
+    }
+    // Discord refuses some questions about the top sections (Events, Boosts and the like:
+    // "Invalid section"), so each line is asked on its own and a refusal only skips it.
+    for (let s = 0; s < sections.length; s++) {
+        let n = 0;
+        for (let r = 0; r < sections[s]; r++) {
+            let record: any;
+            try {
+                if (guildChannels.isPlaceholderRow?.(s, r)) continue;
+                record = guildChannels.getChannelFromSectionRow?.(s, r)?.channel?.record;
+            } catch {
+                continue;
+            }
+            if (!record || record.type === CATEGORY) continue;
+            if (n++ % 2 === 0) shaded.push(record.id);
+        }
     }
     const key = shaded.join() + "|" + (classes.group?.container ?? "");
     if (key === stripeKey) return;

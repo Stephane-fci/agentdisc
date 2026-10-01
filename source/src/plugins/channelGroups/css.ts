@@ -28,19 +28,29 @@ export const SELECTED = "#5865f2";
 export const CARD = "color-mix(in oklab,#5865f2 12%,transparent)";
 const CARD_RADIUS = 8;
 
-// Priority lines (Stephane, 1 Oct): a channel or thread he marks stays red in the list
-// until he removes the mark: a red tint, a red bar on the left and white text. When it is
-// also the open one, it keeps the purple with the red bar.
-export const PRIORITY = "#f23f43";
+// Priority lines (Stephane, 1 Oct): a channel or thread he marks stands out until he
+// removes the mark, in the colour of what is happening in it: green while an agent is
+// working there, red when no agent works and something is unread (go there first),
+// yellow when no agent works and nothing is unread. A tint, a bar on the left and white
+// text; when it is also the open one, it keeps the purple with the coloured bar.
+export type PriorityState = "green" | "red" | "yellow";
+export const PRIORITY_COLOURS: Record<PriorityState, string> = { green: "#23a55a", red: "#f23f43", yellow: "#f0b232" };
 
-export function buildPriorityCss(ids: string[], line?: GroupClasses["line"]) {
-    if (!ids.length || !line) return "";
-    const rows = ids.map(id => `${sel(line.wrapper)}:has([data-list-item-id="channels___${id}"])`);
-    return [
-        `${rows.map(r => `${r} ${sel(line.link)}`).join(",")}{background:color-mix(in oklab,${PRIORITY} 24%,transparent)!important;box-shadow:inset 3px 0 0 ${PRIORITY}!important}`,
-        `${rows.map(r => `${r} ${sel(line.name)}`).join(",")}{color:#fff!important}`,
-        `${rows.map(r => `${r}${sel(line.modeSelected)} ${sel(line.link)}`).join(",")}{background:${SELECTED}!important;box-shadow:inset 4px 0 0 ${PRIORITY},0 2px 10px rgb(88 101 242 / 40%)!important}`
-    ].join("\n");
+export function buildPriorityCss(items: { id: string; state: PriorityState; }[], line?: GroupClasses["line"]) {
+    if (!items.length || !line) return "";
+    const rules: string[] = [];
+    const rowOf = (id: string) => `${sel(line.wrapper)}:has([data-list-item-id="channels___${id}"])`;
+    for (const state of Object.keys(PRIORITY_COLOURS) as PriorityState[]) {
+        const rows = items.filter(i => i.state === state).map(i => rowOf(i.id));
+        if (!rows.length) continue;
+        const colour = PRIORITY_COLOURS[state];
+        rules.push(
+            `${rows.map(r => `${r} ${sel(line.link)}`).join(",")}{background:color-mix(in oklab,${colour} 22%,transparent)!important;box-shadow:inset 3px 0 0 ${colour}!important}`,
+            `${rows.map(r => `${r}${sel(line.modeSelected)} ${sel(line.link)}`).join(",")}{background:${SELECTED}!important;box-shadow:inset 4px 0 0 ${colour},0 2px 10px rgb(88 101 242 / 40%)!important}`
+        );
+    }
+    rules.push(`${items.map(i => `${rowOf(i.id)} ${sel(line.name)}`).join(",")}{color:#fff!important}`);
+    return rules.join("\n");
 }
 
 export function buildGroupCss({ line, group }: GroupClasses) {

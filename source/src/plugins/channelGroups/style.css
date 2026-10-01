@@ -64,3 +64,37 @@
 .vc-threads-all-closed svg {
     transform: rotate(-90deg);
 }
+
+/* Beside it, while any line is marked: one click removes every priority mark. */
+.vc-threads-all-row {
+    display: flex;
+    gap: 6px;
+}
+
+.vc-priority-clear {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border: none;
+    border-radius: var(--radius-sm, 8px);
+    background: color-mix(in oklab, #f23f43 16%, transparent);
+    color: var(--channels-default);
+    font-family: var(--font-primary);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.vc-priority-clear:hover {
+    background: color-mix(in oklab, #f23f43 30%, transparent);
+    color: var(--interactive-text-active);
+}
+
+.vc-threads-all-row .vc-threads-all {
+    flex: 1 1 auto;
+    min-width: 0;
+}

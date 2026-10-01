@@ -13,9 +13,9 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, mapMangledCssClasses, waitFor } from "@webpack";
-import { ActiveJoinedThreadsStore, ChannelStore, Menu, ReadStateStore, SelectedChannelStore, useEffect, useReducer, useStateFromStores } from "@webpack/common";
+import { ActiveJoinedThreadsStore, ChannelStore, Menu, ReadStateStore, SelectedChannelStore, TypingStore, useEffect, useReducer, UserStore, useStateFromStores } from "@webpack/common";
 
-import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, THREAD_TRIM } from "./css";
+import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, PriorityState, THREAD_TRIM } from "./css";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
 // under it, and a small arrow where Discord's white unread mark was folds them away or
@@ -51,9 +51,64 @@ export function togglePriority(id: string) {
     if (priority[id]) delete priority[id];
     else priority[id] = true;
     settings.store.priority = priority;
-    apply();
+    priorityKey = "";
+    updatePriority();
     redrawList();
 }
+
+// One click puts every marked channel and thread back to normal (Stephane, 1 Oct).
+export function clearPriorities() {
+    settings.store.priority = {};
+    priorityKey = "";
+    updatePriority();
+    redrawList();
+}
+
+// What is happening in a marked line: an agent typing there (or, for a folded channel, in
+// one of its hidden threads, whose dots show on the channel line), else unread or not.
+function priorityState(id: string): PriorityState {
+    const me = UserStore.getCurrentUser()?.id;
+    const channel = ChannelStore.getChannel(id);
+    const lines = [id];
+    if (channel?.guild_id && isFolded(id)) {
+        const selected = SelectedChannelStore.getChannelId();
+        for (const t of Object.keys(ActiveJoinedThreadsStore.getActiveJoinedThreadsForParent(channel.guild_id, id) ?? {})) {
+            if (t !== selected) lines.push(t);
+        }
+    }
+    if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return "green";
+    return lines.some(l => ReadStateStore.hasUnread(l)) ? "red" : "yellow";
+}
+
+let priorityStyle: HTMLStyleElement | null = null;
+let priorityKey = "";
+let priorityQueued = false;
+
+function updatePriority() {
+    if (!priorityStyle) return;
+    let items: { id: string; state: PriorityState; }[] = [];
+    try {
+        items = Object.keys(settings.store.priority ?? {}).map(id => ({ id, state: priorityState(id) }));
+    } catch (e) {
+        logger.warn("Could not read the priority lines", e);
+    }
+    const key = items.map(i => i.id + i.state).join() + "|" + (classes.line ? "1" : "0");
+    if (key === priorityKey) return;
+    priorityKey = key;
+    priorityStyle.textContent = buildPriorityCss(items, classes.line);
+}
+
+// Typing and reading change often; the colours are worked out again at most once a frame.
+function queuePriority() {
+    if (priorityQueued || !Object.keys(settings.store.priority ?? {}).length) return;
+    priorityQueued = true;
+    requestAnimationFrame(() => {
+        priorityQueued = false;
+        updatePriority();
+    });
+}
+
+const PRIORITY_STORES = () => [TypingStore, ReadStateStore, SelectedChannelStore, ActiveJoinedThreadsStore] as any[];
 
 export function usePriority(id: string | null | undefined) {
     const { priority } = settings.use(["priority"]);
@@ -236,21 +291,30 @@ const CHEVRON = "M5.3 8.3a1 1 0 0 1 1.4 0L12 13.6l5.3-5.3a1 1 0 1 1 1.4 1.4l-6 6
 // list scrolls, and only shows in a server where some channel has threads.
 function ThreadsButton({ guildId }: { guildId: string; }) {
     useListedChanges();
-    const { folded } = settings.use(["folded"]);
+    const { folded, priority } = settings.use(["folded", "priority"]);
 
     const withThreads: string[] = [];
     for (const [id, threads] of listed) {
         if (threads.length > 0 && ChannelStore.getChannel(id)?.guild_id === guildId) withThreads.push(id);
     }
-    if (withThreads.length === 0) return null;
 
     const someFolded = withThreads.some(id => folded?.[id]);
+    const marks = Object.keys(priority ?? {}).length;
+    if (withThreads.length === 0 && marks === 0) return null;
     return (
         <div className="vc-threads-all-row">
-            <button type="button" className={"vc-threads-all" + (someFolded ? " vc-threads-all-closed" : "")} onClick={() => setAllFolded(withThreads, !someFolded)}>
-                <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CHEVRON} /></svg>
-                {someFolded ? "Show threads" : "Hide threads"}
-            </button>
+            {withThreads.length > 0 && (
+                <button type="button" className={"vc-threads-all" + (someFolded ? " vc-threads-all-closed" : "")} onClick={() => setAllFolded(withThreads, !someFolded)}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CHEVRON} /></svg>
+                    {someFolded ? "Show threads" : "Hide threads"}
+                </button>
+            )}
+            {marks > 0 && (
+                <button type="button" className="vc-priority-clear" title="Remove every priority mark" onClick={clearPriorities}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4m0 0h11.5l-2 4 2 4H5" fill="#f23f43" stroke="#f23f43" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+                    Clear {marks}
+                </button>
+            )}
         </div>
     );
 }
@@ -310,7 +374,9 @@ const classes: GroupClasses = {};
 let style: HTMLStyleElement | null = null;
 
 function apply() {
-    if (style) style.textContent = buildGroupCss(classes) + "\n" + buildPriorityCss(Object.keys(settings.store.priority ?? {}), classes.line);
+    if (style) style.textContent = buildGroupCss(classes);
+    priorityKey = "";
+    updatePriority();
 }
 
 function lookUp(part: keyof typeof LOOKUPS, attempt = 1) {
@@ -440,14 +506,21 @@ export default definePlugin({
     start() {
         style = document.createElement("style");
         style.id = "agentdisc-channel-groups";
-        (document.head ?? document.documentElement).append(style);
+        priorityStyle = document.createElement("style");
+        priorityStyle.id = "agentdisc-priority";
+        (document.head ?? document.documentElement).append(style, priorityStyle);
+        for (const store of PRIORITY_STORES()) store?.addChangeListener?.(queuePriority);
         for (const part of Object.keys(LOOKUPS) as (keyof typeof LOOKUPS)[]) lookUp(part);
         apply();
     },
 
     stop() {
+        for (const store of PRIORITY_STORES()) store?.removeChangeListener?.(queuePriority);
         style?.remove();
         style = null;
+        priorityStyle?.remove();
+        priorityStyle = null;
+        priorityKey = "";
         redrawList();
     }
 });

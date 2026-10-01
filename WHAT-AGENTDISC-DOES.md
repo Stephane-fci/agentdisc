@@ -4,7 +4,7 @@ AgentDisc makes Discord in the browser calmer and easier when you work with AI a
 
 ## Priority marks
 
-A flag button in the top bar marks the channel or thread you are in as a priority with one click; click it again to remove the mark. You can also right-click any channel or thread and choose "Mark as priority". A priority line stays red in the channel list (a red tint with a red bar on the left) until you remove the mark, and a priority thread stays visible even when its channel's threads are folded away.
+A flag button in the top bar marks the channel or thread you are in as a priority with one click; click it again to remove the mark. You can also right-click any channel or thread and choose "Mark as priority". A priority line stands out in the channel list until you remove the mark, in the colour of what is happening in it: green while an agent is working there, red when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A priority thread stays visible even when its channel's threads are folded away. A "Clear" button above the channel list removes every mark at once.
 
 ## Buttons in the top bar
 

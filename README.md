@@ -3,7 +3,7 @@
 AgentDisc is a Chrome extension that makes Discord in the browser calmer and easier when you work with AI agents. It was made by Stephane Franceschini on top of Vencord.
 
 - **Typing signs:** dots and small photos show which channel or thread an agent is working in, even inside threads.
-- **Grouped threads:** each channel's threads sit on a card under it, with one click to fold them.
+- **Clear channel list:** lines alternate like spreadsheet rows, each channel's threads share its shade, the open channel is solid purple, and one click folds a channel's threads.
 - **Panels you can hide:** the server list, the channel header, the account bar and more, each with its own switch.
 - **Read aloud:** a play button on every message reads it in a natural Google voice, and the words light up as they are read.
 - **Midnight theme and left-hand shortcuts:** a calm dark theme, and Alt with Z Q S D (or W A S D) to move between channels.

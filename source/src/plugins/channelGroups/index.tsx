@@ -14,11 +14,13 @@ import definePlugin, { OptionType } from "@utils/types";
 import { filters, mapMangledCssClasses, waitFor } from "@webpack";
 import { ActiveJoinedThreadsStore, ChannelStore, ReadStateStore, SelectedChannelStore, useEffect, useReducer, useStateFromStores } from "@webpack/common";
 
-import { buildGroupCss, GROUP_SPACE, GroupClasses, THREAD_TRIM } from "./css";
+import { buildGroupCss, buildStripeCss, GROUP_SPACE, GroupClasses, THREAD_TRIM } from "./css";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
-// on a soft card under it, and a small arrow where Discord's white unread mark was
-// folds them away or opens them again, remembered after reload.
+// under it, and a small arrow where Discord's white unread mark was folds them away or
+// opens them again, remembered after reload. Since 1 Oct the channel lines alternate
+// between two shades, each channel's threads sharing its shade, and the open channel
+// stands out in solid purple.
 //
 // Discord's channel list places every line from heights it computes itself (its
 // getRowHeight). Hiding thread lines or changing their size with styles alone would
@@ -261,7 +263,7 @@ const LOOKUPS = {
     group: ["container", "spine", "spineBorder", "invertedSpine"]
 } as const;
 const USED = {
-    line: ["wrapper", "typeThread", "link", "unread"],
+    line: ["wrapper", "typeThread", "link", "unread", "modeSelected", "name", "icon"],
     group: ["container", "spine", "spineBorder", "invertedSpine"]
 } as const;
 
@@ -270,6 +272,39 @@ let style: HTMLStyleElement | null = null;
 
 function apply() {
     if (style) style.textContent = buildGroupCss(classes);
+    stripeKey = "";
+    if (list) stripes((list as any).props?.guildChannels);
+}
+
+// Which channels get the lighter shade: every other channel line, counted in the list's
+// own order and starting again under each category, skipping category lines.
+let stripeStyle: HTMLStyleElement | null = null;
+let stripeKey = "";
+const CATEGORY = 4;
+
+function stripes(guildChannels: any) {
+    if (!stripeStyle || !guildChannels) return;
+    const shaded: string[] = [];
+    try {
+        const sections: number[] = guildChannels.getSections(true) ?? [];
+        for (let s = 0; s < sections.length; s++) {
+            let n = 0;
+            for (let r = 0; r < sections[s]; r++) {
+                if (guildChannels.isPlaceholderRow?.(s, r)) continue;
+                const found = guildChannels.getChannelFromSectionRow?.(s, r);
+                const record = found?.channel?.record;
+                if (!record || record.type === CATEGORY) continue;
+                if (n++ % 2 === 0) shaded.push(record.id);
+            }
+        }
+    } catch (e) {
+        logger.warn("Could not read the channel order", e);
+        return;
+    }
+    const key = shaded.join() + "|" + (classes.group?.container ?? "");
+    if (key === stripeKey) return;
+    stripeKey = key;
+    stripeStyle.textContent = buildStripeCss(shaded, classes.group?.container);
 }
 
 function lookUp(part: keyof typeof LOOKUPS, attempt = 1) {
@@ -300,7 +335,7 @@ function lookUp(part: keyof typeof LOOKUPS, attempt = 1) {
 
 export default definePlugin({
     name: "ChannelGroups",
-    description: "A channel's threads sit closer together on a soft card under it; the arrow at the left of the channel folds them away or opens them again.",
+    description: "Channel lines alternate between two shades and a channel's threads share its shade; the open channel stands out in purple; the arrow at the left of a channel folds its threads away or opens them again.",
     authors: [{ name: "Steph", id: 0n }],
     enabledByDefault: true,
     settings,
@@ -377,6 +412,7 @@ export default definePlugin({
 
     setList(instance: any) {
         list = instance;
+        stripes(instance?.props?.guildChannels);
     },
 
     ThreadsButton: (guildId: string) => (
@@ -394,7 +430,9 @@ export default definePlugin({
     start() {
         style = document.createElement("style");
         style.id = "agentdisc-channel-groups";
-        (document.head ?? document.documentElement).append(style);
+        stripeStyle = document.createElement("style");
+        stripeStyle.id = "agentdisc-channel-stripes";
+        (document.head ?? document.documentElement).append(style, stripeStyle);
         for (const part of Object.keys(LOOKUPS) as (keyof typeof LOOKUPS)[]) lookUp(part);
         apply();
     },
@@ -402,6 +440,9 @@ export default definePlugin({
     stop() {
         style?.remove();
         style = null;
+        stripeStyle?.remove();
+        stripeStyle = null;
+        stripeKey = "";
         redrawList();
     }
 });

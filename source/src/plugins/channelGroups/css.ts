@@ -22,45 +22,11 @@ export interface GroupClasses {
 const sel = (cls: string) => cls.split(" ").map(c => "." + c).join("");
 
 export const SELECTED = "#5865f2";
-// Two soft cards of the same strength in two tones, a grey one and the blue-purple of
-// the old thread card, both lighter than the background (Stephane, 1 Oct: "same color
-// power but a different tone", then "blue ish and grey ish").
-export const CARD_A = "rgb(255 255 255 / 6%)";
-export const CARD_B = "color-mix(in oklab,#5865f2 12%,transparent)";
+// The soft blue card: a channel whose threads are open sits on it together with its
+// threads (Stephane, 1 Oct: "If it has a thread and the dropdown is open, threads and the
+// main channel have the same blue color"). Other channels stay as Discord draws them.
+export const CARD = "color-mix(in oklab,#5865f2 12%,transparent)";
 const CARD_RADIUS = 8;
-const CARD_GAP = 2; // space kept free above and below a card, inside its own line
-
-// Every channel sits on a rounded card, the cards alternating between two soft purples
-// like the rows of a sheet, with a little space between them; a channel's threads sit
-// on the same card (Stephane, 1 Oct). The colours come from the list's own order, so
-// they stay the same while scrolling and whether threads are open or folded. The cards
-// are drawn inside each line's own box, so no line changes height.
-export function buildStripeCss(aIds: string[], bIds: string[], container?: string) {
-    if (!aIds.length && !bIds.length) return "";
-    const row = (id: string) => `li[data-dnd-name]:has([data-list-item-id="channels___${id}"])`;
-    const g = container ? sel(container) : null;
-    const rules: string[] = [];
-    for (const [ids, colour] of [[aIds, CARD_A], [bIds, CARD_B]] as const) {
-        if (!ids.length) continue;
-        const rows = ids.map(row);
-        rules.push(
-            `${rows.join(",")}{position:relative;isolation:isolate}`,
-            `${rows.map(r => r + ":before").join(",")}{content:"";position:absolute;inset:${CARD_GAP}px 0 ${CARD_GAP}px var(--space-xs,8px);border-radius:${CARD_RADIUS}px;background:${colour};z-index:-1;pointer-events:none}`
-        );
-        if (g) {
-            const lists = rows.map(r => `${r}+${g}>ul`);
-            rules.push(
-                `${lists.join(",")}{position:relative;isolation:isolate}`,
-                `${lists.map(l => l + ":before").join(",")}{content:"";position:absolute;inset:0 0 0 var(--space-xs,8px);border-radius:0 0 ${CARD_RADIUS}px ${CARD_RADIUS}px;background:${colour};z-index:-1;pointer-events:none}`
-            );
-        }
-    }
-    if (g) {
-        // A channel with threads showing: its card runs on into the threads' part.
-        rules.push(`li[data-dnd-name]:has(+${g}):before{top:${GAP_ABOVE}px!important;bottom:0!important;border-radius:${CARD_RADIUS}px ${CARD_RADIUS}px 0 0!important}`);
-    }
-    return rules.join("\n");
-}
 
 export function buildGroupCss({ line, group }: GroupClasses) {
     const rules: string[] = [];
@@ -82,6 +48,12 @@ export function buildGroupCss({ line, group }: GroupClasses) {
     if (group) {
         const g = sel(group.container);
         rules.push(
+            // The card: rounded, starting where the channel lines start, drawn inside the
+            // lines' own boxes so no line changes height.
+            `li[data-dnd-name]:has(+${g}){position:relative;isolation:isolate}`,
+            `li[data-dnd-name]:has(+${g}):before{content:"";position:absolute;inset:${GAP_ABOVE}px 0 0 var(--space-xs,8px);border-radius:${CARD_RADIUS}px ${CARD_RADIUS}px 0 0;background:${CARD};z-index:-1;pointer-events:none}`,
+            `${g}>ul{position:relative;isolation:isolate}`,
+            `${g}>ul:before{content:"";position:absolute;inset:0 0 0 var(--space-xs,8px);border-radius:0 0 ${CARD_RADIUS}px ${CARD_RADIUS}px;background:${CARD};z-index:-1;pointer-events:none}`,
             `${g}:after{content:"";display:block;height:${GAP_BELOW}px}`,
             // The thread lines' little curves move up with the shorter lines.
             `${g} ${sel(group.spine)}{margin-top:-${THREAD_TRIM / 2}px}`,

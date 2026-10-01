@@ -14,13 +14,12 @@ import definePlugin, { OptionType } from "@utils/types";
 import { filters, mapMangledCssClasses, waitFor } from "@webpack";
 import { ActiveJoinedThreadsStore, ChannelStore, ReadStateStore, SelectedChannelStore, useEffect, useReducer, useStateFromStores } from "@webpack/common";
 
-import { buildGroupCss, buildStripeCss, GROUP_SPACE, GroupClasses, THREAD_TRIM } from "./css";
+import { buildGroupCss, GROUP_SPACE, GroupClasses, THREAD_TRIM } from "./css";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
 // under it, and a small arrow where Discord's white unread mark was folds them away or
-// opens them again, remembered after reload. Since 1 Oct the channel lines alternate
-// between two shades, each channel's threads sharing its shade, and the open channel
-// stands out in solid purple.
+// opens them again, remembered after reload. A channel with open threads sits on one
+// soft blue card with them, and the open channel stands out in solid purple (1 Oct).
 //
 // Discord's channel list places every line from heights it computes itself (its
 // getRowHeight). Hiding thread lines or changing their size with styles alone would
@@ -272,47 +271,6 @@ let style: HTMLStyleElement | null = null;
 
 function apply() {
     if (style) style.textContent = buildGroupCss(classes);
-    stripeKey = "";
-    if (list) stripes((list as any).props?.guildChannels);
-}
-
-// Which card colour each channel gets: the two alternate line by line, counted in the
-// list's own order and starting again under each category, skipping category lines.
-let stripeStyle: HTMLStyleElement | null = null;
-let stripeKey = "";
-const CATEGORY = 4;
-
-function stripes(guildChannels: any) {
-    if (!stripeStyle || !guildChannels) return;
-    const a: string[] = [];
-    const b: string[] = [];
-    let sections: number[];
-    try {
-        sections = guildChannels.getSections(true) ?? [];
-    } catch (e) {
-        logger.warn("Could not read the channel order", e);
-        return;
-    }
-    // Discord refuses some questions about the top sections (Events, Boosts and the like:
-    // "Invalid section"), so each line is asked on its own and a refusal only skips it.
-    for (let s = 0; s < sections.length; s++) {
-        let n = 0;
-        for (let r = 0; r < sections[s]; r++) {
-            let record: any;
-            try {
-                if (guildChannels.isPlaceholderRow?.(s, r)) continue;
-                record = guildChannels.getChannelFromSectionRow?.(s, r)?.channel?.record;
-            } catch {
-                continue;
-            }
-            if (!record || record.type === CATEGORY) continue;
-            (n++ % 2 === 0 ? a : b).push(record.id);
-        }
-    }
-    const key = a.join() + "|" + b.join() + "|" + (classes.group?.container ?? "");
-    if (key === stripeKey) return;
-    stripeKey = key;
-    stripeStyle.textContent = buildStripeCss(a, b, classes.group?.container);
 }
 
 function lookUp(part: keyof typeof LOOKUPS, attempt = 1) {
@@ -343,7 +301,7 @@ function lookUp(part: keyof typeof LOOKUPS, attempt = 1) {
 
 export default definePlugin({
     name: "ChannelGroups",
-    description: "Channel lines alternate between two shades and a channel's threads share its shade; the open channel stands out in purple; the arrow at the left of a channel folds its threads away or opens them again.",
+    description: "A channel with open threads sits on one soft blue card with them; the open channel stands out in purple; the arrow at the left of a channel folds its threads away or opens them again.",
     authors: [{ name: "Steph", id: 0n }],
     enabledByDefault: true,
     settings,
@@ -420,7 +378,6 @@ export default definePlugin({
 
     setList(instance: any) {
         list = instance;
-        stripes(instance?.props?.guildChannels);
     },
 
     ThreadsButton: (guildId: string) => (
@@ -438,9 +395,7 @@ export default definePlugin({
     start() {
         style = document.createElement("style");
         style.id = "agentdisc-channel-groups";
-        stripeStyle = document.createElement("style");
-        stripeStyle.id = "agentdisc-channel-stripes";
-        (document.head ?? document.documentElement).append(style, stripeStyle);
+        (document.head ?? document.documentElement).append(style);
         for (const part of Object.keys(LOOKUPS) as (keyof typeof LOOKUPS)[]) lookUp(part);
         apply();
     },
@@ -448,9 +403,6 @@ export default definePlugin({
     stop() {
         style?.remove();
         style = null;
-        stripeStyle?.remove();
-        stripeStyle = null;
-        stripeKey = "";
         redrawList();
     }
 });

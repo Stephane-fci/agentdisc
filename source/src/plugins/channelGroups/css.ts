@@ -22,10 +22,10 @@ export interface GroupClasses {
 const sel = (cls: string) => cls.split(" ").map(c => "." + c).join("");
 
 export const SELECTED = "#5865f2";
-// Two soft cards of the same strength in two tones, a reddish one and the blue-purple of
+// Two soft cards of the same strength in two tones, a grey one and the blue-purple of
 // the old thread card, both lighter than the background (Stephane, 1 Oct: "same color
-// power but a different tone").
-export const CARD_A = "color-mix(in oklab,#e5484d 12%,transparent)";
+// power but a different tone", then "blue ish and grey ish").
+export const CARD_A = "rgb(255 255 255 / 6%)";
 export const CARD_B = "color-mix(in oklab,#5865f2 12%,transparent)";
 const CARD_RADIUS = 8;
 const CARD_GAP = 2; // space kept free above and below a card, inside its own line

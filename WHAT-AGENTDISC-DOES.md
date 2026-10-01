@@ -24,7 +24,7 @@ Three moving dots, with the small photos of who is typing, appear beside every c
 
 ## Threads grouped under their channel
 
-Every channel sits on a rounded card, and the cards alternate between a soft red and a soft blue, equally gentle, with a little space between them, so two neighbours never look the same. A channel's threads sit on its card, so you see at once which threads belong to which channel. The channel or thread you are in is solid purple with white text, easy to spot at a glance. Where Discord shows the white unread dot, a channel with threads gets a small arrow instead: click it to fold or unfold its threads (the arrow turns white when a folded thread has something new). A button above the channel list shows or hides every channel's threads at once.
+Every channel sits on a rounded card, and the cards alternate between a soft grey and a soft blue, equally gentle, with a little space between them, so two neighbours never look the same. A channel's threads sit on its card, so you see at once which threads belong to which channel. The channel or thread you are in is solid purple with white text, easy to spot at a glance. Where Discord shows the white unread dot, a channel with threads gets a small arrow instead: click it to fold or unfold its threads (the arrow turns white when a folded thread has something new). A button above the channel list shows or hides every channel's threads at once.
 
 ## Panels you can hide
 

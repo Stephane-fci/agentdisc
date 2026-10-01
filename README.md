@@ -4,6 +4,7 @@ AgentDisc is a Chrome extension that makes Discord in the browser calmer and eas
 
 - **Typing signs:** dots and small photos show which channel or thread an agent is working in, even inside threads.
 - **Clear channel list:** a channel with open threads sits on one soft blue card with them; the open channel is solid purple, and one click folds a channel's threads.
+- **Priority marks:** one click on the flag keeps a channel or thread red in the list until you remove the mark.
 - **Panels you can hide:** the server list, the channel header, the account bar and more, each with its own switch.
 - **Read aloud:** a play button on every message reads it in a natural Google voice, and the words light up as they are read.
 - **Midnight theme and left-hand shortcuts:** a calm dark theme, and Alt with Z Q S D (or W A S D) to move between channels.

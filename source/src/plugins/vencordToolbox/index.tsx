@@ -23,6 +23,7 @@ import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
+import { togglePriority, usePriority } from "@plugins/channelGroups";
 import { ChannelSectionStore, isHidden, settings as panelSettings, startSearch, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
 import { findComponentByCodeLazy } from "@webpack";
 import { ChannelStore, Popout, SelectedChannelStore, useRef, useState, useStateFromStores } from "@webpack/common";
@@ -68,6 +69,20 @@ function TopIcon({ children }: PropsWithChildren) {
     );
 }
 
+// The priority flag: red while the channel or thread being read is marked.
+const FlagIcon = ({ on }: { on: boolean; }) => (
+    <TopIcon>
+        <path d="M5 21V4m0 0h11.5l-2 4 2 4H5" fill={on ? "#f23f43" : "none"} stroke={on ? "#f23f43" : "currentColor"} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    </TopIcon>
+);
+
+function PriorityButton({ channelId }: { channelId: string; }) {
+    const on = usePriority(channelId);
+    return (
+        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => togglePriority(channelId)} tooltip={on ? "Remove priority" : "Mark as priority"} icon={() => <FlagIcon on={on} />} selected={on} />
+    );
+}
+
 const SearchIcon = () => (
     <TopIcon>
         <circle cx="10.5" cy="10.5" r="6.3" fill="none" stroke="currentColor" strokeWidth="2.2" />
@@ -102,9 +117,12 @@ function PanelButtons() {
     panelSettings.use(["hideServerList", "chatOnly", "chatOnlyHides", "hideChannelHeader"]);
     const membersShown = useStateFromStores([ChannelSectionStore as any], () => ChannelSectionStore.getState().isMembersOpen);
     const channelType = useStateFromStores([SelectedChannelStore, ChannelStore], () => ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.type);
+    const channelId = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
+    const inServer = useStateFromStores([SelectedChannelStore, ChannelStore], () => !!ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.guild_id);
     const serversShown = !isHidden("serverList");
     return (
         <>
+            {inServer && channelId && isPluginEnabled("ChannelGroups") && <PriorityButton channelId={channelId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={startSearch} tooltip="Search" icon={SearchIcon} selected={false} />
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
             {channelType != null && !NO_MEMBER_LIST.has(channelType) && (

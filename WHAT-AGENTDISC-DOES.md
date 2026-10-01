@@ -2,6 +2,10 @@
 
 AgentDisc makes Discord in the browser calmer and easier when you work with AI agents. It starts with Stephane's own setup; everything below can be switched on or off.
 
+## Priority marks
+
+A flag button in the top bar marks the channel or thread you are in as a priority with one click; click it again to remove the mark. You can also right-click any channel or thread and choose "Mark as priority". A priority line stays red in the channel list (a red tint with a red bar on the left) until you remove the mark, and a priority thread stays visible even when its channel's threads are folded away.
+
 ## Buttons in the top bar
 
 Three buttons sit in the top bar, just before the inbox. Search opens Discord's search; when the channel header is hidden, it comes back while you search and goes away after (Ctrl+F does the same). The server list button shows or hides the servers. The member list button is Discord's own member list switch, lit while the list is open; it shows in server channels, threads and group chats.

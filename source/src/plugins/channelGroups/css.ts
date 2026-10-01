@@ -28,6 +28,21 @@ export const SELECTED = "#5865f2";
 export const CARD = "color-mix(in oklab,#5865f2 12%,transparent)";
 const CARD_RADIUS = 8;
 
+// Priority lines (Stephane, 1 Oct): a channel or thread he marks stays red in the list
+// until he removes the mark: a red tint, a red bar on the left and white text. When it is
+// also the open one, it keeps the purple with the red bar.
+export const PRIORITY = "#f23f43";
+
+export function buildPriorityCss(ids: string[], line?: GroupClasses["line"]) {
+    if (!ids.length || !line) return "";
+    const rows = ids.map(id => `${sel(line.wrapper)}:has([data-list-item-id="channels___${id}"])`);
+    return [
+        `${rows.map(r => `${r} ${sel(line.link)}`).join(",")}{background:color-mix(in oklab,${PRIORITY} 24%,transparent)!important;box-shadow:inset 3px 0 0 ${PRIORITY}!important}`,
+        `${rows.map(r => `${r} ${sel(line.name)}`).join(",")}{color:#fff!important}`,
+        `${rows.map(r => `${r}${sel(line.modeSelected)} ${sel(line.link)}`).join(",")}{background:${SELECTED}!important;box-shadow:inset 4px 0 0 ${PRIORITY},0 2px 10px rgb(88 101 242 / 40%)!important}`
+    ].join("\n");
+}
+
 export function buildGroupCss({ line, group }: GroupClasses) {
     const rules: string[] = [];
 

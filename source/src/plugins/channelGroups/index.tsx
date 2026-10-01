@@ -7,14 +7,15 @@
 import "./style.css";
 
 import { isPluginEnabled } from "@api/PluginManager";
+import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings, Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, mapMangledCssClasses, waitFor } from "@webpack";
-import { ActiveJoinedThreadsStore, ChannelStore, ReadStateStore, SelectedChannelStore, useEffect, useReducer, useStateFromStores } from "@webpack/common";
+import { ActiveJoinedThreadsStore, ChannelStore, Menu, ReadStateStore, SelectedChannelStore, useEffect, useReducer, useStateFromStores } from "@webpack/common";
 
-import { buildGroupCss, GROUP_SPACE, GroupClasses, THREAD_TRIM } from "./css";
+import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, THREAD_TRIM } from "./css";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
 // under it, and a small arrow where Discord's white unread mark was folds them away or
@@ -33,8 +34,44 @@ const settings = definePluginSettings({
     folded: {
         type: OptionType.CUSTOM,
         default: {} as Record<string, true>
+    },
+    // Channels and threads marked as priority, until he removes the mark.
+    priority: {
+        type: OptionType.CUSTOM,
+        default: {} as Record<string, true>
     }
 });
+
+function isPriority(id: string | null | undefined) {
+    return !!id && settings.store.priority?.[id] === true;
+}
+
+export function togglePriority(id: string) {
+    const priority = { ...settings.store.priority };
+    if (priority[id]) delete priority[id];
+    else priority[id] = true;
+    settings.store.priority = priority;
+    apply();
+    redrawList();
+}
+
+export function usePriority(id: string | null | undefined) {
+    const { priority } = settings.use(["priority"]);
+    return !!id && priority?.[id] === true;
+}
+
+const priorityMenu: NavContextMenuPatchCallback = (children, { channel }: { channel?: { id: string; }; }) => {
+    if (!channel) return;
+    children.push(
+        <Menu.MenuGroup>
+            <Menu.MenuItem
+                id="agentdisc-priority"
+                label={isPriority(channel.id) ? "Remove priority" : "Mark as priority"}
+                action={() => togglePriority(channel.id)}
+            />
+        </Menu.MenuGroup>
+    );
+};
 
 interface ChannelRow {
     id: string;
@@ -80,8 +117,9 @@ export function useHiddenThreads(channelId: string, guildId: string | null | und
     return threads.filter(id => id !== selected);
 }
 
-// Only the thread being read stays under a folded channel, like Discord's folded categories.
-const selectedOnly = new Map<string, string[]>();
+// Under a folded channel only the thread being read and priority threads stay, like
+// Discord's folded categories.
+const keptOnly = new Map<string, string[]>();
 function shownThreads(row: ChannelRow): string[] {
     try {
         const ids = row.threadIds ?? NONE;
@@ -93,10 +131,12 @@ function shownThreads(row: ChannelRow): string[] {
         if (ids.length === 0 || !isFolded(row.id)) return ids;
 
         const selected = SelectedChannelStore.getChannelId();
-        if (!ids.includes(selected)) return NONE;
-        let one = selectedOnly.get(selected);
-        if (!one) selectedOnly.set(selected, one = [selected]);
-        return one;
+        const kept = ids.filter(id => id === selected || isPriority(id));
+        if (!kept.length) return NONE;
+        const key = kept.join();
+        let same = keptOnly.get(key);
+        if (!same) keptOnly.set(key, same = kept);
+        return same;
     } catch (e) {
         logger.error("Could not work out the threads of a channel", e);
         return row.threadIds;
@@ -270,7 +310,7 @@ const classes: GroupClasses = {};
 let style: HTMLStyleElement | null = null;
 
 function apply() {
-    if (style) style.textContent = buildGroupCss(classes);
+    if (style) style.textContent = buildGroupCss(classes) + "\n" + buildPriorityCss(Object.keys(settings.store.priority ?? {}), classes.line);
 }
 
 function lookUp(part: keyof typeof LOOKUPS, attempt = 1) {
@@ -305,6 +345,11 @@ export default definePlugin({
     authors: [{ name: "Steph", id: 0n }],
     enabledByDefault: true,
     settings,
+
+    contextMenus: {
+        "channel-context": priorityMenu,
+        "thread-context": priorityMenu
+    },
 
     patches: [
         {

@@ -29,6 +29,7 @@ import { findComponentByCodeLazy } from "@webpack";
 import { ChannelStore, Popout, SelectedChannelStore, useRef, useState, useStateFromStores } from "@webpack/common";
 import type { PropsWithChildren } from "react";
 
+import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
 import { LinksPanel } from "./links";
 import { renderPopout } from "./menu";
 
@@ -141,6 +142,25 @@ function LinksButton({ channelId, guildId }: { channelId: string; guildId: strin
     );
 }
 
+const FindIcon = () => (
+    <TopIcon>
+        <path d="M8.5 3 6.6 15M14.5 3l-1.2 7.4M3 7.5h15M2.4 12.5h7.4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="16" cy="16" r="3.6" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path d="M18.7 18.7 21.5 21.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </TopIcon>
+);
+
+// Find a channel or thread by name (also Ctrl+M).
+function FindButton() {
+    const { open, toggle, box } = useFind();
+    return (
+        <>
+            <HeaderBarIcon className="vc-toolbox-btn" onClick={toggle} tooltip="Find a channel (Ctrl+M)" icon={FindIcon} selected={open} />
+            {box}
+        </>
+    );
+}
+
 const SearchIcon = () => (
     <TopIcon>
         <circle cx="10.5" cy="10.5" r="6.3" fill="none" stroke="currentColor" strokeWidth="2.2" />
@@ -182,6 +202,7 @@ function PanelButtons() {
     return (
         <>
             {inServer && channelId && isPluginEnabled("ChannelGroups") && <PriorityButton channelId={channelId} />}
+            <FindButton />
             <HeaderBarIcon className="vc-toolbox-btn" onClick={startSearch} tooltip="Search" icon={SearchIcon} selected={false} />
             {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
@@ -237,6 +258,14 @@ export default definePlugin({
             }
         }
     ],
+
+    start() {
+        startFindShortcut();
+    },
+
+    stop() {
+        stopFindShortcut();
+    },
 
     TrailingWrapper({ children }: PropsWithChildren) {
         return (

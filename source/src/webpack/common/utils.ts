@@ -181,7 +181,8 @@ export const { zustandPersist } = mapMangledModuleLazy(".onRehydrateStorage)?", 
 
 export const MessageActions = findByPropsLazy("editMessage", "sendMessage");
 export const MessageCache = findByPropsLazy("clearCache", "_channelMessages");
-export const UserProfileActions = findByPropsLazy("openUserProfileModal", "closeUserProfileModal");
+// Discord dropped closeUserProfileModal from this module (2 Oct 2026); only the opener is used.
+export const UserProfileActions = findByPropsLazy("openUserProfileModal");
 export const InviteActions = findByPropsLazy("resolveInvite");
 export const ChannelActionCreators = findByPropsLazy("openPrivateChannel");
 

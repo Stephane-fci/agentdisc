@@ -26,10 +26,11 @@ import definePlugin, { OptionType } from "@utils/types";
 import { togglePriority, usePriority } from "@plugins/channelGroups";
 import { ChannelSectionStore, isHidden, settings as panelSettings, startSearch, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
 import { findComponentByCodeLazy } from "@webpack";
-import { ChannelStore, Popout, SelectedChannelStore, useRef, useState, useStateFromStores } from "@webpack/common";
+import { ChannelStore, Popout, SelectedChannelStore, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
 import type { PropsWithChildren } from "react";
 
 import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
+import { isFeedbackOn, onFeedbackChange, setFeedback } from "./feedback";
 import { LinksPanel } from "./links";
 import { renderPopout } from "./menu";
 
@@ -161,6 +162,22 @@ function FindButton() {
     );
 }
 
+// Feedback mode: a speech bubble with a quote mark, orange while the mode is on.
+const FeedbackIcon = ({ on }: { on: boolean; }) => (
+    <TopIcon>
+        <path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-4.5 3.5V17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" fill={on ? "#f08c28" : "none"} stroke={on ? "#f08c28" : "currentColor"} strokeWidth="2" strokeLinejoin="round" />
+        <path d="M8.5 9.5v2.5M11.5 9.5v2.5M14.5 12h3" stroke={on ? "#fff" : "currentColor"} strokeWidth="2" strokeLinecap="round" />
+    </TopIcon>
+);
+
+function FeedbackButton() {
+    const [on, setOn] = useState(isFeedbackOn());
+    useEffect(() => onFeedbackChange(setOn), []);
+    return (
+        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click a sentence to quote it (Shift: whole paragraph). Click or Esc to stop" : "Feedback mode: quote sentences into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
+    );
+}
+
 const SearchIcon = () => (
     <TopIcon>
         <circle cx="10.5" cy="10.5" r="6.3" fill="none" stroke="currentColor" strokeWidth="2.2" />
@@ -202,6 +219,7 @@ function PanelButtons() {
     return (
         <>
             {inServer && channelId && isPluginEnabled("ChannelGroups") && <PriorityButton channelId={channelId} />}
+            <FeedbackButton />
             <FindButton />
             <HeaderBarIcon className="vc-toolbox-btn" onClick={startSearch} tooltip="Search" icon={SearchIcon} selected={false} />
             {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
@@ -265,6 +283,7 @@ export default definePlugin({
 
     stop() {
         stopFindShortcut();
+        setFeedback(false);
     },
 
     TrailingWrapper({ children }: PropsWithChildren) {

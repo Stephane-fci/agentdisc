@@ -2,6 +2,10 @@
 
 AgentDisc makes Discord in the browser calmer and easier when you work with AI agents. It starts with Stephane's own setup; everything below can be switched on or off.
 
+## Feedback mode
+
+A speech-bubble button in the top bar turns feedback mode on (it turns orange). Move the mouse over any message and the sentence under it lights up orange; hold Shift for the whole paragraph or list item. A click puts it in your message box as "the sentence" >> , ready for your answer; each new click adds the next one on its own line. Text you select yourself goes in as it is. Click the button again or press Esc to stop.
+
 ## Find a channel
 
 A button in the top bar, or Ctrl+M, opens a search box. As soon as you type, the matching channels and threads of all your servers show, best first, with their server. A click or Enter takes you there; the arrows move through the list and Esc closes it. Emoji, dashes and capitals do not matter: "lifely po" finds "🦕-lifely-po-allocation".

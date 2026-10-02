@@ -279,3 +279,13 @@
     font-size: 13px;
     color: var(--text-muted, #949ba4);
 }
+
+/* Feedback mode: the sentence under the mouse lights up orange, a click quotes it. */
+::highlight(agentdisc-feedback) {
+    background-color: rgb(240 140 40 / 45%);
+    color: #fff;
+}
+
+.agentdisc-feedback-on [id^="message-content-"] {
+    cursor: copy;
+}

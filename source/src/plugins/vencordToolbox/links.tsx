@@ -22,6 +22,24 @@ const URL_RE = /https?:\/\/[^\s<>()[\]"'`|]+/g;
 const PAGE = 25;
 // Links to Discord itself (a channel or a message), which the options can hide.
 const DISCORD_LINK = /^https?:\/\/(?:[\w-]+\.)?discord(?:app)?\.com\/channels\//i;
+// Links to Slack (a workspace's messages and channels), which the options can hide.
+const SLACK_LINK = /^(?:https?:\/\/(?:[\w-]+\.)*slack\.com\/|slack:\/\/)/i;
+
+// With "different tracking codes" on, links count as the same page when they differ only
+// after the "?" or "#" (utm and the like); a Figma file counts once whatever its frame or
+// name in the address (Stephane, 2 Oct).
+function groupKey(url: string, variants: boolean) {
+    if (!variants) return url.replace(/\/+$/, "");
+    try {
+        const u = new URL(url);
+        let path = u.pathname.replace(/\/+$/, "");
+        const figma = /^\/(design|file|board|proto|slides)\/([^/]+)/.exec(path);
+        if (/(^|\.)figma\.com$/i.test(u.hostname) && figma) path = `/${figma[1]}/${figma[2]}`;
+        return (u.hostname.replace(/^www\./, "") + path).toLowerCase();
+    } catch {
+        return url.replace(/[?#].*$/, "").replace(/\/+$/, "");
+    }
+}
 const MAX_THREADS = 150;
 const ActiveThreadsStore = findStoreLazy("ActiveThreadsStore") as { getThreadsForParent?(guildId: string, parentId: string): Record<string, unknown>; };
 
@@ -145,7 +163,7 @@ async function search(channelIds: string[], guildId: string | null, offset: numb
     return { waiting: false as const, total: Number(res?.body?.total_results ?? 0), messages: groups.map(g => g.find(m => m.hit) ?? g[0]).filter(Boolean) };
 }
 
-export interface LinkOptions { hideDiscord: boolean; group: boolean; }
+export interface LinkOptions { hideDiscord: boolean; hideSlack: boolean; group: boolean; groupVariants: boolean; }
 
 export function LinksPanel({ channelId, guildId, onClose, options, setOption }: { channelId: string; guildId: string | null; onClose(): void; options: LinkOptions; setOption(key: keyof LinkOptions, value: boolean): void; }) {
     const [showOptions, setShowOptions] = useState(false);
@@ -188,6 +206,7 @@ export function LinksPanel({ channelId, guildId, onClose, options, setOption }: 
     const words = filter.trim().toLowerCase();
     const kept = found
         .filter(f => !options.hideDiscord || !DISCORD_LINK.test(f.url))
+        .filter(f => !options.hideSlack || !SLACK_LINK.test(f.url))
         .filter(f => !words || f.url.toLowerCase().includes(words) || f.author.toLowerCase().includes(words));
 
     // Grouped: one line per link, how many times and when last; no jump, since it was posted more than once.
@@ -195,7 +214,7 @@ export function LinksPanel({ channelId, guildId, onClose, options, setOption }: 
     if (options.group) {
         const byUrl = new Map<string, { url: string; count: number; when: string; }>();
         for (const f of kept) {
-            const key = f.url.replace(/\/+$/, "");
+            const key = groupKey(f.url, options.groupVariants);
             const g = byUrl.get(key);
             if (g) g.count++;
             else byUrl.set(key, { url: f.url, count: 1, when: f.when });
@@ -241,7 +260,9 @@ export function LinksPanel({ channelId, guildId, onClose, options, setOption }: 
             {showOptions && (
                 <div className="agentdisc-links-options">
                     <label><input type="checkbox" checked={options.hideDiscord} onChange={() => setOption("hideDiscord", !options.hideDiscord)} /> Hide links to Discord channels and messages</label>
+                    <label><input type="checkbox" checked={options.hideSlack} onChange={() => setOption("hideSlack", !options.hideSlack)} /> Hide Slack links</label>
                     <label><input type="checkbox" checked={options.group} onChange={() => setOption("group", !options.group)} /> Group the same link posted several times</label>
+                    <label className={options.group ? "" : "agentdisc-links-option-off"}><input type="checkbox" disabled={!options.group} checked={options.groupVariants} onChange={() => setOption("groupVariants", !options.groupVariants)} /> Also group links that only differ by tracking codes</label>
                 </div>
             )}
             <input className="agentdisc-links-filter" placeholder="Filter: figma, dashboard…" value={filter} onChange={e => setFilter(e.currentTarget.value)} autoFocus />

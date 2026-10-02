@@ -51,6 +51,18 @@ export const settings = definePluginSettings({
         default: true,
         description: "Links panel: group the same link posted several times",
         hidden: true
+    },
+    linksHideSlack: {
+        type: OptionType.BOOLEAN,
+        default: true,
+        description: "Links panel: hide Slack links",
+        hidden: true
+    },
+    linksGroupVariants: {
+        type: OptionType.BOOLEAN,
+        default: true,
+        description: "Links panel: also group links that only differ by tracking codes",
+        hidden: true
     }
 });
 
@@ -106,11 +118,11 @@ const LinksIcon = () => (
 function LinksButton({ channelId, guildId }: { channelId: string; guildId: string | null; }) {
     const buttonRef = useRef(null);
     const [show, setShow] = useState(false);
-    const s = settings.use(["linksHideDiscord", "linksGroup"]);
-    const options = { hideDiscord: s.linksHideDiscord, group: s.linksGroup };
-    const setOption = (key: "hideDiscord" | "group", value: boolean) => {
-        if (key === "hideDiscord") settings.store.linksHideDiscord = value;
-        else settings.store.linksGroup = value;
+    const s = settings.use(["linksHideDiscord", "linksHideSlack", "linksGroup", "linksGroupVariants"]);
+    const options = { hideDiscord: s.linksHideDiscord, hideSlack: s.linksHideSlack, group: s.linksGroup, groupVariants: s.linksGroupVariants };
+    const setOption = (key: keyof typeof options, value: boolean) => {
+        const name = { hideDiscord: "linksHideDiscord", hideSlack: "linksHideSlack", group: "linksGroup", groupVariants: "linksGroupVariants" }[key] as "linksHideDiscord";
+        settings.store[name] = value;
     };
     return (
         <Popout

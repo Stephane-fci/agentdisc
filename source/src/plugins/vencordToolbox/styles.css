@@ -193,3 +193,7 @@
 .agentdisc-links-meta .agentdisc-links-when + .agentdisc-links-jump {
     margin-left: auto;
 }
+
+.agentdisc-links-option-off {
+    opacity: 0.5;
+}

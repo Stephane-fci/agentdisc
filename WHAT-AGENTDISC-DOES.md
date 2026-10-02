@@ -4,7 +4,7 @@ AgentDisc makes Discord in the browser calmer and easier when you work with AI a
 
 ## Links in a channel
 
-A link button in the top bar opens a panel with every link posted in the channel you are in and in all its threads (or only in the thread, when you are in a thread), newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard. A link from a thread carries a small tag with the thread's name. A gear at the top of the panel offers two tick boxes, both on at first: hide links to Discord channels and messages, and group the same link posted several times into one line (grouped lines have no Jump button, since they point to several messages). Untick grouping to see every post of a link with its own Jump button.
+A link button in the top bar opens a panel with every link posted in the channel you are in and in all its threads (or only in the thread, when you are in a thread), newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard. A link from a thread carries a small tag with the thread's name. A gear at the top of the panel offers four tick boxes, all on at first: hide links to Discord channels and messages, hide Slack links, group the same link posted several times into one line (grouped lines have no Jump button, since they point to several messages), and also group links that only differ by tracking codes (a Figma file counts once, whatever frame it points to). Untick grouping to see every post of a link with its own Jump button.
 
 ## Priority marks
 

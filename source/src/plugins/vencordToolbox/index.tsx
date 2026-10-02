@@ -30,7 +30,7 @@ import { ChannelStore, Popout, SelectedChannelStore, useEffect, useRef, useState
 import type { PropsWithChildren } from "react";
 
 import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
-import { isFeedbackOn, onFeedbackChange, setFeedback } from "./feedback";
+import { isFeedbackOn, onFeedbackChange, setFeedback, startFeedbackShortcut, stopFeedbackShortcut } from "./feedback";
 import { LinksPanel } from "./links";
 import { renderPopout } from "./menu";
 
@@ -174,7 +174,7 @@ function FeedbackButton() {
     const [on, setOn] = useState(isFeedbackOn());
     useEffect(() => onFeedbackChange(setOn), []);
     return (
-        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click a sentence to quote it (Shift: whole paragraph). Click or Esc to stop" : "Feedback mode: quote sentences into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
+        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click a sentence to quote it (Shift: whole paragraph). Ctrl+L or Esc to stop" : "Feedback mode (Ctrl+L): quote sentences into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
     );
 }
 
@@ -279,10 +279,12 @@ export default definePlugin({
 
     start() {
         startFindShortcut();
+        startFeedbackShortcut();
     },
 
     stop() {
         stopFindShortcut();
+        stopFeedbackShortcut();
         setFeedback(false);
     },
 

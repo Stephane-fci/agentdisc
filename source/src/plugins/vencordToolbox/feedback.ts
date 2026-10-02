@@ -12,8 +12,8 @@ import { ComponentDispatch } from "@webpack/common";
 //   "the sentence" >>
 // ready for his answer, each new one on its own line, the way he already answers long
 // messages by hand. A bullet point is taken whole; elsewhere holding Shift takes the whole
-// paragraph; text he selects himself is taken as it is. Esc or the top-bar button turns
-// the mode off.
+// paragraph; text he selects himself is taken as it is. Ctrl+L (the L key, whatever the
+// keyboard) turns the mode on and off, like the top-bar button; Esc turns it off.
 
 const HIGHLIGHT = "agentdisc-feedback";
 const CONTENT = '[id^="message-content-"]';
@@ -159,6 +159,23 @@ function onClick(e: MouseEvent) {
 
 function onKey(e: KeyboardEvent) {
     if (e.key === "Escape" && on) setFeedback(false);
+}
+
+// Ctrl+L (Stephane, 2 Oct). Chrome lets the page take it before its own address bar.
+function onShortcut(e: KeyboardEvent) {
+    if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey || e.repeat) return;
+    if (e.key.toLowerCase() !== "l") return;
+    e.preventDefault();
+    e.stopPropagation();
+    setFeedback(!on);
+}
+
+export function startFeedbackShortcut() {
+    document.addEventListener("keydown", onShortcut, true);
+}
+
+export function stopFeedbackShortcut() {
+    document.removeEventListener("keydown", onShortcut, true);
 }
 
 export function setFeedback(next: boolean) {

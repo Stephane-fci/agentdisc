@@ -11,8 +11,9 @@ import { ComponentDispatch } from "@webpack/common";
 // message lights up orange; a click puts it in the message box as
 //   "the sentence" >>
 // ready for his answer, each new one on its own line, the way he already answers long
-// messages by hand. Holding Shift takes the whole paragraph or list item instead; text he
-// selects himself is taken as it is. Esc or the top-bar button turns the mode off.
+// messages by hand. A bullet point is taken whole; elsewhere holding Shift takes the whole
+// paragraph; text he selects himself is taken as it is. Esc or the top-bar button turns
+// the mode off.
 
 const HIGHLIGHT = "agentdisc-feedback";
 const CONTENT = '[id^="message-content-"]';
@@ -83,8 +84,12 @@ function pieceAt(x: number, y: number, whole: boolean): Range | null {
     const parent = caret.node.parentElement;
     const content = parent?.closest<HTMLElement>(CONTENT);
     if (!content || parent?.closest("pre")) return null;
-    const scope = parent!.closest<HTMLElement>(BLOCK) ?? content;
-    if (!content.contains(scope)) return null;
+    // The block must sit inside the message text: each Discord message is itself a list
+    // item, which must not count as a bullet point.
+    const block = parent!.closest<HTMLElement>(BLOCK);
+    const scope = block && content.contains(block) ? block : content;
+    // A bullet point or a heading is taken whole (Stephane, 2 Oct).
+    if (scope !== content && scope.matches("li, h1, h2, h3")) whole = true;
 
     const { text, pieces } = textOf(scope);
     const own = pieces.find(p => p.node === caret.node);

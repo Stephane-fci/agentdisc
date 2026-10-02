@@ -42,13 +42,13 @@ export const settings = definePluginSettings({
     },
     linksHideDiscord: {
         type: OptionType.BOOLEAN,
-        default: false,
+        default: true,
         description: "Links panel: hide links to Discord channels and messages",
         hidden: true
     },
     linksGroup: {
         type: OptionType.BOOLEAN,
-        default: false,
+        default: true,
         description: "Links panel: group the same link posted several times",
         hidden: true
     }

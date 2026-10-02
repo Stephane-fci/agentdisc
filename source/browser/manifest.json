@@ -20,7 +20,7 @@
         "https://raw.githubusercontent.com/*"
     ],
 
-    "permissions": ["declarativeNetRequest", "scripting"],
+    "permissions": ["declarativeNetRequest", "scripting", "alarms", "storage"],
 
     "content_scripts": [
         {

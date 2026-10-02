@@ -45,3 +45,39 @@ function duckPage(on) {
     else media().forEach((m, i) => { if (saved.volumes[i] != null) m.volume = saved.volumes[i]; });
   }
 }
+
+// AgentDisc: when a new copy of the app lands in its folder, the app reloads itself and
+// refreshes the open Discord tabs, so an update takes effect within half a minute with
+// no clicks (Stephane, 2 Oct). Every build carries a new dist/stamp.txt; the stamp of
+// the copy that is running is kept, and a different one on disk means a new copy.
+const UPDATE_ALARM = "agentdisc-update";
+
+async function diskStamp() {
+  try {
+    const res = await fetch(chrome.runtime.getURL("dist/stamp.txt"), { cache: "no-store" });
+    return res.ok ? (await res.text()).trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function startWatching() {
+  const stamp = await diskStamp();
+  if (stamp) await chrome.storage.local.set({ agentdiscRunning: stamp });
+  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 0.5 });
+}
+
+chrome.runtime.onInstalled.addListener(async () => {
+  await startWatching();
+  // A new or reloaded copy only reaches Discord once its tabs load again.
+  const tabs = await chrome.tabs.query({ url: ["*://*.discord.com/*"] });
+  for (const tab of tabs) chrome.tabs.reload(tab.id).catch(() => {});
+});
+
+chrome.runtime.onStartup.addListener(() => { startWatching(); });
+
+chrome.alarms.onAlarm.addListener(async alarm => {
+  if (alarm.name !== UPDATE_ALARM) return;
+  const [stamp, saved] = await Promise.all([diskStamp(), chrome.storage.local.get("agentdiscRunning")]);
+  if (stamp && saved.agentdiscRunning && stamp !== saved.agentdiscRunning) chrome.runtime.reload();
+});

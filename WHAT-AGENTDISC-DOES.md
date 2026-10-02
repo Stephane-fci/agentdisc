@@ -4,7 +4,11 @@ AgentDisc makes Discord in the browser calmer and easier when you work with AI a
 
 ## Links in a channel
 
-A link button in the top bar opens a panel with every link posted in the channel or thread you are in, newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard.
+A link button in the top bar opens a panel with every link posted in the channel you are in and in all its threads (or only in the thread, when you are in a thread), newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard. A link from a thread says which thread it came from.
+
+## Updates
+
+When a new version is copied into the AgentDisc folder, the app notices within half a minute, reloads itself and refreshes Discord. No clicks needed.
 
 ## Priority marks
 

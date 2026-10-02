@@ -5,22 +5,60 @@
  */
 
 import { Logger } from "@utils/Logger";
-import { NavigationRouter, RestAPI, useEffect, useState } from "@webpack/common";
+import { findStoreLazy } from "@webpack";
+import { ActiveJoinedThreadsStore, ChannelStore, NavigationRouter, RestAPI, useEffect, useState } from "@webpack/common";
 
 // The links panel (Stephane, 2 Oct): every link posted in the channel or thread being
 // read, newest first, with its date and a button that jumps to the message, so a Figma
 // or dashboard link is found in a second. The links come from Discord's own search
-// ("has: link"), 25 messages at a time, so even old ones are found.
+// ("has: link"), 25 messages at a time, so even old ones are found. Opened on a channel,
+// it also covers every thread of that channel, open or archived; opened on a thread, only
+// that thread (Stephane, 2 Oct).
 
 const logger = new Logger("AgentDiscLinks");
 const URL_RE = /https?:\/\/[^\s<>()[\]"'`|]+/g;
 const PAGE = 25;
+const MAX_THREADS = 150;
+const ActiveThreadsStore = findStoreLazy("ActiveThreadsStore") as { getThreadsForParent?(guildId: string, parentId: string): Record<string, unknown>; };
 
 interface Found {
     url: string;
     messageId: string;
+    channelId: string;
     when: string;
     author: string;
+}
+
+// The channel itself plus all its threads, with their names: the open ones Discord already
+// knows, and the archived ones from Discord's list of past threads.
+async function placesOf(channelId: string, guildId: string | null) {
+    const names = new Map<string, string>();
+    const channel = ChannelStore.getChannel(channelId);
+    if (!guildId || channel?.isThread?.()) return { ids: [channelId], names };
+    const ids = new Set([channelId]);
+    try {
+        for (const id of Object.keys(ActiveThreadsStore.getThreadsForParent?.(guildId, channelId) ?? {})) ids.add(id);
+    } catch { }
+    try {
+        for (const id of Object.keys(ActiveJoinedThreadsStore.getActiveJoinedThreadsForParent(guildId, channelId) ?? {})) ids.add(id);
+    } catch { }
+    try {
+        let before: string | undefined;
+        for (let round = 0; round < 3 && ids.size < MAX_THREADS; round++) {
+            const res: any = await RestAPI.get({ url: `/channels/${channelId}/threads/archived/public`, query: before ? { limit: 100, before } : { limit: 100 } } as any);
+            const threads: any[] = res?.body?.threads ?? [];
+            for (const t of threads) {
+                ids.add(t.id);
+                if (t.name) names.set(t.id, t.name);
+            }
+            if (!res?.body?.has_more || !threads.length) break;
+            before = threads[threads.length - 1]?.thread_metadata?.archive_timestamp;
+            if (!before) break;
+        }
+    } catch (e) {
+        logger.warn("Could not list the archived threads", e);
+    }
+    return { ids: [...ids].slice(0, MAX_THREADS), names };
 }
 
 function trimUrl(url: string) {
@@ -49,10 +87,10 @@ function day(iso: string) {
         + ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
-async function search(channelId: string, guildId: string | null, offset: number) {
+async function search(channelIds: string[], guildId: string | null, offset: number) {
     const res: any = await RestAPI.get({
-        url: guildId ? `/guilds/${guildId}/messages/search` : `/channels/${channelId}/messages/search`,
-        query: guildId ? { channel_id: channelId, has: "link", offset, include_nsfw: true } : { has: "link", offset },
+        url: guildId ? `/guilds/${guildId}/messages/search` : `/channels/${channelIds[0]}/messages/search`,
+        query: guildId ? { channel_id: channelIds, has: "link", offset, include_nsfw: true } : { has: "link", offset },
         retries: 2
     } as any);
     if (res?.status === 202) return { waiting: true as const, retryAfter: Number(res.body?.retry_after ?? 2) };
@@ -66,11 +104,23 @@ export function LinksPanel({ channelId, guildId, onClose }: { channelId: string;
     const [total, setTotal] = useState<number | null>(null);
     const [state, setState] = useState<"loading" | "ready" | "waiting" | "failed">("loading");
     const [filter, setFilter] = useState("");
+    const [places, setPlaces] = useState<{ ids: string[]; names: Map<string, string>; } | null>(null);
 
     async function load(offset: number, tries = 0) {
         setState("loading");
         try {
-            const r = await search(channelId, guildId, offset);
+            let where = places ?? await placesOf(channelId, guildId);
+            let r;
+            try {
+                r = await search(where.ids, guildId, offset);
+            } catch (e) {
+                // If the search refuses the list of threads, the channel alone still works.
+                if (where.ids.length === 1) throw e;
+                logger.warn("Search over the threads refused; channel only", e);
+                where = { ids: [channelId], names: where.names };
+                r = await search(where.ids, guildId, offset);
+            }
+            if (places !== where) setPlaces(where);
             if (r.waiting) {
                 // Discord is still building its search for this channel: try again shortly.
                 setState("waiting");
@@ -84,7 +134,7 @@ export function LinksPanel({ channelId, guildId, onClose }: { channelId: string;
                 for (const m of r.messages) {
                     for (const url of linksOf(m)) {
                         if (list.some(f => f.url === url)) continue;
-                        list.push({ url, messageId: m.id, when: m.timestamp, author: m.author?.global_name ?? m.author?.username ?? "" });
+                        list.push({ url, messageId: m.id, channelId: m.channel_id ?? channelId, when: m.timestamp, author: m.author?.global_name ?? m.author?.username ?? "" });
                     }
                 }
                 return list;
@@ -101,15 +151,23 @@ export function LinksPanel({ channelId, guildId, onClose }: { channelId: string;
     const words = filter.trim().toLowerCase();
     const shown = words ? found.filter(f => f.url.toLowerCase().includes(words) || f.author.toLowerCase().includes(words)) : found;
 
-    function jump(messageId: string) {
-        NavigationRouter.transitionTo(`/channels/${guildId ?? "@me"}/${channelId}/${messageId}`);
+    function jump(f: Found) {
+        NavigationRouter.transitionTo(`/channels/${guildId ?? "@me"}/${f.channelId}/${f.messageId}`);
         onClose();
     }
+
+    // Where a link was posted, when it was in one of the channel's threads.
+    function threadName(f: Found) {
+        if (f.channelId === channelId) return "";
+        return places?.names.get(f.channelId) ?? ChannelStore.getChannel(f.channelId)?.name ?? "a thread";
+    }
+
+    const inThread = !!ChannelStore.getChannel(channelId)?.isThread?.();
 
     return (
         <div className="agentdisc-links" role="dialog" aria-label="Links in this channel">
             <div className="agentdisc-links-head">
-                <span>Links in this channel</span>
+                <span>{inThread ? "Links in this thread" : "Links in this channel and its threads"}</span>
                 {total != null && <span className="agentdisc-links-count">{found.length}</span>}
             </div>
             <input className="agentdisc-links-filter" placeholder="Filter: figma, dashboard…" value={filter} onChange={e => setFilter(e.currentTarget.value)} autoFocus />
@@ -123,13 +181,13 @@ export function LinksPanel({ channelId, guildId, onClose }: { channelId: string;
                                 {rest && <span className="agentdisc-links-path">{rest}</span>}
                             </a>
                             <div className="agentdisc-links-meta">
-                                <span>{day(f.when)}{f.author ? " · " + f.author : ""}</span>
-                                <button type="button" className="agentdisc-links-jump" onClick={() => jump(f.messageId)}>Jump</button>
+                                <span>{day(f.when)}{f.author ? " · " + f.author : ""}{threadName(f) ? " · in " + threadName(f) : ""}</span>
+                                <button type="button" className="agentdisc-links-jump" onClick={() => jump(f)}>Jump</button>
                             </div>
                         </div>
                     );
                 })}
-                {state === "ready" && shown.length === 0 && <div className="agentdisc-links-note">{found.length ? "No link matches." : "No links in this channel yet."}</div>}
+                {state === "ready" && shown.length === 0 && <div className="agentdisc-links-note">{found.length ? "No link matches." : inThread ? "No links in this thread yet." : "No links in this channel or its threads yet."}</div>}
                 {state === "loading" && <div className="agentdisc-links-note">Looking for links…</div>}
                 {state === "waiting" && <div className="agentdisc-links-note">Discord is still indexing this channel, trying again…</div>}
                 {state === "failed" && <div className="agentdisc-links-note">The search did not answer. <button type="button" className="agentdisc-links-jump" onClick={() => void load(0)}>Try again</button></div>}

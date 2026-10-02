@@ -150,6 +150,9 @@ async function buildExtension(target, files) {
         "dist/Vencord.css": await readFile("dist/extension.css"),
         // AgentDisc: the Chrome build leaves out the 5.7 MB style editor (his style box is empty).
         ...(target === "chromium-unpacked" ? {} : await loadDir("dist/vendor/monaco", "dist/")),
+        // AgentDisc: a mark that changes with every build, so the running app sees a new copy
+        // in its folder and reloads itself (browser/service-worker.js).
+        ...(target === "chromium-unpacked" ? { "dist/stamp.txt": Buffer.from(String(Date.now())) } : {}),
         ...Object.fromEntries(await Promise.all(files.map(async f => {
             let content = await readFile(join("browser", f));
             if (f.startsWith("manifest")) {

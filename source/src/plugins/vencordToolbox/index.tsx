@@ -39,6 +39,18 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         default: true,
         description: "Show the plugins menu in the toolbox",
+    },
+    linksHideDiscord: {
+        type: OptionType.BOOLEAN,
+        default: false,
+        description: "Links panel: hide links to Discord channels and messages",
+        hidden: true
+    },
+    linksGroup: {
+        type: OptionType.BOOLEAN,
+        default: false,
+        description: "Links panel: group the same link posted several times",
+        hidden: true
     }
 });
 
@@ -94,6 +106,12 @@ const LinksIcon = () => (
 function LinksButton({ channelId, guildId }: { channelId: string; guildId: string | null; }) {
     const buttonRef = useRef(null);
     const [show, setShow] = useState(false);
+    const s = settings.use(["linksHideDiscord", "linksGroup"]);
+    const options = { hideDiscord: s.linksHideDiscord, group: s.linksGroup };
+    const setOption = (key: "hideDiscord" | "group", value: boolean) => {
+        if (key === "hideDiscord") settings.store.linksHideDiscord = value;
+        else settings.store.linksGroup = value;
+    };
     return (
         <Popout
             position="bottom"
@@ -102,7 +120,7 @@ function LinksButton({ channelId, guildId }: { channelId: string; guildId: strin
             shouldShow={show}
             onRequestClose={() => setShow(false)}
             targetElementRef={buttonRef}
-            renderPopout={() => <LinksPanel key={channelId} channelId={channelId} guildId={guildId} onClose={() => setShow(false)} />}
+            renderPopout={() => <LinksPanel key={channelId} channelId={channelId} guildId={guildId} onClose={() => setShow(false)} options={options} setOption={setOption} />}
         >
             {(_, { isShown }) => (
                 <HeaderBarIcon ref={buttonRef} className="vc-toolbox-btn" onClick={() => setShow(v => !v)} tooltip={isShown ? null : "Links in this channel"} icon={LinksIcon} selected={isShown} />

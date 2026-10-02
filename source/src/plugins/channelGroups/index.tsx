@@ -231,6 +231,11 @@ function redrawList() {
     }
 }
 
+// The threads the channel list shows under a channel (the links panel reads them too).
+export function listedThreads(channelId: string): string[] {
+    return listed.get(channelId) ?? NONE;
+}
+
 export function redrawChannelList() {
     redrawList();
 }

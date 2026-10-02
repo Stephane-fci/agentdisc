@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { listedThreads } from "@plugins/channelGroups";
 import { Logger } from "@utils/Logger";
 import { findStoreLazy } from "@webpack";
 import { ActiveJoinedThreadsStore, ChannelStore, NavigationRouter, RestAPI, useEffect, useState } from "@webpack/common";
@@ -12,12 +13,15 @@ import { ActiveJoinedThreadsStore, ChannelStore, NavigationRouter, RestAPI, useE
 // read, newest first, with its date and a button that jumps to the message, so a Figma
 // or dashboard link is found in a second. The links come from Discord's own search
 // ("has: link"), 25 messages at a time, so even old ones are found. Opened on a channel,
-// it also covers every thread of that channel, open or archived; opened on a thread, only
-// that thread (Stephane, 2 Oct).
+// it also covers every thread of that channel, open or archived, read straight from each
+// thread's messages (Discord's search did not return thread messages); opened on a
+// thread, only that thread (Stephane, 2 Oct).
 
 const logger = new Logger("AgentDiscLinks");
 const URL_RE = /https?:\/\/[^\s<>()[\]"'`|]+/g;
 const PAGE = 25;
+// Links to Discord itself (a channel or a message), which the options can hide.
+const DISCORD_LINK = /^https?:\/\/(?:[\w-]+\.)?discord(?:app)?\.com\/channels\//i;
 const MAX_THREADS = 150;
 const ActiveThreadsStore = findStoreLazy("ActiveThreadsStore") as { getThreadsForParent?(guildId: string, parentId: string): Record<string, unknown>; };
 
@@ -35,7 +39,7 @@ async function placesOf(channelId: string, guildId: string | null) {
     const names = new Map<string, string>();
     const channel = ChannelStore.getChannel(channelId);
     if (!guildId || channel?.isThread?.()) return { ids: [channelId], names };
-    const ids = new Set([channelId]);
+    const ids = new Set([channelId, ...listedThreads(channelId)]);
     try {
         for (const id of Object.keys(ActiveThreadsStore.getThreadsForParent?.(guildId, channelId) ?? {})) ids.add(id);
     } catch { }
@@ -87,6 +91,49 @@ function day(iso: string) {
         + ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
+function foundIn(m: any, channelId: string, url: string): Found {
+    return { url, messageId: m.id, channelId: m.channel_id ?? channelId, when: m.timestamp, author: m.author?.global_name ?? m.author?.username ?? "" };
+}
+
+// Each thread's own messages, newest first, up to 300 per thread, three threads at a time.
+async function threadLinks(ids: string[]): Promise<Found[]> {
+    const out: Found[] = [];
+    let next = 0;
+    const worker = async () => {
+        while (next < ids.length) {
+            const id = ids[next++];
+            let before: string | undefined;
+            for (let page = 0; page < 3; page++) {
+                let res: any;
+                try {
+                    res = await RestAPI.get({ url: `/channels/${id}/messages`, query: before ? { limit: 100, before } : { limit: 100 } } as any);
+                } catch (e) {
+                    logger.warn("Could not read a thread", id, e);
+                    break;
+                }
+                const messages: any[] = Array.isArray(res?.body) ? res.body : [];
+                for (const m of messages) for (const url of linksOf(m)) out.push(foundIn(m, id, url));
+                if (messages.length < 100) break;
+                before = messages[messages.length - 1]?.id;
+            }
+        }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    return out;
+}
+
+// Newest first; every post of a link is kept (the options can group them).
+function merge(lists: Found[][]): Found[] {
+    const all = lists.flat().sort((a, b) => Date.parse(b.when) - Date.parse(a.when));
+    const seen = new Set<string>();
+    return all.filter(f => {
+        const key = f.messageId + " " + f.url;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 async function search(channelIds: string[], guildId: string | null, offset: number) {
     const res: any = await RestAPI.get({
         url: guildId ? `/guilds/${guildId}/messages/search` : `/channels/${channelIds[0]}/messages/search`,
@@ -98,7 +145,10 @@ async function search(channelIds: string[], guildId: string | null, offset: numb
     return { waiting: false as const, total: Number(res?.body?.total_results ?? 0), messages: groups.map(g => g.find(m => m.hit) ?? g[0]).filter(Boolean) };
 }
 
-export function LinksPanel({ channelId, guildId, onClose }: { channelId: string; guildId: string | null; onClose(): void; }) {
+export interface LinkOptions { hideDiscord: boolean; group: boolean; }
+
+export function LinksPanel({ channelId, guildId, onClose, options, setOption }: { channelId: string; guildId: string | null; onClose(): void; options: LinkOptions; setOption(key: keyof LinkOptions, value: boolean): void; }) {
+    const [showOptions, setShowOptions] = useState(false);
     const [found, setFound] = useState<Found[]>([]);
     const [next, setNext] = useState(0);
     const [total, setTotal] = useState<number | null>(null);
@@ -109,36 +159,23 @@ export function LinksPanel({ channelId, guildId, onClose }: { channelId: string;
     async function load(offset: number, tries = 0) {
         setState("loading");
         try {
-            let where = places ?? await placesOf(channelId, guildId);
-            let r;
-            try {
-                r = await search(where.ids, guildId, offset);
-            } catch (e) {
-                // If the search refuses the list of threads, the channel alone still works.
-                if (where.ids.length === 1) throw e;
-                logger.warn("Search over the threads refused; channel only", e);
-                where = { ids: [channelId], names: where.names };
-                r = await search(where.ids, guildId, offset);
-            }
-            if (places !== where) setPlaces(where);
+            const where = places ?? await placesOf(channelId, guildId);
+            if (!places) setPlaces(where);
+            // The channel's own links come from Discord's search; its threads are read directly.
+            const threads = offset === 0 ? threadLinks(where.ids.filter(id => id !== channelId)) : Promise.resolve([] as Found[]);
+            const r = await search([channelId], guildId, offset);
             if (r.waiting) {
                 // Discord is still building its search for this channel: try again shortly.
                 setState("waiting");
                 if (tries < 5) setTimeout(() => void load(offset, tries + 1), Math.max(1, r.retryAfter) * 1000);
                 return;
             }
+            const fromChannel: Found[] = [];
+            for (const m of r.messages) for (const url of linksOf(m)) fromChannel.push(foundIn(m, channelId, url));
+            const fromThreads = await threads;
             setTotal(r.total);
             setNext(offset + PAGE);
-            setFound(prev => {
-                const list = offset === 0 ? [] : [...prev];
-                for (const m of r.messages) {
-                    for (const url of linksOf(m)) {
-                        if (list.some(f => f.url === url)) continue;
-                        list.push({ url, messageId: m.id, channelId: m.channel_id ?? channelId, when: m.timestamp, author: m.author?.global_name ?? m.author?.username ?? "" });
-                    }
-                }
-                return list;
-            });
+            setFound(prev => merge([offset === 0 ? [] : prev, fromChannel, fromThreads]));
             setState("ready");
         } catch (e) {
             logger.warn("Link search failed", e);
@@ -149,7 +186,22 @@ export function LinksPanel({ channelId, guildId, onClose }: { channelId: string;
     useEffect(() => { void load(0); }, [channelId]);
 
     const words = filter.trim().toLowerCase();
-    const shown = words ? found.filter(f => f.url.toLowerCase().includes(words) || f.author.toLowerCase().includes(words)) : found;
+    const kept = found
+        .filter(f => !options.hideDiscord || !DISCORD_LINK.test(f.url))
+        .filter(f => !words || f.url.toLowerCase().includes(words) || f.author.toLowerCase().includes(words));
+
+    // Grouped: one line per link, how many times and when last; no jump, since it was posted more than once.
+    const groups: { url: string; count: number; when: string; }[] = [];
+    if (options.group) {
+        const byUrl = new Map<string, { url: string; count: number; when: string; }>();
+        for (const f of kept) {
+            const key = f.url.replace(/\/+$/, "");
+            const g = byUrl.get(key);
+            if (g) g.count++;
+            else byUrl.set(key, { url: f.url, count: 1, when: f.when });
+        }
+        groups.push(...byUrl.values());
+    }
 
     function jump(f: Found) {
         NavigationRouter.transitionTo(`/channels/${guildId ?? "@me"}/${f.channelId}/${f.messageId}`);
@@ -163,31 +215,57 @@ export function LinksPanel({ channelId, guildId, onClose }: { channelId: string;
     }
 
     const inThread = !!ChannelStore.getChannel(channelId)?.isThread?.();
+    const count = options.group ? groups.length : kept.length;
+
+    const Url = ({ url }: { url: string; }) => {
+        const { site, rest } = parts(url);
+        return (
+            <a className="agentdisc-links-url" href={url} target="_blank" rel="noreferrer noopener" title={url}>
+                <span className="agentdisc-links-site">{site}</span>
+                {rest && <span className="agentdisc-links-path">{rest}</span>}
+            </a>
+        );
+    };
 
     return (
         <div className="agentdisc-links" role="dialog" aria-label="Links in this channel">
             <div className="agentdisc-links-head">
                 <span>{inThread ? "Links in this thread" : "Links in this channel and its threads"}</span>
-                {total != null && <span className="agentdisc-links-count">{found.length}</span>}
+                <span className="agentdisc-links-head-right">
+                    {total != null && <span className="agentdisc-links-count">{count}</span>}
+                    <button type="button" className={"agentdisc-links-gear" + (showOptions ? " agentdisc-links-gear-on" : "")} title="Options" aria-label="Options" onClick={() => setShowOptions(v => !v)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)" /></svg>
+                    </button>
+                </span>
             </div>
+            {showOptions && (
+                <div className="agentdisc-links-options">
+                    <label><input type="checkbox" checked={options.hideDiscord} onChange={() => setOption("hideDiscord", !options.hideDiscord)} /> Hide links to Discord channels and messages</label>
+                    <label><input type="checkbox" checked={options.group} onChange={() => setOption("group", !options.group)} /> Group the same link posted several times</label>
+                </div>
+            )}
             <input className="agentdisc-links-filter" placeholder="Filter: figma, dashboard…" value={filter} onChange={e => setFilter(e.currentTarget.value)} autoFocus />
             <div className="agentdisc-links-list">
-                {shown.map(f => {
-                    const { site, rest } = parts(f.url);
-                    return (
-                        <div className="agentdisc-links-item" key={f.url}>
-                            <a className="agentdisc-links-url" href={f.url} target="_blank" rel="noreferrer noopener" title={f.url}>
-                                <span className="agentdisc-links-site">{site}</span>
-                                {rest && <span className="agentdisc-links-path">{rest}</span>}
-                            </a>
+                {options.group
+                    ? groups.map(g => (
+                        <div className="agentdisc-links-item" key={g.url}>
+                            <Url url={g.url} />
                             <div className="agentdisc-links-meta">
-                                <span>{day(f.when)}{f.author ? " · " + f.author : ""}{threadName(f) ? " · in " + threadName(f) : ""}</span>
+                                <span>{g.count > 1 ? `Posted ${g.count} times, last ` : ""}{day(g.when)}</span>
+                            </div>
+                        </div>
+                    ))
+                    : kept.map(f => (
+                        <div className="agentdisc-links-item" key={f.messageId + f.url}>
+                            <Url url={f.url} />
+                            <div className="agentdisc-links-meta">
+                                <span className="agentdisc-links-when">{day(f.when)}{f.author ? " · " + f.author : ""}</span>
+                                {threadName(f) && <span className="agentdisc-links-thread" title={threadName(f)}>{threadName(f)}</span>}
                                 <button type="button" className="agentdisc-links-jump" onClick={() => jump(f)}>Jump</button>
                             </div>
                         </div>
-                    );
-                })}
-                {state === "ready" && shown.length === 0 && <div className="agentdisc-links-note">{found.length ? "No link matches." : inThread ? "No links in this thread yet." : "No links in this channel or its threads yet."}</div>}
+                    ))}
+                {state === "ready" && count === 0 && <div className="agentdisc-links-note">{found.length ? "No link matches." : inThread ? "No links in this thread yet." : "No links in this channel or its threads yet."}</div>}
                 {state === "loading" && <div className="agentdisc-links-note">Looking for links…</div>}
                 {state === "waiting" && <div className="agentdisc-links-note">Discord is still indexing this channel, trying again…</div>}
                 {state === "failed" && <div className="agentdisc-links-note">The search did not answer. <button type="button" className="agentdisc-links-jump" onClick={() => void load(0)}>Try again</button></div>}

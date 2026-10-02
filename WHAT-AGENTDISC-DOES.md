@@ -6,10 +6,6 @@ AgentDisc makes Discord in the browser calmer and easier when you work with AI a
 
 A link button in the top bar opens a panel with every link posted in the channel you are in and in all its threads (or only in the thread, when you are in a thread), newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard. A link from a thread carries a small tag with the thread's name. A gear at the top of the panel offers two tick boxes: hide links to Discord channels and messages, and group the same link posted several times into one line (grouped lines have no Jump button, since they point to several messages).
 
-## Updates
-
-When a new version is copied into the AgentDisc folder, the app notices within half a minute, reloads itself and refreshes Discord. No clicks needed.
-
 ## Priority marks
 
 A flag button in the top bar marks the channel or thread you are in as a priority with one click; click it again to remove the mark. You can also right-click any channel or thread and choose "Mark as priority". A priority line stands out in the channel list until you remove the mark, in the colour of what is happening in it: green while an agent is working there, red when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A priority thread stays visible even when its channel's threads are folded away. A "Clear" button above the channel list removes every mark at once.

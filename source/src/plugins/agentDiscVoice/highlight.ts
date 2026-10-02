@@ -9,14 +9,19 @@
 // moving from word to word"). The voice service gives no word times, so each word's
 // moment is estimated inside its piece from its length and the pauses at punctuation;
 // each piece starts on time, so the guess never drifts far. The spoken text is cleaned
-// (links read as "a link to...", code skipped), so spoken words are matched to the
-// words on screen in order, skipping what only one side has. Nothing in Discord's page
-// is changed: the light is drawn with the browser's own highlight layer.
+// (links read as "a link to...", code skipped), so spoken words are lined up with the
+// words on screen as a whole, keeping the most words in order and skipping what only one
+// side has; a bare link's own text on screen is left out. Nothing in Discord's page is
+// changed: the light is drawn with the browser's own highlight layer.
 
 const HIGHLIGHT = "agentdisc-reading";
 const HOVER = "agentdisc-hover";
 const WORD = /[\p{L}\p{N}]+(?:['’][\p{L}]+)*/gu;
 const LOOK_AHEAD = 40;
+// Above this many word pairs the whole-text line-up would take too long; the quick
+// in-order match is used instead.
+const MAX_PAIRS = 6_000_000;
+const BARE_LINK = /^\s*(https?:\/\/|www\.)\S+\s*$/i;
 
 interface SpokenWord { norm: string; at: number; }
 interface ScreenWord { norm: string; range: Range; }
@@ -59,8 +64,15 @@ function readScreen() {
         const box = document.getElementById(`message-content-${id}`);
         if (!box) continue;
         const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, {
-            // Code blocks are skipped by the voice, so they are skipped here too.
-            acceptNode: n => n.parentElement?.closest("pre") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+            // Code blocks are skipped by the voice, so they are skipped here too, and so is
+            // the text of a bare link (the voice says "a link to" and the site instead).
+            acceptNode: n => {
+                const parent = n.parentElement;
+                if (parent?.closest("pre")) return NodeFilter.FILTER_REJECT;
+                const anchor = parent?.closest("a");
+                if (anchor && BARE_LINK.test(anchor.textContent ?? "")) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            }
         });
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
             const text = node.textContent ?? "";
@@ -74,16 +86,48 @@ function readScreen() {
     }
 }
 
+// Spoken words and screen words are lined up as a whole: the longest run of words both
+// share, in order (Stephane, 2 Oct: after a link "all the words after it go everywhere",
+// and in a long message the words further down could not be hovered). A word only one
+// side has (a link read as "a link to", a number read differently) is simply skipped and
+// never pulls the rest out of place.
 function match() {
-    link = [];
-    let j = 0;
-    for (const piece of spoken) for (const w of piece) {
-        let found: number | null = null;
-        for (let k = j; k < Math.min(screen.length, j + LOOK_AHEAD); k++) {
-            if (screen[k].norm === w.norm) { found = k; break; }
+    const words = spoken.flat().map(w => w.norm);
+    const n = words.length;
+    const m = screen.length;
+    link = new Array(n).fill(null);
+    if (!n || !m) return;
+
+    if (n * m > MAX_PAIRS) {
+        let j = 0;
+        for (let i = 0; i < n; i++) {
+            for (let k = j; k < Math.min(m, j + LOOK_AHEAD); k++) {
+                if (screen[k].norm === words[i]) { link[i] = k; j = k + 1; break; }
+            }
         }
-        link.push(found);
-        if (found != null) j = found + 1;
+        return;
+    }
+
+    // best[i][j]: how many words line up between spoken word i onwards and screen word j onwards.
+    const width = m + 1;
+    const best = new Uint16Array((n + 1) * width);
+    for (let i = n - 1; i >= 0; i--) {
+        for (let j = m - 1; j >= 0; j--) {
+            best[i * width + j] = words[i] === screen[j].norm
+                ? best[(i + 1) * width + j + 1] + 1
+                : Math.max(best[(i + 1) * width + j], best[i * width + j + 1]);
+        }
+    }
+    let i = 0;
+    let j = 0;
+    while (i < n && j < m) {
+        if (words[i] === screen[j].norm) {
+            link[i++] = j++;
+        } else if (best[(i + 1) * width + j] >= best[i * width + j + 1]) {
+            i++;
+        } else {
+            j++;
+        }
     }
 }
 

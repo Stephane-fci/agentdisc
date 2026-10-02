@@ -29,6 +29,7 @@ import { findComponentByCodeLazy } from "@webpack";
 import { ChannelStore, Popout, SelectedChannelStore, useRef, useState, useStateFromStores } from "@webpack/common";
 import type { PropsWithChildren } from "react";
 
+import { LinksPanel } from "./links";
 import { renderPopout } from "./menu";
 
 const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_BOTTOM,", 'position:"bottom"');
@@ -83,6 +84,33 @@ function PriorityButton({ channelId }: { channelId: string; }) {
     );
 }
 
+const LinksIcon = () => (
+    <TopIcon>
+        <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </TopIcon>
+);
+
+// Every link posted in the channel being read, in a panel under the button.
+function LinksButton({ channelId, guildId }: { channelId: string; guildId: string | null; }) {
+    const buttonRef = useRef(null);
+    const [show, setShow] = useState(false);
+    return (
+        <Popout
+            position="bottom"
+            align="right"
+            animation={Popout.Animation.NONE}
+            shouldShow={show}
+            onRequestClose={() => setShow(false)}
+            targetElementRef={buttonRef}
+            renderPopout={() => <LinksPanel key={channelId} channelId={channelId} guildId={guildId} onClose={() => setShow(false)} />}
+        >
+            {(_, { isShown }) => (
+                <HeaderBarIcon ref={buttonRef} className="vc-toolbox-btn" onClick={() => setShow(v => !v)} tooltip={isShown ? null : "Links in this channel"} icon={LinksIcon} selected={isShown} />
+            )}
+        </Popout>
+    );
+}
+
 const SearchIcon = () => (
     <TopIcon>
         <circle cx="10.5" cy="10.5" r="6.3" fill="none" stroke="currentColor" strokeWidth="2.2" />
@@ -118,12 +146,14 @@ function PanelButtons() {
     const membersShown = useStateFromStores([ChannelSectionStore as any], () => ChannelSectionStore.getState().isMembersOpen);
     const channelType = useStateFromStores([SelectedChannelStore, ChannelStore], () => ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.type);
     const channelId = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
-    const inServer = useStateFromStores([SelectedChannelStore, ChannelStore], () => !!ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.guild_id);
+    const guildId = useStateFromStores([SelectedChannelStore, ChannelStore], () => ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.guild_id ?? null);
+    const inServer = !!guildId;
     const serversShown = !isHidden("serverList");
     return (
         <>
             {inServer && channelId && isPluginEnabled("ChannelGroups") && <PriorityButton channelId={channelId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={startSearch} tooltip="Search" icon={SearchIcon} selected={false} />
+            {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
             {channelType != null && !NO_MEMBER_LIST.has(channelType) && (
                 <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide Member List" : "Show Member List"} icon={MembersIcon} selected={membersShown} />

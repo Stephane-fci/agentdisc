@@ -14,3 +14,112 @@
 .vc-toolbox-btn:hover .vc-toolbox-icon {
     color: var(--interactive-icon-hover);
 }
+/* The links panel under its top-bar button. */
+.agentdisc-links {
+    width: 400px;
+    max-height: min(560px, 70vh);
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    background: var(--background-base-low, var(--background-floating, #111214));
+    border: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+    box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+    overflow: hidden;
+}
+
+.agentdisc-links-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px 8px;
+    font-weight: 700;
+}
+
+.agentdisc-links-count {
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: color-mix(in oklab, #5865f2 30%, transparent);
+    font-size: 12px;
+}
+
+.agentdisc-links-filter {
+    margin: 0 12px 8px;
+    padding: 7px 10px;
+    border: 1px solid var(--border-subtle, rgb(255 255 255 / 10%));
+    border-radius: 6px;
+    background: var(--background-base-lowest, #000);
+    color: inherit;
+    font-size: 14px;
+    outline: none;
+}
+
+.agentdisc-links-list {
+    overflow-y: auto;
+    padding: 0 8px 10px;
+}
+
+.agentdisc-links-item {
+    padding: 8px 8px;
+    border-radius: 6px;
+}
+
+.agentdisc-links-item:hover {
+    background: var(--interactive-background-hover, rgb(255 255 255 / 5%));
+}
+
+.agentdisc-links-url {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--text-link, #00a8fc);
+    text-decoration: none;
+}
+
+.agentdisc-links-site {
+    font-weight: 600;
+}
+
+.agentdisc-links-path {
+    opacity: 0.75;
+}
+
+.agentdisc-links-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--text-muted, #949ba4);
+}
+
+.agentdisc-links-jump,
+.agentdisc-links-more {
+    padding: 2px 10px;
+    border: none;
+    border-radius: 6px;
+    background: color-mix(in oklab, #5865f2 30%, transparent);
+    color: var(--interactive-text-active, #fff);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.agentdisc-links-jump:hover,
+.agentdisc-links-more:hover {
+    background: #5865f2;
+}
+
+.agentdisc-links-more {
+    display: block;
+    margin: 8px auto 0;
+    padding: 6px 14px;
+}
+
+.agentdisc-links-note {
+    padding: 12px 8px;
+    color: var(--text-muted, #949ba4);
+    font-size: 13px;
+}

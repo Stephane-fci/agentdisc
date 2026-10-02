@@ -2,6 +2,10 @@
 
 AgentDisc makes Discord in the browser calmer and easier when you work with AI agents. It starts with Stephane's own setup; everything below can be switched on or off.
 
+## Links in a channel
+
+A link button in the top bar opens a panel with every link posted in the channel or thread you are in, newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard.
+
 ## Priority marks
 
 A flag button in the top bar marks the channel or thread you are in as a priority with one click; click it again to remove the mark. You can also right-click any channel or thread and choose "Mark as priority". A priority line stands out in the channel list until you remove the mark, in the colour of what is happening in it: green while an agent is working there, red when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A priority thread stays visible even when its channel's threads are folded away. A "Clear" button above the channel list removes every mark at once.
@@ -18,7 +22,7 @@ A small purple robot at the top of Discord opens one simple menu with three grou
 
 Next to the name on every message there is a small purple play button. Click it and a natural AI voice reads that message, plus the messages sent right after it under the same name, so an agent's answer split in several parts is read as one. You can also right-click a message and choose "Read aloud".
 
-While it reads, a player appears in the channel header, or just above the message box when the header is hidden (as in the starting setup): play and pause, back 10 seconds, forward 10 seconds, a timeline you can drag, speed from 1× to 2×, and close. The word being read lights up in the message, and a click on any word of that message jumps the reading there. The play button turns while the voice is being prepared, shows pause while it plays, and the player closes by itself at the end unless you moved around in it. Reading goes on when you change channel.
+While it reads, a player sits inside the channel's top bar, between the channel name and its buttons (or just above the message box when the top bar is hidden): play and pause, back 10 seconds, forward 10 seconds, a timeline you can drag, speed from 1× to 2×, and close. Space pauses or plays, and the left and right arrows go back or forward 10 seconds (in the message box only while it is empty, so typing is never disturbed). The word being read lights up in the message, and a click on any word of that message jumps the reading there. The play button turns while the voice is being prepared, shows pause while it plays, and the player closes by itself at the end unless you moved around in it. Reading goes on when you change channel. While the voice plays, any YouTube tab turns down to a fifth of its volume, without pausing, and goes back to where it was when the voice stops (a switch in the AgentDiscVoice settings turns this off).
 
 Links are read as "a link to" plus the site, and code blocks are skipped. Playing the same message again is free for 30 days. If the voice is not set up or not answering, Chrome's own voice reads instead.
 

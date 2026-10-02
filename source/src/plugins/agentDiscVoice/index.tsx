@@ -15,6 +15,8 @@ import { createRoot, Menu, useEffect, useState } from "@webpack/common";
 
 import { agentName, answerText, isCard } from "./answer";
 import { startClickToRead, stopClickToRead } from "./clickToRead";
+import { duckWhen, setDuck } from "./duck";
+import { startKeys, stopKeys } from "./keys";
 import { PlayBar, Spinner } from "./PlayBar";
 import { close, getView, play, subscribe, togglePlay } from "./player";
 import { hasPass, loadPass, savePass, setServiceFound } from "./service";
@@ -57,6 +59,11 @@ const settings = definePluginSettings({
         type: OptionType.STRING,
         description: "How to say names: word=spoken form; separated by ;",
         default: "AgentDisc=Agent Disc; Vencord=Ven cord"
+    },
+    lowerMusic: {
+        type: OptionType.BOOLEAN,
+        description: "Turn YouTube tabs down while the voice reads, and back up after",
+        default: true
     },
     service: {
         type: OptionType.STRING,
@@ -174,6 +181,8 @@ export default definePlugin({
         setServiceFound(address => { if (!settings.store.service.trim()) settings.store.service = address; });
         void loadPass();
         startClickToRead();
+        startKeys();
+        duckWhen(() => settings.store.lowerMusic);
         addMessageDecoration("agentdisc-play", ({ message }) => readable(message) ? <PlayButton message={message!} /> : null);
         host = document.createElement("div");
         host.id = "agentdisc-voice-root";
@@ -185,6 +194,8 @@ export default definePlugin({
     stop() {
         removeMessageDecoration("agentdisc-play");
         stopClickToRead();
+        stopKeys();
+        setDuck(false);
         close();
         root?.unmount();
         root = null;

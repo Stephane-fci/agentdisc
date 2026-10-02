@@ -24,6 +24,11 @@ document.addEventListener(
             if (event.data.type === 'OPEN_SHORTCUTS') {
             chrome.runtime.sendMessage({ action: "openShortcuts" });
             }
+
+            // AgentDisc read aloud: turn YouTube tabs down while the voice plays.
+            if (event.data.type === 'AGENTDISC_DUCK') {
+                chrome.runtime.sendMessage({ action: "agentdiscDuck", on: !!event.data.on });
+            }
         }, false);
     },
     { once: true }

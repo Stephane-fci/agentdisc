@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { useEffect, useState } from "@webpack/common";
+import { ReactDOM, useEffect, useState } from "@webpack/common";
 
 import { close, getView, nextRate, PlayerView, skip, subscribe, togglePlay,userSeek } from "./player";
 
@@ -17,25 +17,33 @@ function usePlayer(): PlayerView {
     return v;
 }
 
-// Sits in the empty middle of the channel's top bar, between the channel name and its
-// buttons, so it never hides the messages (Stephane, 29 Sept). When that space is too
-// narrow, it sits over the message box; bottom centre when there is neither.
-const BAR_HEIGHT = 36;
-const MIN_WIDTH = 380;
+// Sits inside the channel's top bar as one of its parts, between the channel name and its
+// buttons, so it never covers them (Stephane, 2 Oct: "embedded inside because sometimes it
+// hides buttons that are behind it"). When the top bar is hidden or too narrow, it floats
+// over the message box; bottom centre when there is neither.
+const MIN_WIDTH = 300;
+const SLOT = "agentdisc-voice-slot";
 
-function inTopBar(): React.CSSProperties | null {
+function topBarSlot(): HTMLElement | null {
     const bars = [...document.querySelectorAll<HTMLElement>('section[class*="title_"]')]
         .map(el => ({ el, r: el.getBoundingClientRect() }))
         .filter(({ r }) => r.width > 300 && r.height > 24)
         .sort((x, y) => y.r.width - x.r.width);
-    if (!bars.length) return null;
-    const { el, r } = bars[0];
-    const name = el.querySelector<HTMLElement>("h1, h2")?.getBoundingClientRect();
-    const tools = el.querySelector<HTMLElement>('[class*="toolbar_"]')?.getBoundingClientRect();
-    const left = Math.max(r.left + 8, (name && name.width ? name.right : r.left + r.width * 0.25) + 16);
-    const right = Math.min(r.right - 8, (tools && tools.width ? tools.left : r.right - 280) - 16);
-    if (right - left < MIN_WIDTH) return null;
-    return { left, width: right - left, top: r.top + (r.height - BAR_HEIGHT) / 2, height: BAR_HEIGHT };
+    const bar = bars[0]?.el;
+    if (!bar) return null;
+    const tools = bar.querySelector<HTMLElement>('[class*="toolbar_"]');
+    const row = tools?.parentElement ?? bar;
+    let slot = row.querySelector<HTMLElement>(`:scope > .${SLOT}`);
+    if (!slot) {
+        slot = document.createElement("div");
+        slot.className = SLOT;
+        row.insertBefore(slot, tools ?? null);
+    }
+    return slot;
+}
+
+function removeSlots(keep?: HTMLElement | null) {
+    for (const el of document.querySelectorAll<HTMLElement>(`.${SLOT}`)) if (el !== keep) el.remove();
 }
 
 function overMessageBox(): React.CSSProperties {
@@ -48,12 +56,18 @@ function overMessageBox(): React.CSSProperties {
         : { left: "50%", width: "min(640px, 90vw)", bottom: 90, transform: "translateX(-50%)" };
 }
 
+interface Place { slot: HTMLElement | null; style: React.CSSProperties; }
+
 function usePlace() {
-    const [place, setPlace] = useState<React.CSSProperties>({});
+    const [place, setPlace] = useState<Place>({ slot: null, style: {} });
     useEffect(() => {
         const update = () => {
-            const next = inTopBar() ?? overMessageBox();
-            setPlace(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next);
+            let slot = topBarSlot();
+            // Too little room once inside: give the space back and float instead.
+            if (slot && slot.getBoundingClientRect().width < MIN_WIDTH) slot = null;
+            removeSlots(slot);
+            const style = slot ? {} : overMessageBox();
+            setPlace(prev => prev.slot === slot && JSON.stringify(prev.style) === JSON.stringify(style) ? prev : { slot, style });
         };
         update();
         const timer = setInterval(update, 500);
@@ -61,6 +75,7 @@ function usePlace() {
         return () => {
             clearInterval(timer);
             window.removeEventListener("resize", update);
+            removeSlots();
         };
     }, []);
     return place;
@@ -95,8 +110,8 @@ function Bar({ v }: { v: PlayerView; }) {
     const shown = drag ?? v.position;
     const status = v.waiting && v.playing ? "Making the voice…" : v.note;
 
-    return (
-        <div className="agentdisc-voice-bar" style={place} role="region" aria-label="Read aloud">
+    const bar = (
+        <div className={"agentdisc-voice-bar" + (place.slot ? " agentdisc-voice-inline" : "")} style={place.style} role="region" aria-label="Read aloud">
             <div className="agentdisc-voice-row">
                 <span className="agentdisc-voice-agent" title={v.agent}>🔊 {v.agent}</span>
                 <button className="agentdisc-voice-btn" title="Back 10 seconds" onClick={() => skip(-10)} disabled={v.browserOnly}><Icon d={BACK} /><span>10</span></button>
@@ -122,6 +137,7 @@ function Bar({ v }: { v: PlayerView; }) {
             {status && <div className="agentdisc-voice-note">{status}</div>}
         </div>
     );
+    return place.slot ? ReactDOM.createPortal(bar, place.slot) : bar;
 }
 
 export function PlayBar() {

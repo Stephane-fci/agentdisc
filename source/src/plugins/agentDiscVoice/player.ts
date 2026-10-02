@@ -7,6 +7,7 @@
 import { Logger } from "@utils/Logger";
 
 import { splitPieces } from "./clean";
+import { setDuck } from "./duck";
 import * as highlight from "./highlight";
 import { keepCopy, Made, makeSpeech, ServiceError } from "./service";
 
@@ -58,6 +59,7 @@ function emit() {
     view.browserOnly = pieces.length > 0 && pieces.every(p => p.status === "browser");
     snapshot = { ...view };
     listeners.forEach(fn => fn());
+    setDuck(view.open && view.playing);
 }
 
 let pieces: Piece[] = [];

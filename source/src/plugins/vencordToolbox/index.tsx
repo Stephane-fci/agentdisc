@@ -174,7 +174,7 @@ function FeedbackButton() {
     const [on, setOn] = useState(isFeedbackOn());
     useEffect(() => onFeedbackChange(setOn), []);
     return (
-        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click a sentence to quote it (Shift: whole paragraph). Ctrl+L or Esc to stop" : "Feedback mode (Ctrl+L): quote sentences into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
+        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click a paragraph to quote it (tap Ctrl: sentence or paragraph). Ctrl+L or Esc to stop" : "Feedback mode (Ctrl+L): quote paragraphs or sentences into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
     );
 }
 

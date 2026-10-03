@@ -7,12 +7,14 @@
 import { insertTextIntoChatInputBox } from "@utils/discord";
 import { ComponentDispatch } from "@webpack/common";
 
-// Feedback mode (Stephane, 2 Oct): with the mode on, the sentence under the mouse in any
-// message lights up orange; a click puts it in the message box as
-//   "the sentence" >>
+// Feedback mode (Stephane, 2 Oct): with the mode on, the paragraph under the mouse in any
+// message lights up orange (a bullet point or heading counts as a paragraph); a click puts
+// it in the message box as
+//   "the paragraph" >>
 // ready for his answer, each new one on its own line, the way he already answers long
-// messages by hand. A bullet point is taken whole; elsewhere holding Shift takes the whole
-// paragraph; text he selects himself is taken as it is. Ctrl+L (the L key, whatever the
+// messages by hand. A tap on Ctrl switches to the sentence under the mouse, the next tap
+// back to the paragraph (Stephane, 3 Oct); Ctrl used in a shortcut such as Ctrl+V does not
+// count. Text he selects himself is taken as it is. Ctrl+L (the L key, whatever the
 // keyboard) turns the mode on and off, like the top-bar button; Esc turns it off.
 
 const HIGHLIGHT = "agentdisc-feedback";
@@ -20,6 +22,10 @@ const CONTENT = '[id^="message-content-"]';
 const BLOCK = "li, h1, h2, h3, blockquote";
 
 let on = false;
+// Whole paragraphs (true) or single sentences (false); each new start is paragraphs.
+let whole = true;
+// Set while Ctrl is down after it switched the mode: any other key undoes the switch.
+let ctrlSwitched = false;
 let hovered: Range | null = null;
 let frame = 0;
 let lastMove: MouseEvent | null = null;
@@ -53,17 +59,18 @@ function caretAt(x: number, y: number): { node: Node; offset: number; } | null {
 function textOf(scope: HTMLElement) {
     const pieces: { node: Text; start: number; }[] = [];
     let text = "";
-    // Lists, headings and quotes are their own blocks: the message text around them leaves them out.
-    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
-        acceptNode: n => {
-            const parent = n.parentElement;
-            if (parent?.closest("pre")) return NodeFilter.FILTER_REJECT;
-            const block = parent?.closest(BLOCK);
-            if (block && block !== scope && scope.contains(block)) return NodeFilter.FILTER_REJECT;
-            return NodeFilter.FILTER_ACCEPT;
-        }
-    });
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+        const parent = n.parentElement;
+        // The "(edited)" mark is not part of the message.
+        if (parent?.closest("time")) continue;
+        // Lists, headings, quotes and code blocks are their own blocks: the message text
+        // around them leaves them out, and they end the paragraph before them.
+        const block = parent?.closest(BLOCK);
+        if (parent?.closest("pre") || block && block !== scope && scope.contains(block)) {
+            if (text && !text.endsWith("\n")) text += "\n";
+            continue;
+        }
         pieces.push({ node: n, start: text.length });
         text += n.data;
     }
@@ -77,7 +84,7 @@ function pointIn(pieces: { node: Text; start: number; }[], at: number): [Text, n
     return [pieces[0].node, 0];
 }
 
-// The sentence (or, with Shift, the paragraph) around one point of a message.
+// The paragraph (or the sentence) around one point of a message.
 function pieceAt(x: number, y: number, whole: boolean): Range | null {
     const caret = caretAt(x, y);
     if (!caret || caret.node.nodeType !== Node.TEXT_NODE) return null;
@@ -88,8 +95,6 @@ function pieceAt(x: number, y: number, whole: boolean): Range | null {
     // item, which must not count as a bullet point.
     const block = parent!.closest<HTMLElement>(BLOCK);
     const scope = block && content.contains(block) ? block : content;
-    // A bullet point or a heading is taken whole (Stephane, 2 Oct).
-    if (scope !== content && scope.matches("li, h1, h2, h3")) whole = true;
 
     const { text, pieces } = textOf(scope);
     const own = pieces.find(p => p.node === caret.node);
@@ -125,9 +130,15 @@ function onMove(e: MouseEvent) {
     frame = requestAnimationFrame(() => {
         frame = 0;
         const m = lastMove!;
-        hovered = pieceAt(m.clientX, m.clientY, m.shiftKey);
+        hovered = pieceAt(m.clientX, m.clientY, whole);
         paint(hovered);
     });
+}
+
+function repaint() {
+    if (!lastMove) return;
+    hovered = pieceAt(lastMove.clientX, lastMove.clientY, whole);
+    paint(hovered);
 }
 
 function messageBoxHasText() {
@@ -148,7 +159,7 @@ function onClick(e: MouseEvent) {
     if (!target?.closest?.(CONTENT)) return;
     // Text he selected himself goes in as it is.
     const selected = window.getSelection()?.toString() ?? "";
-    const range = selected.trim() ? null : pieceAt(e.clientX, e.clientY, e.shiftKey);
+    const range = selected.trim() ? null : pieceAt(e.clientX, e.clientY, whole);
     const text = selected.trim() || range?.toString() || "";
     if (!text.trim()) return;
     e.preventDefault();
@@ -159,6 +170,21 @@ function onClick(e: MouseEvent) {
 
 function onKey(e: KeyboardEvent) {
     if (e.key === "Escape" && on) setFeedback(false);
+    if (e.key === "Control") {
+        if (e.repeat || e.altKey || e.shiftKey || e.metaKey) return;
+        whole = !whole;
+        ctrlSwitched = true;
+        repaint();
+    } else if (ctrlSwitched && e.ctrlKey) {
+        // Ctrl was the start of a shortcut, not a switch.
+        whole = !whole;
+        ctrlSwitched = false;
+        repaint();
+    }
+}
+
+function onKeyUp(e: KeyboardEvent) {
+    if (e.key === "Control") ctrlSwitched = false;
 }
 
 // Ctrl+L (Stephane, 2 Oct). Chrome lets the page take it before its own address bar.
@@ -181,15 +207,19 @@ export function stopFeedbackShortcut() {
 export function setFeedback(next: boolean) {
     if (next === on) return;
     on = next;
+    whole = true;
+    ctrlSwitched = false;
     document.documentElement.classList.toggle("agentdisc-feedback-on", on);
     if (on) {
         document.addEventListener("mousemove", onMove, true);
         document.addEventListener("click", onClick, true);
         document.addEventListener("keydown", onKey, true);
+        document.addEventListener("keyup", onKeyUp, true);
     } else {
         document.removeEventListener("mousemove", onMove, true);
         document.removeEventListener("click", onClick, true);
         document.removeEventListener("keydown", onKey, true);
+        document.removeEventListener("keyup", onKeyUp, true);
         hovered = null;
         paint(null);
     }

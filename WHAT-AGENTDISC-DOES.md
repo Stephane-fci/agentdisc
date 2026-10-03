@@ -4,7 +4,7 @@ AgentDisc makes Discord in the browser calmer and easier when you work with AI a
 
 ## Feedback mode
 
-A speech-bubble button in the top bar, or Ctrl+L, turns feedback mode on (the button turns orange). Move the mouse over any message and the sentence under it lights up orange; a bullet point lights up whole, and holding Shift takes the whole paragraph. A click puts it in your message box as "the sentence" >> , ready for your answer; each new click adds the next one on its own line. Text you select yourself goes in as it is. Click the button again, press Ctrl+L again or press Esc to stop.
+A speech-bubble button in the top bar, or Ctrl+L, turns feedback mode on (the button turns orange). Move the mouse over any message and the paragraph under it lights up orange (a bullet point counts as a paragraph). Tap Ctrl to switch to the single sentence under the mouse, and tap it again to go back to the whole paragraph. A click puts it in your message box as "the text" >> , ready for your answer; each new click adds the next one on its own line. Text you select yourself goes in as it is. Click the button again, press Ctrl+L again or press Esc to stop.
 
 ## Find a channel
 

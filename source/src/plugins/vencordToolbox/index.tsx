@@ -32,6 +32,7 @@ import type { PropsWithChildren } from "react";
 import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
 import { isFeedbackOn, onFeedbackChange, setFeedback, startFeedbackShortcut, stopFeedbackShortcut } from "./feedback";
 import { LinksPanel } from "./links";
+import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
 
 const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_BOTTOM,", 'position:"bottom"');
@@ -268,6 +269,22 @@ export default definePlugin({
     settings,
 
     patches: [
+        // A message over the length limit is attached as a text file on Enter, with no window.
+        {
+            find: '"MESSAGE_LENGTH_UPSELL",this.handleMessageLengthUpsell',
+            replacement: {
+                match: /handleMessageLengthUpsell\(\i\){let{channel:(\i),content:(\i)}=\i;/,
+                replace: "$&return $self.attachLongMessage($1,$2);"
+            }
+        },
+        // No "Send longer messages with Discord Nitro!" under the message box (Stephane, 4 Oct).
+        {
+            find: "upsellLongMessages:{iconOnly:!1}",
+            replacement: {
+                match: /upsellLongMessages:\{iconOnly:!\d\}/g,
+                replace: "upsellLongMessages:void 0"
+            }
+        },
         {
             find: '?"BACK_FORWARD_NAVIGATION":',
             replacement: {
@@ -276,6 +293,8 @@ export default definePlugin({
             }
         }
     ],
+
+    attachLongMessage,
 
     start() {
         startFindShortcut();

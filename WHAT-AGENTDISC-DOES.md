@@ -60,6 +60,10 @@ Discord's own shortcuts: Alt with the up and down arrows moves to the channel ab
 
 AgentDisc adds the same moves for the left hand: Alt with Z (up), S (down), Q (back) and D (forward) on an AZERTY keyboard, or Alt with W, S, A and D on a QWERTY keyboard.
 
+## Long messages
+
+When a message is longer than Discord allows, Enter no longer opens the "message too long" window: the text is attached as a text file right away, and Enter again sends it. The "Send longer messages with Discord Nitro!" line under the message box is gone.
+
 ## Small tidy-ups
 
 The invite and settings buttons that pop up when the mouse passes over a channel are gone (right-click still has both). Discord's tracking is blocked. Links no longer try to open the Discord desktop app. If a Discord update breaks one of the AgentDisc parts, a thin purple bar appears at the top; hover it to see which part, and ask your agent to rebuild the app.

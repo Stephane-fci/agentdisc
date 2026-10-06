@@ -96,12 +96,87 @@ function NameBox({ title, initial, placeholder, save }: { title: string; initial
     );
 }
 
-// The category a new channel goes in: the one of the channel (or thread's channel) open now.
-function currentCategory(channel: any) {
-    const base = channel?.isThread?.() ? ChannelStore.getChannel(channel.parent_id) : channel;
-    if (!base) return null;
-    if (base.type === CATEGORY) return base;
-    return base.parent_id ? ChannelStore.getChannel(base.parent_id) : null;
+// The real categories of a server, in their order in the list (Discord's list of them
+// starts with a made-up "Uncategorized" one).
+function guildCategories(guildId: string): any[] {
+    return ((GuildChannelStore.getChannels(guildId) as any)?.[CATEGORY] ?? [])
+        .map((e: any) => e.channel)
+        .filter((c: any) => c && ChannelStore.getChannel(c.id)?.type === CATEGORY)
+        .sort((a: any, b: any) => a.position - b.position);
+}
+
+// The first category whose name starts with the same emoji as this name.
+function categoryForName(name: string, categories: any[]) {
+    const emoji = leadingEmoji(name);
+    return emoji ? categories.find(c => leadingEmoji(c.name) === emoji) ?? null : null;
+}
+
+// A new channel always goes in a category (Stephane, 6 Oct): the one whose emoji starts the
+// name typed, else the category of the channel open now, else the one with that channel's
+// emoji. The box shows the category and lets him pick another.
+function NewChannelBox({ guildId, categories, fallback }: { guildId: string; categories: any[]; fallback: string | null; }) {
+    const [name, setName] = useState("");
+    const [picked, setPicked] = useState<string | null | undefined>(undefined);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+    const categoryId = picked !== undefined ? picked : categoryForName(name, categories)?.id ?? fallback;
+
+    async function submit() {
+        const clean = name.trim();
+        if (!clean || busy) return;
+        setBusy(true);
+        setError("");
+        try {
+            const { body } = await RestAPI.post({
+                url: `/guilds/${guildId}/channels`,
+                body: { type: TEXT, name: clean, ...(categoryId ? { parent_id: categoryId } : {}) }
+            });
+            closeBox();
+            if (body?.id) NavigationRouter.transitionTo(`/channels/${guildId}/${body.id}`);
+        } catch (e) {
+            setError(errorText(e));
+            setBusy(false);
+        }
+    }
+
+    const keys = (e: React.KeyboardEvent) => {
+        if (e.key === "Escape") { e.preventDefault(); closeBox(); }
+        else if (e.key === "Enter") { e.preventDefault(); submit(); }
+        e.stopPropagation();
+    };
+
+    return (
+        <div className="agentdisc-find-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) closeBox(); }}>
+            <div className="agentdisc-find agentdisc-namebox" role="dialog" aria-label="New channel">
+                <div className="agentdisc-namebox-title">New channel</div>
+                <input
+                    className="agentdisc-find-input"
+                    placeholder="Channel name"
+                    value={name}
+                    autoFocus
+                    disabled={busy}
+                    onChange={e => setName(e.currentTarget.value)}
+                    onKeyDown={keys}
+                />
+                <label className="agentdisc-namebox-field">
+                    <span>Category</span>
+                    <select
+                        className="agentdisc-namebox-select"
+                        value={categoryId ?? ""}
+                        disabled={busy}
+                        onChange={e => setPicked(e.currentTarget.value || null)}
+                        onKeyDown={keys}
+                    >
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        <option value="">No category</option>
+                    </select>
+                </label>
+                <div className={"agentdisc-find-note" + (error ? " agentdisc-namebox-error" : "")}>
+                    {error || (busy ? "Saving…" : "Enter creates it, Esc closes. The category follows the emoji you type.")}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 export function openNewChannel() {
@@ -111,21 +186,12 @@ export function openNewChannel() {
         showToast("Open a server first, then create the channel.", Toasts.Type.FAILURE);
         return;
     }
-    const category = currentCategory(current);
-    show(
-        <NameBox
-            title={category ? `New channel in ${category.name}` : "New channel"}
-            initial=""
-            placeholder="Channel name"
-            save={async name => {
-                const { body } = await RestAPI.post({
-                    url: `/guilds/${guildId}/channels`,
-                    body: { type: TEXT, name, ...(category ? { parent_id: category.id } : {}) }
-                });
-                if (body?.id) NavigationRouter.transitionTo(`/channels/${guildId}/${body.id}`);
-            }}
-        />
-    );
+    const categories = guildCategories(guildId);
+    const base = current?.isThread?.() ? ChannelStore.getChannel(current.parent_id) : current;
+    const fallback = base?.type === CATEGORY ? base.id
+        : base?.parent_id && categories.some(c => c.id === base.parent_id) ? base.parent_id
+            : base ? categoryForName(base.name, categories)?.id ?? null : null;
+    show(<NewChannelBox guildId={guildId} categories={categories} fallback={fallback} />);
 }
 
 // Renames the channel or thread open now. False when there is nothing to rename (a DM).
@@ -174,10 +240,7 @@ export async function tidyChannel(): Promise<boolean> {
             showToast("This channel's name does not start with an emoji.", Toasts.Type.FAILURE);
             return true;
         }
-        category = records(lists?.[CATEGORY])
-            .filter(c => ChannelStore.getChannel(c.id)?.type === CATEGORY)
-            .sort((a, b) => a.position - b.position)
-            .find(c => leadingEmoji(c.name) === emoji);
+        category = categoryForName(channel.name, guildCategories(guildId));
         if (!category) {
             showToast(`No category starts with ${emoji}.`, Toasts.Type.FAILURE);
             return true;

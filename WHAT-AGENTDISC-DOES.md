@@ -20,7 +20,7 @@ A flag button in the top bar, or Ctrl+B, bookmarks the channel or thread you are
 
 ## Above the channel list
 
-A row of buttons stays at the top of the channel list. "Hide threads" or "Show threads" folds or opens every channel's threads. "Close categories" or "Open categories" closes or opens every category of the server. A closed category still shows a channel that is bookmarked or where someone is typing (in it or in one of its threads), like it shows unread ones. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Ctrl+P does the same): type its name and press Enter, and it is created in the category of the channel you are in and opens.
+A row of buttons stays at the top of the channel list. "Hide threads" or "Show threads" folds or opens every channel's threads. "Close categories" or "Open categories" closes or opens every category of the server. A closed category still shows a channel that is bookmarked or where someone is typing (in it or in one of its threads), like it shows unread ones. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Ctrl+P does the same): type its name and press Enter, and it opens. It always goes in a category: the first one whose name starts with the emoji you typed, else the category of the channel you are in, else the one with that channel's emoji. The box shows the category, and you can pick another.
 
 ## Tidy a channel into its category
 

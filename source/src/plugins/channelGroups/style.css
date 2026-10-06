@@ -345,3 +345,30 @@ html.agentdisc-channel-filter .vc-list-tools ~ * {
     font-size: 14px;
     line-height: 22px;
 }
+
+/* The new channel box: the category it goes in, which he can change. */
+.agentdisc-namebox-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 12px 0;
+    color: var(--text-muted, #949ba4);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.agentdisc-namebox-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--border-subtle, rgb(255 255 255 / 12%));
+    border-radius: 8px;
+    background: var(--background-base-lowest, #000);
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+    outline: none;
+}
+
+.agentdisc-namebox-select:focus {
+    border-color: color-mix(in oklab, #5865f2 60%, transparent);
+}

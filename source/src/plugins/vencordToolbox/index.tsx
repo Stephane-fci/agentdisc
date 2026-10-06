@@ -21,10 +21,10 @@ import "./styles.css";
 import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { Devs } from "@utils/constants";
-import definePlugin, { OptionType } from "@utils/types";
 import { togglePriority, usePriority } from "@plugins/channelGroups";
 import { ChannelSectionStore, isHidden, settings as panelSettings, startSearch, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
+import { Devs } from "@utils/constants";
+import definePlugin, { OptionType } from "@utils/types";
 import { findComponentByCodeLazy } from "@webpack";
 import { ChannelStore, Popout, SelectedChannelStore, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
 import type { PropsWithChildren } from "react";
@@ -270,6 +270,21 @@ export default definePlugin({
     settings,
 
     patches: [
+        // Ctrl+K and Ctrl+P are AgentDisc's (tidy a channel, new channel, Stephane 6 Oct):
+        // Discord's quick switcher (Ctrl+M finds channels instead) and pinned messages
+        // shortcuts move to keys nobody presses.
+        {
+            find: 'binds:["mod+k"],comboKeysBindGlobal',
+            replacement: { match: /binds:\["mod\+k"\]/, replace: 'binds:["mod+shift+alt+k"]' }
+        },
+        {
+            find: 'binds:["mod+k","mod+t"],comboKeysBindGlobal',
+            replacement: { match: /binds:\["mod\+k","mod\+t"\]/, replace: 'binds:["mod+t"]' }
+        },
+        {
+            find: 'binds:["mod+p"],comboKeysBindGlobal',
+            replacement: { match: /binds:\["mod\+p"\]/, replace: 'binds:["mod+shift+alt+p"]' }
+        },
         // A message over the length limit is attached as a text file on Enter, with no window.
         {
             find: '"MESSAGE_LENGTH_UPSELL",this.handleMessageLengthUpsell',

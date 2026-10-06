@@ -20,7 +20,11 @@ A flag button in the top bar, or Ctrl+B, bookmarks the channel or thread you are
 
 ## Above the channel list
 
-A row of buttons stays at the top of the channel list. "Hide threads" or "Show threads" folds or opens every channel's threads. "Close categories" or "Open categories" closes or opens every category of the server. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Alt+N does the same): type its name and press Enter, and it is created in the category of the channel you are in and opens.
+A row of buttons stays at the top of the channel list. "Hide threads" or "Show threads" folds or opens every channel's threads. "Close categories" or "Open categories" closes or opens every category of the server. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Ctrl+P does the same): type its name and press Enter, and it is created in the category of the channel you are in and opens.
+
+## Tidy a channel into its category
+
+Ctrl+K on a channel outside any category moves it into the first category whose name starts with the same emoji, at the top of that category: "🥑-discord-app" goes into "🥑 Tools & Skills". Ctrl+K on a channel inside a category takes it out, to the top of the channel list. In a thread, its channel moves.
 
 ## Rename a channel
 
@@ -68,7 +72,7 @@ Discord's own shortcuts: Alt with the up and down arrows moves to the channel ab
 
 AgentDisc adds the same moves for the left hand: Alt with Z (up), S (down), Q (back) and D (forward) on an AZERTY keyboard, or Alt with W, S, A and D on a QWERTY keyboard.
 
-More AgentDisc shortcuts: Ctrl+M finds a channel, Ctrl+L turns feedback mode on and off, Ctrl+B bookmarks the channel you are in (with text selected in the message box it still makes the text bold), Ctrl+R renames it, and Alt+N creates a channel. Chrome keeps Ctrl+N for a new window, so the new channel shortcut is Alt+N.
+More AgentDisc shortcuts: Ctrl+M finds a channel, Ctrl+L turns feedback mode on and off, Ctrl+B bookmarks the channel you are in (with text selected in the message box it still makes the text bold), Ctrl+R renames it, Ctrl+P creates a channel, Ctrl+K moves it into or out of its category, and Ctrl+H shows a window with every shortcut and button. Discord's own Ctrl+K (quick switcher, use Ctrl+M instead) and Ctrl+P (pinned messages, the pin button stays) give way to these.
 
 ## Long messages
 

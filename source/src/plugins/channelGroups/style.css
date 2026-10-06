@@ -309,3 +309,39 @@ html.agentdisc-channel-filter .vc-list-tools ~ * {
 .agentdisc-namebox-error {
     color: #f23f43;
 }
+
+/* Ctrl+H: every shortcut and button, in one window. */
+.agentdisc-help {
+    max-height: 76vh;
+    overflow-y: auto;
+    outline: none;
+    padding-bottom: 12px;
+}
+
+.agentdisc-help-rows {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 14px;
+    padding: 10px 14px 4px;
+}
+
+.agentdisc-help-row {
+    display: contents;
+}
+
+.agentdisc-help-key {
+    justify-self: start;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: color-mix(in oklab, #5865f2 22%, transparent);
+    color: var(--interactive-text-active, #fff);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.agentdisc-help-what {
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+    line-height: 22px;
+}

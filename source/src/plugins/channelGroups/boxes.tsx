@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { ChannelStore, createRoot, NavigationRouter, RestAPI, SelectedChannelStore, SelectedGuildStore, showToast, Toasts, useState } from "@webpack/common";
+import { ChannelStore, createRoot, GuildChannelStore, NavigationRouter, RestAPI, SelectedChannelStore, SelectedGuildStore, showToast, Toasts, useState } from "@webpack/common";
 import type { Root } from "react-dom/client";
 
 // New channel and rename (Stephane, 6 Oct): one small box in the middle of the screen,
@@ -16,12 +16,24 @@ const TEXT = 0;
 
 let root: Root | null = null;
 let host: HTMLElement | null = null;
+let shown = "";
 
 export function closeBox() {
     root?.unmount();
     host?.remove();
     root = null;
     host = null;
+    shown = "";
+}
+
+// Which box is open ("" for none), so a shortcut can close its own box again.
+export function openBoxKind() {
+    return shown;
+}
+
+export function showBox(node: React.ReactNode, kind = "box") {
+    show(node);
+    shown = kind;
 }
 
 function show(node: React.ReactNode) {
@@ -132,5 +144,61 @@ export function openRename(): boolean {
             }}
         />
     );
+    return true;
+}
+
+// Ctrl+K (Stephane, 6 Oct): a channel outside any category goes into the first category
+// whose name starts with the same emoji; a channel in a category comes out of it, to the
+// top of the list. In a thread, its channel moves. It lands first in its new place.
+function leadingEmoji(name: string): string | null {
+    const first = new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(name.trim())[Symbol.iterator]().next().value?.segment;
+    if (!first || !/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(first)) return null;
+    return first.replace(/[\uFE0E\uFE0F]/g, "");
+}
+
+export async function tidyChannel(): Promise<boolean> {
+    const open = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
+    const channel = open?.isThread?.() ? ChannelStore.getChannel(open.parent_id) : open;
+    if (!channel?.guild_id || channel.type === CATEGORY) return false;
+    const guildId = channel.guild_id;
+    const lists = GuildChannelStore.getChannels(guildId) as any;
+    const records = (entries: any[] | undefined) => (entries ?? []).map(e => e.channel).filter(Boolean);
+    const selectable = records(lists?.SELECTABLE);
+    // Text channels and voice channels are ordered apart; the channel moves among its own kind.
+    const group = selectable.some(c => c.id === channel.id) ? selectable : records(lists?.VOCAL);
+
+    let category: any = null;
+    if (!channel.parent_id) {
+        const emoji = leadingEmoji(channel.name);
+        if (!emoji) {
+            showToast("This channel's name does not start with an emoji.", Toasts.Type.FAILURE);
+            return true;
+        }
+        category = records(lists?.[CATEGORY])
+            .filter(c => ChannelStore.getChannel(c.id)?.type === CATEGORY)
+            .sort((a, b) => a.position - b.position)
+            .find(c => leadingEmoji(c.name) === emoji);
+        if (!category) {
+            showToast(`No category starts with ${emoji}.`, Toasts.Type.FAILURE);
+            return true;
+        }
+    }
+
+    const parentId = category?.id ?? null;
+    const others = group
+        .filter(c => c.id !== channel.id && (c.parent_id ?? null) === parentId)
+        .sort((a, b) => a.position - b.position);
+    try {
+        await RestAPI.patch({
+            url: `/guilds/${guildId}/channels`,
+            body: [
+                { id: channel.id, parent_id: parentId, position: 0, lock_permissions: false },
+                ...others.map((c, i) => ({ id: c.id, position: i + 1 }))
+            ]
+        });
+        showToast(category ? `Moved into ${category.name}` : "Moved out of its category, to the top", Toasts.Type.SUCCESS);
+    } catch (e) {
+        showToast(`Could not move it: ${errorText(e)}`, Toasts.Type.FAILURE);
+    }
     return true;
 }

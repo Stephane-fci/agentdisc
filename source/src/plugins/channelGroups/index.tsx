@@ -465,7 +465,7 @@ function ListTools({ guildId }: { guildId: string; }) {
                 <button type="button" className={"vc-list-icon" + (filterOpen ? " vc-list-icon-on" : "")} title="Filter channels" aria-label="Filter channels" onClick={() => setFilterOpen(v => !v)}>
                     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fillRule="evenodd" d={SEARCH} /></svg>
                 </button>
-                <button type="button" className="vc-list-icon" title="New channel (Alt+N)" aria-label="New channel" onClick={openNewChannel}>
+                <button type="button" className="vc-list-icon" title="New channel (Ctrl+P)" aria-label="New channel" onClick={openNewChannel}>
                     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={PLUS} /></svg>
                 </button>
             </div>

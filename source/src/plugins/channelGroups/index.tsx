@@ -77,7 +77,7 @@ export function clearPriorities() {
 // back to its place when the bookmark goes (Stephane, 6 Oct). Discord's own favourites
 // section does exactly that, so bookmarked channels are added to the favourites Discord
 // reads when it builds the list. Threads stay under their channel.
-const ChannelListStore = findStoreLazy("ChannelListStore") as { agentdiscRefresh?(guildId: string): boolean; emitChange(): void; };
+const ChannelListStore = findStoreLazy("ChannelListStore") as { agentdiscRefresh?(guildId: string): boolean; agentdiscUpdate?(channelId: string): boolean; emitChange(): void; };
 const CATEGORY = 4;
 
 function isChannelBookmark(id: string) {
@@ -97,6 +97,60 @@ function withBookmarks(guildId: string, favourites: string[] | null | undefined)
         logger.warn("Could not add the bookmarks to the top of the list", e);
         return own;
     }
+}
+
+// In a closed category, a bookmarked channel and a channel where someone is typing (in it
+// or in one of its threads) stay visible, like an unread one (Stephane, 6 Oct).
+const typingShown = new Set<string>();
+const typingCandidates = new Set<string>();
+let typingQueued = false;
+
+function keepVisible(id: string) {
+    return isChannelBookmark(id) || (isPluginEnabled("ChannelGroups") && typingShown.has(id));
+}
+
+function someoneTyping(channelId: string, guildId: string, me: string | undefined) {
+    const lines = [channelId, ...Object.keys(ActiveJoinedThreadsStore.getActiveJoinedThreadsForParent(guildId, channelId) ?? {})];
+    return lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me));
+}
+
+function checkTyping() {
+    typingQueued = false;
+    try {
+        const me = UserStore.getCurrentUser()?.id;
+        let changed = false;
+        for (const id of typingCandidates) {
+            const channel = ChannelStore.getChannel(id);
+            const typing = !!channel?.guild_id && someoneTyping(id, channel.guild_id, me);
+            if (typing === typingShown.has(id)) {
+                if (!typing) typingCandidates.delete(id);
+                continue;
+            }
+            if (typing) typingShown.add(id);
+            else {
+                typingShown.delete(id);
+                typingCandidates.delete(id);
+            }
+            if (ChannelListStore.agentdiscUpdate?.(id)) changed = true;
+        }
+        if (changed) ChannelListStore.emitChange();
+    } catch (e) {
+        logger.warn("Could not show the channels where someone is typing", e);
+    }
+}
+
+function queueTypingCheck() {
+    if (typingQueued || !typingCandidates.size) return;
+    typingQueued = true;
+    requestAnimationFrame(checkTyping);
+}
+
+// Someone starts typing: their channel (a thread's channel) is checked on the next frame.
+function onTypingStart({ channelId }: { channelId?: string; }) {
+    const channel = channelId ? ChannelStore.getChannel(channelId) : null;
+    if (!channel?.guild_id) return;
+    typingCandidates.add(channel.isThread() ? channel.parent_id : channel.id);
+    queueTypingCheck();
 }
 
 function refreshLists(ids: string[]) {
@@ -676,6 +730,12 @@ export default definePlugin({
                 {
                     match: /(\i\.\i)\.isFavorite\((\i)\.guild_id,\2\.id\)/,
                     replace: "($self.isChannelBookmark($2.id)||$&)"
+                },
+                {
+                    // A closed category keeps a bookmarked channel, and one where someone is
+                    // typing, in view, like the open, unread or mentioned ones.
+                    match: /(\i\|\|\i\|\|!\i\(\)\.isEmpty\(\i\)\|\|\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
+                    replace: "$1||$self.keepVisible(this.id)"
                 }
             ]
         },
@@ -684,7 +744,7 @@ export default definePlugin({
             find: 'displayName="ChannelListStore"',
             replacement: {
                 match: /getGuildWithoutChangingGuildActionRows\((\i)\)\{let \i=(\i)\.getGuildChannelRowsOnly\(\1\)/,
-                replace: "agentdiscRefresh(id){return $2.clearGuildId(id)}$&"
+                replace: "agentdiscRefresh(id){return $2.clearGuildId(id)}agentdiscUpdate(id){return $2.nonPositionalChannelIdUpdate(id)}$&"
             }
         }
     ],
@@ -693,6 +753,7 @@ export default definePlugin({
     rowHeight,
     withBookmarks,
     isChannelBookmark,
+    keepVisible,
     hideTopLine,
     onlyHiddenTopLines,
 
@@ -735,12 +796,20 @@ export default definePlugin({
         priorityStyle.id = "agentdisc-priority";
         (document.head ?? document.documentElement).append(style, priorityStyle);
         for (const store of PRIORITY_STORES()) store?.addChangeListener?.(queuePriority);
+        TypingStore.addChangeListener(queueTypingCheck);
+        FluxDispatcher.subscribe("TYPING_START", onTypingStart);
         for (const part of Object.keys(LOOKUPS) as (keyof typeof LOOKUPS)[]) lookUp(part);
         apply();
     },
 
     stop() {
         for (const store of PRIORITY_STORES()) store?.removeChangeListener?.(queuePriority);
+        TypingStore.removeChangeListener(queueTypingCheck);
+        FluxDispatcher.unsubscribe("TYPING_START", onTypingStart);
+        typingCandidates.clear();
+        const shown = [...typingShown];
+        typingShown.clear();
+        for (const id of shown) ChannelListStore.agentdiscUpdate?.(id);
         style?.remove();
         style = null;
         priorityStyle?.remove();

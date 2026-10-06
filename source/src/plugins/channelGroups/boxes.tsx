@@ -97,11 +97,11 @@ function NameBox({ title, initial, placeholder, save }: { title: string; initial
 }
 
 // The real categories of a server, in their order in the list (Discord's list of them
-// starts with a made-up "Uncategorized" one).
+// starts with a made-up "Uncategorized" one). Archive categories never count (Stephane, 6 Oct).
 function guildCategories(guildId: string): any[] {
     return ((GuildChannelStore.getChannels(guildId) as any)?.[CATEGORY] ?? [])
         .map((e: any) => e.channel)
-        .filter((c: any) => c && ChannelStore.getChannel(c.id)?.type === CATEGORY)
+        .filter((c: any) => c && ChannelStore.getChannel(c.id)?.type === CATEGORY && !/archive/i.test(c.name))
         .sort((a: any, b: any) => a.position - b.position);
 }
 
@@ -111,15 +111,13 @@ function categoryForName(name: string, categories: any[]) {
     return emoji ? categories.find(c => leadingEmoji(c.name) === emoji) ?? null : null;
 }
 
-// A new channel always goes in a category (Stephane, 6 Oct): the one whose emoji starts the
-// name typed, else the category of the channel open now, else the one with that channel's
-// emoji. The box shows the category and lets him pick another.
-function NewChannelBox({ guildId, categories, fallback }: { guildId: string; categories: any[]; fallback: string | null; }) {
+// A new channel goes outside any category unless he picks one in the box (Stephane, 6 Oct:
+// "no category as default"). Archive categories are not offered.
+function NewChannelBox({ guildId, categories }: { guildId: string; categories: any[]; }) {
     const [name, setName] = useState("");
-    const [picked, setPicked] = useState<string | null | undefined>(undefined);
+    const [categoryId, setCategoryId] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const categoryId = picked !== undefined ? picked : categoryForName(name, categories)?.id ?? fallback;
 
     async function submit() {
         const clean = name.trim();
@@ -164,15 +162,15 @@ function NewChannelBox({ guildId, categories, fallback }: { guildId: string; cat
                         className="agentdisc-namebox-select"
                         value={categoryId ?? ""}
                         disabled={busy}
-                        onChange={e => setPicked(e.currentTarget.value || null)}
+                        onChange={e => setCategoryId(e.currentTarget.value || null)}
                         onKeyDown={keys}
                     >
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         <option value="">No category</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </label>
                 <div className={"agentdisc-find-note" + (error ? " agentdisc-namebox-error" : "")}>
-                    {error || (busy ? "Saving…" : "Enter creates it, Esc closes. The category follows the emoji you type.")}
+                    {error || (busy ? "Saving…" : "Enter creates it, Esc closes.")}
                 </div>
             </div>
         </div>
@@ -186,12 +184,7 @@ export function openNewChannel() {
         showToast("Open a server first, then create the channel.", Toasts.Type.FAILURE);
         return;
     }
-    const categories = guildCategories(guildId);
-    const base = current?.isThread?.() ? ChannelStore.getChannel(current.parent_id) : current;
-    const fallback = base?.type === CATEGORY ? base.id
-        : base?.parent_id && categories.some(c => c.id === base.parent_id) ? base.parent_id
-            : base ? categoryForName(base.name, categories)?.id ?? null : null;
-    show(<NewChannelBox guildId={guildId} categories={categories} fallback={fallback} />);
+    show(<NewChannelBox guildId={guildId} categories={guildCategories(guildId)} />);
 }
 
 // Renames the channel or thread open now. False when there is nothing to rename (a DM).

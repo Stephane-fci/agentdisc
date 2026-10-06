@@ -10,12 +10,13 @@ import { ActiveJoinedThreadsStore, ChannelStore, GuildChannelStore, GuildStore, 
 // as soon as he types, the matching channels and threads of every server show, the best
 // first, and a click or Enter takes him there.
 
-interface Place {
+export interface Place {
     id: string;
     guildId: string;
     name: string;
     plain: string;
     where: string;
+    parentName: string;
     kind: "channel" | "thread" | "voice";
     recent: bigint;
 }
@@ -23,7 +24,7 @@ interface Place {
 const SHOWN = 30;
 
 // Emoji, dashes and capitals do not count: "lifely po" finds "🦕-lifely-po-allocation".
-function plain(text: string) {
+export function plain(text: string) {
     return text.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "")
         .replace(/\p{Extended_Pictographic}|️|‍/gu, " ")
         .replace(/[-_.·|/]+/g, " ").replace(/\s+/g, " ").trim();
@@ -37,9 +38,11 @@ function recency(channel: any) {
     }
 }
 
-function allPlaces(): Place[] {
+// Every channel, voice channel and joined thread, of every server or of one.
+export function allPlaces(guildId?: string | null): Place[] {
     const places: Place[] = [];
-    const guilds = Object.values(GuildStore.getGuilds() ?? {}) as any[];
+    const all = Object.values(GuildStore.getGuilds() ?? {}) as any[];
+    const guilds = guildId ? all.filter(g => g.id === guildId) : all;
     for (const guild of guilds) {
         let lists: any;
         try {
@@ -56,6 +59,7 @@ function allPlaces(): Place[] {
                 name: channel.name,
                 plain: plain(channel.name),
                 where: [guild.name, parent?.name].filter(Boolean).join(" · "),
+                parentName: parent?.name ?? "",
                 kind,
                 recent: recency(channel)
             });
@@ -74,7 +78,7 @@ function allPlaces(): Place[] {
 
 // Best first: names that start with what is typed, then a word that starts with it, then
 // any name containing every word typed; the most recently active first within each.
-function find(places: Place[], query: string): Place[] {
+export function find(places: Place[], query: string, limit = SHOWN): Place[] {
     const q = plain(query);
     if (!q) return [];
     const words = q.split(" ");
@@ -86,17 +90,17 @@ function find(places: Place[], query: string): Place[] {
         scored.push({ p, score });
     }
     scored.sort((a, b) => a.score - b.score || (b.p.recent > a.p.recent ? 1 : b.p.recent < a.p.recent ? -1 : 0));
-    return scored.slice(0, SHOWN).map(s => s.p);
+    return scored.slice(0, limit).map(s => s.p);
 }
 
-const ICONS: Record<Place["kind"], string> = {
+export const ICONS: Record<Place["kind"], string> = {
     channel: "M10.99 3.16A1 1 0 1 0 9 2.84L8.15 8H4a1 1 0 0 0 0 2h3.82l-.67 4H3a1 1 0 1 0 0 2h3.82l-.8 4.84a1 1 0 0 0 1.97.32L8.85 16h4.97l-.8 4.84a1 1 0 0 0 1.97.32l.86-5.16H20a1 1 0 1 0 0-2h-3.82l.67-4H21a1 1 0 1 0 0-2h-3.82l.8-4.84a1 1 0 1 0-1.97-.32L15.15 8h-4.97l.8-4.84ZM14.15 14l.67-4H9.85l-.67 4h4.97Z",
     thread: "M4 3a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h1v3.5a.5.5 0 0 0 .85.35L9.7 16H14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H4Zm14 5v6a4 4 0 0 1-4 4h-3.1l-1.55 1.55A2 2 0 0 0 11 20h3.3l3.85 3.85a.5.5 0 0 0 .85-.35V20h1a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-2Z",
     voice: "M12 3a1 1 0 0 0-1.7-.7L6.6 6H4a2 2 0 0 0-2 2v8c0 1.1.9 2 2 2h2.6l3.7 3.7A1 1 0 0 0 12 21V3Zm3.1 5.3a1 1 0 0 1 1.4 0 5 5 0 0 1 0 7.4 1 1 0 1 1-1.4-1.4 3 3 0 0 0 0-4.6 1 1 0 0 1 0-1.4Z"
 };
 
 function SearchBox({ onClose }: { onClose(): void; }) {
-    const places = useMemo(allPlaces, []);
+    const places = useMemo(() => allPlaces(), []);
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     const results = useMemo(() => find(places, query), [places, query]);

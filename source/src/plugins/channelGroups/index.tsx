@@ -6,15 +6,17 @@
 
 import "./style.css";
 
-import { isPluginEnabled } from "@api/PluginManager";
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings, Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { allPlaces, find, ICONS, type Place } from "@plugins/vencordToolbox/channelSearch";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
-import { filters, mapMangledCssClasses, waitFor } from "@webpack";
-import { ActiveJoinedThreadsStore, ChannelStore, Menu, ReadStateStore, SelectedChannelStore, TypingStore, useEffect, useReducer, UserStore, useStateFromStores } from "@webpack/common";
+import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
+import { ActiveJoinedThreadsStore, ChannelStore, FluxDispatcher, GuildChannelStore, Menu, NavigationRouter, ReadStateStore, SelectedChannelStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
 
+import { openNewChannel } from "./boxes";
 import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, PriorityState, THREAD_TRIM } from "./css";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
@@ -46,6 +48,10 @@ function isPriority(id: string | null | undefined) {
     return !!id && settings.store.priority?.[id] === true;
 }
 
+export function isBookmarked(id: string | null | undefined) {
+    return isPriority(id);
+}
+
 export function togglePriority(id: string) {
     const priority = { ...settings.store.priority };
     if (priority[id]) delete priority[id];
@@ -53,15 +59,54 @@ export function togglePriority(id: string) {
     settings.store.priority = priority;
     priorityKey = "";
     updatePriority();
+    refreshLists([id]);
     redrawList();
 }
 
 // One click puts every marked channel and thread back to normal (Stephane, 1 Oct).
 export function clearPriorities() {
+    const before = Object.keys(settings.store.priority ?? {});
     settings.store.priority = {};
     priorityKey = "";
     updatePriority();
+    refreshLists(before);
     redrawList();
+}
+
+// A bookmarked channel goes to the top of its server's channel list, wherever it was, and
+// back to its place when the bookmark goes (Stephane, 6 Oct). Discord's own favourites
+// section does exactly that, so bookmarked channels are added to the favourites Discord
+// reads when it builds the list. Threads stay under their channel.
+const ChannelListStore = findStoreLazy("ChannelListStore") as { agentdiscRefresh?(guildId: string): boolean; emitChange(): void; };
+const CATEGORY = 4;
+
+function isChannelBookmark(id: string) {
+    if (!isPriority(id) || !isPluginEnabled("ChannelGroups")) return false;
+    const channel = ChannelStore.getChannel(id);
+    return !!channel && !channel.isThread() && channel.type !== CATEGORY;
+}
+
+function withBookmarks(guildId: string, favourites: string[] | null | undefined) {
+    const own = favourites ?? [];
+    if (!isPluginEnabled("ChannelGroups")) return own;
+    try {
+        const marks = Object.keys(settings.store.priority ?? {})
+            .filter(id => isChannelBookmark(id) && ChannelStore.getChannel(id)?.guild_id === guildId && !own.includes(id));
+        return marks.length ? [...own, ...marks] : own;
+    } catch (e) {
+        logger.warn("Could not add the bookmarks to the top of the list", e);
+        return own;
+    }
+}
+
+function refreshLists(ids: string[]) {
+    try {
+        const guilds = new Set(ids.map(id => ChannelStore.getChannel(id)?.guild_id).filter(Boolean) as string[]);
+        for (const guildId of guilds) ChannelListStore.agentdiscRefresh?.(guildId);
+        ChannelListStore.emitChange();
+    } catch (e) {
+        logger.warn("Could not redraw the channel list after a bookmark", e);
+    }
 }
 
 // What is happening in a marked line: an agent typing there (or, for a folded channel, in
@@ -121,7 +166,7 @@ const priorityMenu: NavContextMenuPatchCallback = (children, { channel }: { chan
         <Menu.MenuGroup>
             <Menu.MenuItem
                 id="agentdisc-priority"
-                label={isPriority(channel.id) ? "Remove priority" : "Mark as priority"}
+                label={isPriority(channel.id) ? "Remove bookmark" : "Bookmark"}
                 action={() => togglePriority(channel.id)}
             />
         </Menu.MenuGroup>
@@ -291,35 +336,166 @@ function useListed(channelId: string) {
 
 const CHEVRON = "M5.3 8.3a1 1 0 0 1 1.4 0L12 13.6l5.3-5.3a1 1 0 1 1 1.4 1.4l-6 6a1 1 0 0 1-1.4 0l-6-6a1 1 0 0 1 0-1.4Z";
 
-// One button above the channel list (Stephane, 29 Sept): "Show threads" while some
-// channels are folded, "Hide threads" when all are open. It stays in place while the
-// list scrolls, and only shows in a server where some channel has threads.
-function ThreadsButton({ guildId }: { guildId: string; }) {
+const SEARCH = "M15.62 17.03a9 9 0 1 1 1.41-1.41l4.68 4.67a1 1 0 0 1-1.42 1.42l-4.67-4.68ZM17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z";
+const PLUS = "M13 5a1 1 0 1 0-2 0v6H5a1 1 0 1 0 0 2h6v6a1 1 0 1 0 2 0v-6h6a1 1 0 1 0 0-2h-6V5Z";
+const CLOSE = "M17.3 18.7a1 1 0 0 0 1.4-1.4L13.42 12l5.3-5.3a1 1 0 0 0-1.42-1.4L12 10.58l-5.3-5.3a1 1 0 0 0-1.4 1.42L10.58 12l-5.3 5.3a1 1 0 1 0 1.42 1.4L12 13.42l5.3 5.3Z";
+const FLAG = "M5 21V4m0 0h11.5l-2 4 2 4H5";
+
+const CategoryCollapseStore = findStoreLazy("CategoryCollapseStore") as { isCollapsed(id: string): boolean; };
+
+function categoryIds(guildId: string): string[] {
+    try {
+        // Discord's list of categories starts with a made-up "Uncategorized" one; only real ones count.
+        return ((GuildChannelStore.getChannels(guildId) as any)?.[CATEGORY] ?? [])
+            .map((c: any) => c.channel?.id)
+            .filter((id: string) => id && ChannelStore.getChannel(id)?.type === CATEGORY);
+    } catch {
+        return NONE;
+    }
+}
+
+// The channel filter (Stephane, 6 Oct): while he types, only the matching channels and
+// threads of this server stay in the panel; the arrows move, Enter opens, Esc clears.
+function ChannelFilter({ guildId, onClose }: { guildId: string; onClose(): void; }) {
+    const [query, setQuery] = useState("");
+    const [active, setActive] = useState(0);
+    const places = useMemo(() => allPlaces(guildId), [guildId]);
+    const results = useMemo(() => find(places, query, 80), [places, query]);
+    const selected = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
+    const unread = useStateFromStores([ReadStateStore], () => results.filter(p => ReadStateStore.hasUnread(p.id)).map(p => p.id).join(), [results]);
+    const filtering = query.trim().length > 0;
+
+    useEffect(() => setActive(0), [query]);
+    useEffect(() => {
+        document.documentElement.classList.toggle("agentdisc-channel-filter", filtering);
+        return () => document.documentElement.classList.remove("agentdisc-channel-filter");
+    }, [filtering]);
+
+    const go = (p: Place | undefined) => p && NavigationRouter.transitionTo(`/channels/${p.guildId}/${p.id}`);
+    const unreadIds = new Set(unread.split(","));
+
+    return (
+        <div className="vc-filter">
+            <div className="vc-filter-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fillRule="evenodd" d={SEARCH} /></svg>
+                <input
+                    className="vc-filter-input"
+                    placeholder="Filter channels…"
+                    value={query}
+                    autoFocus
+                    onChange={e => setQuery(e.currentTarget.value)}
+                    onKeyDown={e => {
+                        if (e.key === "Escape") { e.preventDefault(); if (query) setQuery(""); else onClose(); }
+                        else if (e.key === "ArrowDown") { e.preventDefault(); setActive(i => Math.min(i + 1, results.length - 1)); }
+                        else if (e.key === "ArrowUp") { e.preventDefault(); setActive(i => Math.max(i - 1, 0)); }
+                        else if (e.key === "Enter") { e.preventDefault(); go(results[active]); }
+                        e.stopPropagation();
+                    }}
+                />
+                <button type="button" className="vc-filter-close" title="Close the filter" onClick={onClose}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CLOSE} /></svg>
+                </button>
+            </div>
+            {filtering && (
+                <div className="vc-filter-list">
+                    {results.map((p, i) => (
+                        <div
+                            key={p.id}
+                            className={"vc-filter-item" + (p.id === selected ? " vc-filter-selected" : "") + (i === active ? " vc-filter-active" : "") + (unreadIds.has(p.id) ? " vc-filter-unread" : "") + (p.kind === "thread" ? " vc-filter-thread" : "")}
+                            onMouseEnter={() => setActive(i)}
+                            onClick={() => go(p)}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fillRule="evenodd" d={ICONS[p.kind]} /></svg>
+                            <span className="vc-filter-name">{p.name}</span>
+                            {p.parentName && <span className="vc-filter-where">{p.parentName}</span>}
+                        </div>
+                    ))}
+                    {!results.length && <div className="vc-filter-none">No channel matches.</div>}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// The buttons above the channel list (Stephane, 29 Sept, then 1 and 6 Oct): show or hide
+// every thread, clear every bookmark, close or open every category, filter the channels and
+// create a channel. They stay in place while the list scrolls.
+function ListTools({ guildId }: { guildId: string; }) {
     useListedChanges();
     const { folded, priority } = settings.use(["folded", "priority"]);
+    const [filterOpen, setFilterOpen] = useState(false);
 
     const withThreads: string[] = [];
     for (const [id, threads] of listed) {
         if (threads.length > 0 && ChannelStore.getChannel(id)?.guild_id === guildId) withThreads.push(id);
     }
 
+    const categories = useStateFromStores([GuildChannelStore], () => categoryIds(guildId), [guildId], sameIds);
+    const anyOpen = useStateFromStores([CategoryCollapseStore as any], () => categories.some(id => !CategoryCollapseStore.isCollapsed(id)), [categories]);
+
     const someFolded = withThreads.some(id => folded?.[id]);
     const marks = Object.keys(priority ?? {}).length;
-    if (withThreads.length === 0 && marks === 0) return null;
     return (
-        <div className="vc-threads-all-row">
-            {withThreads.length > 0 && (
-                <button type="button" className={"vc-threads-all" + (someFolded ? " vc-threads-all-closed" : "")} onClick={() => setAllFolded(withThreads, !someFolded)}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CHEVRON} /></svg>
-                    {someFolded ? "Show threads" : "Hide threads"}
+        <div className="vc-list-tools">
+            <div className="vc-threads-all-row">
+                {withThreads.length > 0 && (
+                    <button type="button" className={"vc-threads-all" + (someFolded ? " vc-threads-all-closed" : "")} onClick={() => setAllFolded(withThreads, !someFolded)}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CHEVRON} /></svg>
+                        {someFolded ? "Show threads" : "Hide threads"}
+                    </button>
+                )}
+                {marks > 0 && (
+                    <button type="button" className="vc-priority-clear" title="Remove every bookmark" onClick={clearPriorities}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d={FLAG} fill="#f23f43" stroke="#f23f43" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+                        Clear {marks}
+                    </button>
+                )}
+                {categories.length > 0 && (
+                    <button
+                        type="button"
+                        className={"vc-threads-all" + (anyOpen ? "" : " vc-threads-all-closed")}
+                        title={anyOpen ? "Close every category" : "Open every category"}
+                        onClick={() => FluxDispatcher.dispatch({ type: anyOpen ? "CATEGORY_COLLAPSE_ALL" : "CATEGORY_EXPAND_ALL", guildId })}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CHEVRON} /></svg>
+                        {anyOpen ? "Close categories" : "Open categories"}
+                    </button>
+                )}
+                <span className="vc-list-tools-gap" />
+                <button type="button" className={"vc-list-icon" + (filterOpen ? " vc-list-icon-on" : "")} title="Filter channels" aria-label="Filter channels" onClick={() => setFilterOpen(v => !v)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fillRule="evenodd" d={SEARCH} /></svg>
                 </button>
-            )}
-            {marks > 0 && (
-                <button type="button" className="vc-priority-clear" title="Remove every priority mark" onClick={clearPriorities}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4m0 0h11.5l-2 4 2 4H5" fill="#f23f43" stroke="#f23f43" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
-                    Clear {marks}
+                <button type="button" className="vc-list-icon" title="New channel (Alt+N)" aria-label="New channel" onClick={openNewChannel}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={PLUS} /></svg>
                 </button>
-            )}
+            </div>
+            {filterOpen && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setFilterOpen(false)} />}
+        </div>
+    );
+}
+
+// The small cross after a bookmarked channel's name takes the bookmark off (Stephane, 6 Oct).
+function UnmarkButton({ channelId }: { channelId: string; }) {
+    const marked = usePriority(channelId);
+    if (!marked || ChannelStore.getChannel(channelId)?.isThread()) return null;
+    const stop = (e: React.SyntheticEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    return (
+        <div
+            className="vc-unmark"
+            role="button"
+            aria-label="Remove bookmark"
+            title="Remove bookmark"
+            onMouseDown={stop}
+            onMouseUp={stop}
+            onClick={e => {
+                stop(e);
+                togglePriority(channelId);
+            }}
+        >
+            <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CLOSE} /></svg>
         </div>
     );
 }
@@ -465,21 +641,58 @@ export default definePlugin({
                 {
                     match: /children:\[this\.renderTopUnread\(\),/,
                     replace: "children:[$self.ThreadsButton(this.props.guildId),this.renderTopUnread(),"
+                },
+                {
+                    // The favourites heading on top of the list reads "Bookmarks".
+                    match: /(case \i\.\i:return\(0,\i\.jsx\)\(\i,\{name:)\i\.intl\.string\(\i\.t\.[\w$]+\)(\}\);case \i\.recentsSectionNumber:)/,
+                    replace: '$1"Bookmarks"$2'
                 }
             ]
         },
         {
             // The channel line: the fold arrow goes where the white unread mark was.
             find: "UNREAD_IMPORTANT:",
+            replacement: [
+                {
+                    match: /(?<=,channel:(\i),.+?)children:\[(?=\i\|\|!\i\?null:\(0,\i\.jsx\)\("div",\{className:)/,
+                    replace: "children:[$self.FoldArrow($1),"
+                },
+                {
+                    // The cross that takes a bookmark off, right after the channel name.
+                    match: /children:\(0,\i\.jsx\)\(\i,\{textVariant:"text-md\/medium",channel:(\i),name:[^}]+\}\)\}\)/,
+                    replace: "$&,$self.UnmarkButton($1)"
+                }
+            ]
+        },
+        {
+            // Discord builds each server's channel list with its favourites on top, out of
+            // their categories; bookmarked channels join them.
+            find: "suggestedFavoriteChannelId;",
+            replacement: [
+                {
+                    match: /(\i\.\i)\.getGuildFavorites\((\i)\.id\)\?\?\[\]/g,
+                    replace: "$self.withBookmarks($2.id,$1.getGuildFavorites($2.id))"
+                },
+                {
+                    match: /(\i\.\i)\.isFavorite\((\i)\.guild_id,\2\.id\)/,
+                    replace: "($self.isChannelBookmark($2.id)||$&)"
+                }
+            ]
+        },
+        {
+            // A way to have the list built again when a bookmark changes.
+            find: 'displayName="ChannelListStore"',
             replacement: {
-                match: /(?<=,channel:(\i),.+?)children:\[(?=\i\|\|!\i\?null:\(0,\i\.jsx\)\("div",\{className:)/,
-                replace: "children:[$self.FoldArrow($1),"
+                match: /getGuildWithoutChangingGuildActionRows\((\i)\)\{let \i=(\i)\.getGuildChannelRowsOnly\(\1\)/,
+                replace: "agentdiscRefresh(id){return $2.clearGuildId(id)}$&"
             }
         }
     ],
 
     shownThreads,
     rowHeight,
+    withBookmarks,
+    isChannelBookmark,
     hideTopLine,
     onlyHiddenTopLines,
 
@@ -498,7 +711,13 @@ export default definePlugin({
 
     ThreadsButton: (guildId: string) => (
         <ErrorBoundary noop key="vc-threads-all">
-            <ThreadsButton guildId={guildId} />
+            <ListTools guildId={guildId} />
+        </ErrorBoundary>
+    ),
+
+    UnmarkButton: (channel: { id: string; }) => (
+        <ErrorBoundary noop key="vc-unmark">
+            <UnmarkButton channelId={channel.id} />
         </ErrorBoundary>
     ),
 
@@ -509,6 +728,7 @@ export default definePlugin({
     ),
 
     start() {
+        refreshLists(Object.keys(settings.store.priority ?? {}));
         style = document.createElement("style");
         style.id = "agentdisc-channel-groups";
         priorityStyle = document.createElement("style");
@@ -526,6 +746,7 @@ export default definePlugin({
         priorityStyle?.remove();
         priorityStyle = null;
         priorityKey = "";
+        refreshLists(Object.keys(settings.store.priority ?? {}));
         redrawList();
     }
 });

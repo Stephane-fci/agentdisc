@@ -34,6 +34,7 @@ import { isFeedbackOn, onFeedbackChange, setFeedback, startFeedbackShortcut, sto
 import { LinksPanel } from "./links";
 import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
+import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 
 const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_BOTTOM,", 'position:"bottom"');
 
@@ -107,7 +108,7 @@ const FlagIcon = ({ on }: { on: boolean; }) => (
 function PriorityButton({ channelId }: { channelId: string; }) {
     const on = usePriority(channelId);
     return (
-        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => togglePriority(channelId)} tooltip={on ? "Remove priority" : "Mark as priority"} icon={() => <FlagIcon on={on} />} selected={on} />
+        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => togglePriority(channelId)} tooltip={on ? "Remove bookmark (Ctrl+B)" : "Bookmark (Ctrl+B)"} icon={() => <FlagIcon on={on} />} selected={on} />
     );
 }
 
@@ -299,11 +300,13 @@ export default definePlugin({
     start() {
         startFindShortcut();
         startFeedbackShortcut();
+        startChannelShortcuts();
     },
 
     stop() {
         stopFindShortcut();
         stopFeedbackShortcut();
+        stopChannelShortcuts();
         setFeedback(false);
     },
 

@@ -281,6 +281,15 @@ function lookUp(part: Part, attempt = 1) {
     }
 }
 
+// The channel header (name, topic, buttons above the messages), for the rename on a click
+// of the channel name.
+export function channelHeaderSelector() {
+    const C = classes.chat;
+    if (!C?.chat || !C.title) return null;
+    const sel = (cls: string) => cls.split(" ").map(c => "." + c).join("");
+    return `${sel(C.chat)} ${sel(C.title)}`;
+}
+
 // Search lives in the channel header. When the header is hidden, it comes back while a
 // search is going on (the search box has the focus or search results are open) and goes
 // away again a moment after (Stephane, 30 Sept: a search button in the top bar).

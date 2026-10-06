@@ -14,9 +14,17 @@ A button in the top bar, or Ctrl+M, opens a search box. As soon as you type, the
 
 A link button in the top bar opens a panel with every link posted in the channel you are in and in all its threads (or only in the thread, when you are in a thread), newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard. A link from a thread carries a small tag with the thread's name. A gear at the top of the panel offers four tick boxes, all on at first: hide links to Discord channels and messages, hide Slack links, group the same link posted several times into one line (grouped lines have no Jump button, since they point to several messages), and also group links that only differ by tracking codes (a Figma file counts once, whatever frame it points to). Untick grouping to see every post of a link with its own Jump button.
 
-## Priority marks
+## Bookmarks
 
-A flag button in the top bar marks the channel or thread you are in as a priority with one click; click it again to remove the mark. You can also right-click any channel or thread and choose "Mark as priority". A priority line stands out in the channel list until you remove the mark, in the colour of what is happening in it: green while an agent is working there, red when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A priority thread stays visible even when its channel's threads are folded away. A "Clear" button above the channel list removes every mark at once.
+A flag button in the top bar, or Ctrl+B, bookmarks the channel or thread you are in; do it again to remove the bookmark. You can also right-click any channel or thread and choose "Bookmark". A bookmarked channel moves to a "Bookmarks" section at the top of the channel list, wherever it was, and goes back to its place when the bookmark goes; a bookmarked thread stays under its channel, visible even when the channel's threads are folded away. A bookmarked line stands out in the colour of what is happening in it: green while an agent is working there, red when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A small cross after a bookmarked channel's name removes its bookmark, and a "Clear" button above the channel list removes every bookmark at once.
+
+## Above the channel list
+
+A row of buttons stays at the top of the channel list. "Hide threads" or "Show threads" folds or opens every channel's threads. "Close categories" or "Open categories" closes or opens every category of the server. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Alt+N does the same): type its name and press Enter, and it is created in the category of the channel you are in and opens.
+
+## Rename a channel
+
+Ctrl+R, or a click on the channel name above the messages, opens a small box with the name of the channel or thread you are in. Change it and press Enter to save, or Esc to leave it as it was.
 
 ## Buttons in the top bar
 
@@ -59,6 +67,8 @@ Midnight: a near-black channel list, a slightly lighter chat so the two stand ap
 Discord's own shortcuts: Alt with the up and down arrows moves to the channel above or below, Alt with left and right goes back and forward through the channels you visited, and Alt with Shift and the arrows jumps between unread channels.
 
 AgentDisc adds the same moves for the left hand: Alt with Z (up), S (down), Q (back) and D (forward) on an AZERTY keyboard, or Alt with W, S, A and D on a QWERTY keyboard.
+
+More AgentDisc shortcuts: Ctrl+M finds a channel, Ctrl+L turns feedback mode on and off, Ctrl+B bookmarks the channel you are in (with text selected in the message box it still makes the text bold), Ctrl+R renames it, and Alt+N creates a channel. Chrome keeps Ctrl+N for a new window, so the new channel shortcut is Alt+N.
 
 ## Long messages
 

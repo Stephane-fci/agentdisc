@@ -98,3 +98,214 @@
     flex: 1 1 auto;
     min-width: 0;
 }
+
+/* The tools above the channel list (6 Oct): close or open every category, filter the
+   channels, create a channel. The row wraps when the panel is narrow. */
+.vc-list-tools {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.vc-threads-all-row {
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.vc-threads-all-row .vc-threads-all {
+    width: auto;
+    white-space: nowrap;
+}
+
+.vc-list-tools-gap {
+    flex: 1 1 0;
+}
+
+.vc-list-icon {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm, 8px);
+    background: color-mix(in oklab, #5865f2 14%, transparent);
+    color: var(--channels-default);
+    cursor: pointer;
+}
+
+.vc-list-icon:hover,
+.vc-list-icon-on {
+    background: color-mix(in oklab, #5865f2 28%, transparent);
+    color: var(--interactive-text-active);
+}
+
+/* The filter: while it holds text, only the matching channels show in the panel. */
+html.agentdisc-channel-filter .vc-list-tools {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+html.agentdisc-channel-filter .vc-list-tools ~ * {
+    display: none !important;
+}
+
+.vc-filter {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    padding: 2px 8px 4px;
+}
+
+.vc-filter-box {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 6px 0 10px;
+    border: 1px solid color-mix(in oklab, #5865f2 45%, transparent);
+    border-radius: var(--radius-sm, 8px);
+    background: var(--background-base-lowest, #000);
+    color: var(--channels-default);
+}
+
+.vc-filter-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    color: var(--text-default, #dbdee1);
+    font-family: var(--font-primary);
+    font-size: 14px;
+}
+
+.vc-filter-close {
+    display: flex;
+    padding: 3px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.vc-filter-close:hover {
+    background: var(--interactive-background-hover, rgb(255 255 255 / 8%));
+    color: var(--interactive-text-active);
+}
+
+.vc-filter-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: calc(100vh - 200px);
+    margin-top: 6px;
+    overflow-y: auto;
+}
+
+.vc-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    margin-bottom: 2px;
+    padding: 0 8px;
+    border-radius: 6px;
+    color: var(--channels-default);
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.vc-filter-item svg {
+    flex: 0 0 auto;
+    opacity: 0.8;
+}
+
+.vc-filter-thread {
+    padding-inline-start: 22px;
+}
+
+.vc-filter-active {
+    background: var(--interactive-background-hover, rgb(255 255 255 / 6%));
+    color: var(--interactive-text-active);
+}
+
+.vc-filter-unread {
+    color: var(--interactive-text-active, #fff);
+    font-weight: 600;
+}
+
+.vc-filter-selected,
+.vc-filter-selected.vc-filter-active {
+    background: #5865f2;
+    color: #fff;
+}
+
+.vc-filter-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.vc-filter-where {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: right;
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.vc-filter-none {
+    padding: 10px;
+    color: var(--text-muted, #949ba4);
+    font-size: 13px;
+}
+
+/* The cross after a bookmarked channel's name takes the bookmark off. */
+.vc-unmark {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-inline-start: 4px;
+    border-radius: 4px;
+    color: rgb(255 255 255 / 70%);
+    cursor: pointer;
+}
+
+.vc-unmark:hover {
+    background: rgb(0 0 0 / 25%);
+    color: #fff;
+}
+
+/* The new channel and rename box: the channel search box with a title. */
+.agentdisc-namebox {
+    max-height: none;
+}
+
+.agentdisc-namebox-title {
+    padding: 14px 14px 0;
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.agentdisc-namebox .agentdisc-find-input {
+    margin: 10px 12px 2px;
+}
+
+.agentdisc-namebox-error {
+    color: #f23f43;
+}

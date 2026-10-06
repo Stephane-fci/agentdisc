@@ -8,7 +8,7 @@ A speech-bubble button in the top bar, or Ctrl+L, turns feedback mode on (the bu
 
 ## Find a channel
 
-A button in the top bar, or Ctrl+M, opens a search box. As soon as you type, the matching channels and threads of all your servers show, best first, with their server. A click or Enter takes you there; the arrows move through the list and Esc closes it. Emoji, dashes and capitals do not matter: "lifely po" finds "🦕-lifely-po-allocation".
+A button in the top bar, or Ctrl+O, opens a search box. As soon as you type, the matching channels and threads of the server you are in show, best first, each with its category and the day of its last message (the time if it was today). In direct messages it searches all your servers and shows the server too. A click or Enter takes you there; the arrows move through the list and Esc closes it. Emoji, dashes and capitals do not matter: "lifely po" finds "🦕-lifely-po-allocation".
 
 ## Links in a channel
 
@@ -72,7 +72,7 @@ Discord's own shortcuts: Alt with the up and down arrows moves to the channel ab
 
 AgentDisc adds the same moves for the left hand: Alt with Z (up), S (down), Q (back) and D (forward) on an AZERTY keyboard, or Alt with W, S, A and D on a QWERTY keyboard.
 
-More AgentDisc shortcuts: Ctrl+M finds a channel, Ctrl+L turns feedback mode on and off, Ctrl+B bookmarks the channel you are in (with text selected in the message box it still makes the text bold), Ctrl+R renames it, Ctrl+P creates a channel, Ctrl+K moves it into or out of its category, and Ctrl+H shows a window with every shortcut and button. Discord's own Ctrl+K (quick switcher, use Ctrl+M instead) and Ctrl+P (pinned messages, the pin button stays) give way to these.
+More AgentDisc shortcuts: Ctrl+O finds a channel, Ctrl+L turns feedback mode on and off, Ctrl+B bookmarks the channel you are in (with text selected in the message box it still makes the text bold), Ctrl+R renames it, Ctrl+P creates a channel, Ctrl+K moves it into or out of its category, and Ctrl+H shows a window with every shortcut and button. Discord's own Ctrl+K (quick switcher, use Ctrl+O instead) and Ctrl+P (pinned messages, the pin button stays) give way to these.
 
 ## Long messages
 

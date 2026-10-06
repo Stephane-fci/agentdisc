@@ -158,7 +158,7 @@ function FindButton() {
     const { open, toggle, box } = useFind();
     return (
         <>
-            <HeaderBarIcon className="vc-toolbox-btn" onClick={toggle} tooltip="Find a channel (Ctrl+M)" icon={FindIcon} selected={open} />
+            <HeaderBarIcon className="vc-toolbox-btn" onClick={toggle} tooltip="Find a channel in this server (Ctrl+O)" icon={FindIcon} selected={open} />
             {box}
         </>
     );
@@ -271,7 +271,7 @@ export default definePlugin({
 
     patches: [
         // Ctrl+K and Ctrl+P are AgentDisc's (tidy a channel, new channel, Stephane 6 Oct):
-        // Discord's quick switcher (Ctrl+M finds channels instead) and pinned messages
+        // Discord's quick switcher (Ctrl+O finds channels instead) and pinned messages
         // shortcuts move to keys nobody presses.
         {
             find: 'binds:["mod+k"],comboKeysBindGlobal',

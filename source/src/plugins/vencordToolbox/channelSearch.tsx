@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { ActiveJoinedThreadsStore, ChannelStore, GuildChannelStore, GuildStore, NavigationRouter, ReactDOM, useEffect, useMemo, useRef, useState } from "@webpack/common";
+import { ActiveJoinedThreadsStore, ChannelStore, GuildChannelStore, GuildStore, NavigationRouter, ReactDOM, SelectedGuildStore, useEffect, useMemo, useRef, useState } from "@webpack/common";
 
-// Channel search (Stephane, 2 Oct): a button in the top bar and Ctrl+M open one search box;
-// as soon as he types, the matching channels and threads of every server show, the best
-// first, and a click or Enter takes him there.
+// Channel search (Stephane, 2 Oct): a button in the top bar and Ctrl+O (Ctrl+M until 6 Oct)
+// open one search box; as soon as he types, the matching channels and threads show, the
+// best first, and a click or Enter takes him there. In a server it searches that server
+// only, and each line shows its category and the day of its last message (6 Oct); outside
+// a server (direct messages) it searches every server.
 
 export interface Place {
     id: string;
@@ -17,6 +19,7 @@ export interface Place {
     plain: string;
     where: string;
     parentName: string;
+    lastDate: string;
     kind: "channel" | "thread" | "voice";
     recent: bigint;
 }
@@ -36,6 +39,29 @@ function recency(channel: any) {
     } catch {
         return 0n;
     }
+}
+
+const DISCORD_EPOCH = 1420070400000n;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"];
+
+// When the last message was posted: the time today, "Yesterday", the day and month this
+// year, the full date before. Message ids carry their own time.
+export function lastMessageDate(channel: any): string {
+    const id = channel?.lastMessageId ?? channel?.last_message_id;
+    if (!id) return "";
+    let when: Date;
+    try {
+        when = new Date(Number((BigInt(id) >> 22n) + DISCORD_EPOCH));
+    } catch {
+        return "";
+    }
+    const now = new Date();
+    const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const days = Math.round((day(now) - day(when)) / 86400000);
+    if (days <= 0) return `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
+    if (days === 1) return "Yesterday";
+    const date = `${when.getDate()} ${MONTHS[when.getMonth()]}`;
+    return when.getFullYear() === now.getFullYear() ? date : `${date} ${when.getFullYear()}`;
 }
 
 // Every channel, voice channel and joined thread, of every server or of one.
@@ -60,6 +86,7 @@ export function allPlaces(guildId?: string | null): Place[] {
                 plain: plain(channel.name),
                 where: [guild.name, parent?.name].filter(Boolean).join(" · "),
                 parentName: parent?.name ?? "",
+                lastDate: lastMessageDate(channel),
                 kind,
                 recent: recency(channel)
             });
@@ -100,7 +127,7 @@ export const ICONS: Record<Place["kind"], string> = {
 };
 
 function SearchBox({ onClose }: { onClose(): void; }) {
-    const places = useMemo(() => allPlaces(), []);
+    const places = useMemo(() => allPlaces(SelectedGuildStore.getGuildId()), []);
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     const results = useMemo(() => find(places, query), [places, query]);
@@ -122,7 +149,7 @@ function SearchBox({ onClose }: { onClose(): void; }) {
             <div className="agentdisc-find" role="dialog" aria-label="Find a channel">
                 <input
                     className="agentdisc-find-input"
-                    placeholder="Find a channel or thread…"
+                    placeholder={SelectedGuildStore.getGuildId() ? "Find a channel or thread in this server…" : "Find a channel or thread…"}
                     value={query}
                     autoFocus
                     onChange={e => setQuery(e.currentTarget.value)}
@@ -144,7 +171,8 @@ function SearchBox({ onClose }: { onClose(): void; }) {
                         >
                             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={ICONS[p.kind]} /></svg>
                             <span className="agentdisc-find-name">{p.name}</span>
-                            <span className="agentdisc-find-where">{p.where}</span>
+                            <span className="agentdisc-find-where">{p.guildId === SelectedGuildStore.getGuildId() ? p.parentName : p.where}</span>
+                            <span className="agentdisc-find-date">{p.lastDate}</span>
                         </div>
                     ))}
                     {query.trim() && !results.length && <div className="agentdisc-find-note">No channel or thread matches.</div>}
@@ -157,10 +185,10 @@ function SearchBox({ onClose }: { onClose(): void; }) {
 
 let toggleFind: (() => void) | null = null;
 
-// Ctrl+M (the M key, whatever the keyboard) opens or closes the search box.
+// Ctrl+O (the O key, whatever the keyboard) opens or closes the search box.
 function onKey(e: KeyboardEvent) {
     if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey || e.repeat) return;
-    if (e.key.toLowerCase() !== "m" || !toggleFind) return;
+    if (e.key.toLowerCase() !== "o" || !toggleFind) return;
     e.preventDefault();
     e.stopPropagation();
     toggleFind();

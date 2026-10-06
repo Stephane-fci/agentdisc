@@ -10,7 +10,7 @@ import { closeBox, openBoxKind, showBox } from "@plugins/channelGroups/boxes";
 // again, Esc or a click outside closes it. Keep it in step with WHAT-AGENTDISC-DOES.md.
 
 const SHORTCUTS: [string, string][] = [
-    ["Ctrl+M", "Find a channel or thread in any server"],
+    ["Ctrl+O", "Find a channel or thread in this server, with its category and last message day"],
     ["Ctrl+P", "Create a channel in the category you are in"],
     ["Ctrl+R", "Rename this channel or thread (or click its name at the top)"],
     ["Ctrl+B", "Bookmark this channel or thread, or remove the bookmark"],

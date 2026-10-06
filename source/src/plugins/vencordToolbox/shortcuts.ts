@@ -20,7 +20,7 @@ import { toggleHelp } from "./help";
 //   Ctrl+P  create a channel (Chrome keeps Ctrl+N for a new window). Discord's own Ctrl+P
 //           (pinned messages) is taken off in index.tsx.
 //   Ctrl+K  put the channel in the category with its emoji, or take it out to the top.
-//           Discord's own Ctrl+K (quick switcher) is taken off; Ctrl+M finds channels.
+//           Discord's own Ctrl+K (quick switcher) is taken off; Ctrl+O finds channels.
 //   Ctrl+H  the window with every shortcut and button.
 
 function stop(e: Event) {

@@ -73,10 +73,10 @@ export function clearPriorities() {
     redrawList();
 }
 
-// A bookmarked channel goes to the top of its server's channel list, wherever it was, and
-// back to its place when the bookmark goes (Stephane, 6 Oct). Discord's own favourites
-// section does exactly that, so bookmarked channels are added to the favourites Discord
-// reads when it builds the list. Threads stay under their channel.
+// A bookmark only colours its line; the channel keeps its place in the list (Stephane,
+// 6 Oct: the Bookmarks section at the top was tried and taken out the same evening). The
+// list is built again when a bookmark changes, because a closed category keeps bookmarked
+// channels in view.
 const ChannelListStore = findStoreLazy("ChannelListStore") as { agentdiscRefresh?(guildId: string): boolean; agentdiscUpdate?(channelId: string): boolean; emitChange(): void; };
 const CATEGORY = 4;
 
@@ -84,19 +84,6 @@ function isChannelBookmark(id: string) {
     if (!isPriority(id) || !isPluginEnabled("ChannelGroups")) return false;
     const channel = ChannelStore.getChannel(id);
     return !!channel && !channel.isThread() && channel.type !== CATEGORY;
-}
-
-function withBookmarks(guildId: string, favourites: string[] | null | undefined) {
-    const own = favourites ?? [];
-    if (!isPluginEnabled("ChannelGroups")) return own;
-    try {
-        const marks = Object.keys(settings.store.priority ?? {})
-            .filter(id => isChannelBookmark(id) && ChannelStore.getChannel(id)?.guild_id === guildId && !own.includes(id));
-        return marks.length ? [...own, ...marks] : own;
-    } catch (e) {
-        logger.warn("Could not add the bookmarks to the top of the list", e);
-        return own;
-    }
 }
 
 // In a closed category, a bookmarked channel and a channel where someone is typing (in it
@@ -528,32 +515,6 @@ function ListTools({ guildId }: { guildId: string; }) {
     );
 }
 
-// The small cross after a bookmarked channel's name takes the bookmark off (Stephane, 6 Oct).
-function UnmarkButton({ channelId }: { channelId: string; }) {
-    const marked = usePriority(channelId);
-    if (!marked || ChannelStore.getChannel(channelId)?.isThread()) return null;
-    const stop = (e: React.SyntheticEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-    };
-    return (
-        <div
-            className="vc-unmark"
-            role="button"
-            aria-label="Remove bookmark"
-            title="Remove bookmark"
-            onMouseDown={stop}
-            onMouseUp={stop}
-            onClick={e => {
-                stop(e);
-                togglePriority(channelId);
-            }}
-        >
-            <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CLOSE} /></svg>
-        </div>
-    );
-}
-
 function FoldArrow({ channelId }: { channelId: string; }) {
     const threads = useListed(channelId);
     const folded = isFolded(channelId);
@@ -695,49 +656,25 @@ export default definePlugin({
                 {
                     match: /children:\[this\.renderTopUnread\(\),/,
                     replace: "children:[$self.ThreadsButton(this.props.guildId),this.renderTopUnread(),"
-                },
-                {
-                    // The favourites heading on top of the list reads "Bookmarks".
-                    match: /(case \i\.\i:return\(0,\i\.jsx\)\(\i,\{name:)\i\.intl\.string\(\i\.t\.[\w$]+\)(\}\);case \i\.recentsSectionNumber:)/,
-                    replace: '$1"Bookmarks"$2'
                 }
             ]
         },
         {
             // The channel line: the fold arrow goes where the white unread mark was.
             find: "UNREAD_IMPORTANT:",
-            replacement: [
-                {
-                    match: /(?<=,channel:(\i),.+?)children:\[(?=\i\|\|!\i\?null:\(0,\i\.jsx\)\("div",\{className:)/,
-                    replace: "children:[$self.FoldArrow($1),"
-                },
-                {
-                    // The cross that takes a bookmark off, right after the channel name.
-                    match: /children:\(0,\i\.jsx\)\(\i,\{textVariant:"text-md\/medium",channel:(\i),name:[^}]+\}\)\}\)/,
-                    replace: "$&,$self.UnmarkButton($1)"
-                }
-            ]
+            replacement: {
+                match: /(?<=,channel:(\i),.+?)children:\[(?=\i\|\|!\i\?null:\(0,\i\.jsx\)\("div",\{className:)/,
+                replace: "children:[$self.FoldArrow($1),"
+            }
         },
         {
-            // Discord builds each server's channel list with its favourites on top, out of
-            // their categories; bookmarked channels join them.
+            // A closed category keeps a bookmarked channel, and one where someone is typing,
+            // in view, like the open, unread or mentioned ones.
             find: "suggestedFavoriteChannelId;",
-            replacement: [
-                {
-                    match: /(\i\.\i)\.getGuildFavorites\((\i)\.id\)\?\?\[\]/g,
-                    replace: "$self.withBookmarks($2.id,$1.getGuildFavorites($2.id))"
-                },
-                {
-                    match: /(\i\.\i)\.isFavorite\((\i)\.guild_id,\2\.id\)/,
-                    replace: "($self.isChannelBookmark($2.id)||$&)"
-                },
-                {
-                    // A closed category keeps a bookmarked channel, and one where someone is
-                    // typing, in view, like the open, unread or mentioned ones.
-                    match: /(\i\|\|\i\|\|!\i\(\)\.isEmpty\(\i\)\|\|\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
-                    replace: "$1||$self.keepVisible(this.id)"
-                }
-            ]
+            replacement: {
+                match: /(\i\|\|\i\|\|!\i\(\)\.isEmpty\(\i\)\|\|\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
+                replace: "$1||$self.keepVisible(this.id)"
+            }
         },
         {
             // A way to have the list built again when a bookmark changes.
@@ -751,8 +688,6 @@ export default definePlugin({
 
     shownThreads,
     rowHeight,
-    withBookmarks,
-    isChannelBookmark,
     keepVisible,
     hideTopLine,
     onlyHiddenTopLines,
@@ -773,12 +708,6 @@ export default definePlugin({
     ThreadsButton: (guildId: string) => (
         <ErrorBoundary noop key="vc-threads-all">
             <ListTools guildId={guildId} />
-        </ErrorBoundary>
-    ),
-
-    UnmarkButton: (channel: { id: string; }) => (
-        <ErrorBoundary noop key="vc-unmark">
-            <UnmarkButton channelId={channel.id} />
         </ErrorBoundary>
     ),
 

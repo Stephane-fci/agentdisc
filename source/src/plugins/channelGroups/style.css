@@ -271,25 +271,6 @@ html.agentdisc-channel-filter .vc-list-tools ~ * {
     font-size: 13px;
 }
 
-/* The cross after a bookmarked channel's name takes the bookmark off. */
-.vc-unmark {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    margin-inline-start: 4px;
-    border-radius: 4px;
-    color: rgb(255 255 255 / 70%);
-    cursor: pointer;
-}
-
-.vc-unmark:hover {
-    background: rgb(0 0 0 / 25%);
-    color: #fff;
-}
-
 /* The new channel and rename box: the channel search box with a title. */
 .agentdisc-namebox {
     max-height: none;

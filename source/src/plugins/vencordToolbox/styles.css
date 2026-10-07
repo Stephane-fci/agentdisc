@@ -299,3 +299,174 @@
 .agentdisc-feedback-on [id^="message-content-"] {
     cursor: copy;
 }
+
+/* The right panel above the member list (7 Oct): the map of linked channels, then the
+   calendar of his days; the member list keeps the rest of the column and its own scroll. */
+[class*="membersWrap_"]:has(> .agentdisc-side) {
+    display: flex !important;
+    flex-direction: column;
+}
+
+[class*="membersWrap_"]:has(> .agentdisc-side) > [class*="members_"] {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+}
+
+.agentdisc-side {
+    flex: 0 0 auto;
+    padding: 10px 8px 6px;
+    border-bottom: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+}
+
+.agentdisc-side-map {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.agentdisc-side-line {
+    stroke: rgb(255 255 255 / 18%);
+    stroke-width: 1;
+}
+
+.agentdisc-side-line.agentdisc-side-on {
+    stroke: #f2622e;
+}
+
+.agentdisc-side-dot {
+    cursor: pointer;
+}
+
+.agentdisc-side-dot circle:not([fill]) {
+    fill: #b5bac1;
+}
+
+.agentdisc-side-dot text {
+    fill: var(--text-muted, #949ba4);
+    font-size: 9px;
+}
+
+.agentdisc-side-dot.agentdisc-side-on circle:not([fill]) {
+    fill: #fff;
+}
+
+.agentdisc-side-dot.agentdisc-side-on text {
+    fill: #fff;
+}
+
+.agentdisc-side-centre {
+    fill: #f2622e;
+}
+
+.agentdisc-side-note {
+    padding: 2px 0 6px;
+    color: var(--text-muted, #949ba4);
+    font-size: 12px;
+    text-align: center;
+}
+
+.agentdisc-side-cal {
+    margin-top: 6px;
+    padding: 8px 2px 4px;
+    border-top: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+}
+
+.agentdisc-side-cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.agentdisc-side-cal-title {
+    color: var(--header-primary, #fff);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.agentdisc-side-cal-year {
+    color: #f2622e;
+}
+
+.agentdisc-side-cal-nav button {
+    padding: 2px 4px;
+    border: none;
+    background: none;
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.agentdisc-side-cal-nav button:hover {
+    color: var(--interactive-text-active, #fff);
+}
+
+.agentdisc-side-cal-grid {
+    display: grid;
+    grid-template-columns: 18px repeat(7, 1fr);
+    row-gap: 2px;
+    text-align: center;
+}
+
+.agentdisc-side-cal-wk {
+    color: var(--text-muted, #949ba4);
+    font-size: 9px;
+    line-height: 22px;
+    opacity: 0.7;
+}
+
+.agentdisc-side-cal-wd {
+    color: var(--text-muted, #949ba4);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 18px;
+}
+
+.agentdisc-side-cal-day {
+    position: relative;
+    border-radius: 6px;
+    color: var(--text-default, #dbdee1);
+    font-size: 12px;
+    line-height: 22px;
+}
+
+.agentdisc-side-cal-out {
+    opacity: 0.35;
+}
+
+.agentdisc-side-cal-today {
+    color: #f2622e;
+    font-weight: 700;
+}
+
+.agentdisc-side-cal-marked {
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.agentdisc-side-cal-marked::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 1px;
+    width: 4px;
+    height: 4px;
+    margin-left: -2px;
+    border-radius: 50%;
+    background: #f2622e;
+}
+
+.agentdisc-side-cal-marked.agentdisc-side-cal-today {
+    color: #f2622e;
+}
+
+.agentdisc-side-cal-marked:hover {
+    background: rgb(255 255 255 / 8%);
+}
+
+.agentdisc-side-reading {
+    padding-top: 4px;
+}

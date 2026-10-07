@@ -35,6 +35,8 @@ import { LinksPanel } from "./links";
 import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
 import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
+import { startSideData, stopSideData } from "./sideData";
+import { renderSidePanel } from "./sidePanel";
 
 const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_BOTTOM,", 'position:"bottom"');
 
@@ -285,6 +287,15 @@ export default definePlugin({
             find: 'binds:["mod+p"],comboKeysBindGlobal',
             replacement: { match: /binds:\["mod\+p"\]/, replace: 'binds:["mod+shift+alt+p"]' }
         },
+        // The right panel (Stephane, 7 Oct): the map of linked channels and the calendar of
+        // his days sit above the member list, inside its column.
+        {
+            find: "lastReportedAnalyticsChannel",
+            replacement: {
+                match: /(?<=render\(\)\{let\{groups:\i,listId:\i,channel:(\i),sectionHeight:\i\}=this\.props;.{0,300}?)component:(.{0,400}?)(?=,children:\(0,\i\.jsx\)\(\i\.\i,\{children:\i=>\{let\{ref:)/,
+                replace: "component:[$self.renderSidePanel($1),$2]"
+            }
+        },
         // A message over the length limit is attached as a text file on Enter, with no window.
         {
             find: '"MESSAGE_LENGTH_UPSELL",this.handleMessageLengthUpsell',
@@ -311,17 +322,20 @@ export default definePlugin({
     ],
 
     attachLongMessage,
+    renderSidePanel,
 
     start() {
         startFindShortcut();
         startFeedbackShortcut();
         startChannelShortcuts();
+        startSideData();
     },
 
     stop() {
         stopFindShortcut();
         stopFeedbackShortcut();
         stopChannelShortcuts();
+        stopSideData();
         setFeedback(false);
     },
 

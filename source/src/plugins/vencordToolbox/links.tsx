@@ -53,7 +53,7 @@ interface Found {
 
 // The channel itself plus all its threads, with their names: the open ones Discord already
 // knows, and the archived ones from Discord's list of past threads.
-async function placesOf(channelId: string, guildId: string | null) {
+export async function placesOf(channelId: string, guildId: string | null) {
     const names = new Map<string, string>();
     const channel = ChannelStore.getChannel(channelId);
     if (!guildId || channel?.isThread?.()) return { ids: [channelId], names };

@@ -40,6 +40,8 @@ const BUTTONS: [string, string][] = [
     ["Magnifier", "Above the channels: filter the channel list as you type"],
     ["Plus", "Above the channels: create a channel"],
     ["Arrow left of a channel", "Fold or open that channel's threads"],
+    ["Map above the members", "The channels linked from this channel; click a dot to open it"],
+    ["Calendar above the members", "The days you wrote here; click a marked day to open its first message"],
     ["Play button on a message", "Read it aloud; the words light up as they are read"]
 ];
 

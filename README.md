@@ -8,6 +8,7 @@ AgentDisc is a Chrome extension that makes Discord in the browser calmer and eas
 - **Channel tools:** close or open every category, filter the channel list as you type, create a channel (Ctrl+P), rename one (Ctrl+R or a click on its name), and put a channel in the category with its emoji (Ctrl+K). Ctrl+H lists every shortcut.
 - **Feedback mode:** click paragraphs or sentences in a long answer to quote them into your reply, ready for your comments.
 - **Find a channel:** Ctrl+O or a top-bar button, type a few letters, Enter to go; each match shows its category and the day of its last message.
+- **Map and calendar:** above the member list, the channels linked from this channel and the days you wrote in it.
 - **Links panel:** every link posted in a channel, with its date and a jump to the message.
 - **Panels you can hide:** the server list, the channel header, the account bar and more, each with its own switch.
 - **Read aloud:** a play button on every message reads it in a natural Google voice, and the words light up as they are read.

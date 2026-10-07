@@ -26,6 +26,10 @@ A row of buttons stays at the top of the channel list. "Hide threads" or "Show t
 
 Ctrl+K on a channel outside any category moves it into the first category whose name starts with the same emoji (never an archive category), at the top of that category: "🥑-discord-app" goes into "🥑 Tools & Skills". Ctrl+K on a channel inside a category takes it out, to the top of the channel list. In a thread, its channel moves.
 
+## Map and calendar above the members
+
+When the member list is open, two things sit above it. First a map: the channel you are in is the orange dot in the middle, and around it are the channels linked from it (a channel mentioned by name, a link to a channel or a message, a forwarded message); a click on a dot opens that channel. Then a calendar of the month, like Obsidian's: a dot under a day means you wrote in this channel or its threads that day, and a click on it opens the channel at that day's first message. The first visit to a long channel takes a few seconds to read it; after that, only new messages are read.
+
 ## Rename a channel
 
 Ctrl+R, or a click on the channel name above the messages, opens a small box with the name of the channel or thread you are in. Change it and press Enter to save, or Esc to leave it as it was.

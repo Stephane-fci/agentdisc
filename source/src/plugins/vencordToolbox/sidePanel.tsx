@@ -139,7 +139,8 @@ function LinkMap({ channel }: { channel: any; }) {
             // No hover box (Stephane, 7 Oct); the hovered dot gets a ring and its name.
             .nodeLabel(() => "")
             .nodeCanvasObject((n: MapNode, ctx: CanvasRenderingContext2D, scale: number) => {
-                const r = n.kind === "centre" ? 8 : 4 + 4 * (n.count / (fg.__most || 1));
+                // Small dots, like Obsidian (Stephane, 7 Oct: "make the circles smaller").
+                const r = n.kind === "centre" ? 4.5 : 2 + 2.5 * (n.count / (fg.__most || 1));
                 const on = hover.current === n.id;
                 ctx.beginPath();
                 ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
@@ -167,7 +168,7 @@ function LinkMap({ channel }: { channel: any; }) {
             .nodePointerAreaPaint((n: MapNode, color: string, ctx: CanvasRenderingContext2D) => {
                 ctx.fillStyle = color;
                 ctx.beginPath();
-                ctx.arc(n.x!, n.y!, 11, 0, 2 * Math.PI);
+                ctx.arc(n.x!, n.y!, 8, 0, 2 * Math.PI);
                 ctx.fill();
             })
             .linkColor(() => "rgba(255,255,255,0.18)")

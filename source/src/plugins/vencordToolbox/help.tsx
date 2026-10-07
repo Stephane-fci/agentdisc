@@ -33,7 +33,7 @@ const BUTTONS: [string, string][] = [
     ["Magnifier", "Top bar: Discord's message search"],
     ["Chain link", "Top bar: every link posted in this channel and its threads"],
     ["Two panel icons", "Top bar: fold or open the server list, and the whole right panel"],
-    ["# before the channel name", "At the top: copy the link of this channel or thread"],
+    ["# of a channel", "At the top, or in the channel list: copy the link of that channel"],
     ["Link icon on a message", "In the bar that shows on hover: copy the link of that message"],
     ["AgentDisc", "Top bar: every AgentDisc switch and setting"],
     ["Hide / Show threads", "Above the channels: fold or open every channel's threads"],

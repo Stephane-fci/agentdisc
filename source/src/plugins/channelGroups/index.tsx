@@ -695,11 +695,13 @@ export default definePlugin({
         },
         {
             // A closed category keeps a bookmarked channel, and one where someone is typing,
-            // in view, like the open, unread or mentioned ones.
+            // in view, like the open, unread or mentioned ones. Unread threads no longer keep
+            // their channel in view in a closed category (Stephane, 7 Oct): with its threads
+            // folded, the channel looked visible for no reason.
             find: "suggestedFavoriteChannelId;",
             replacement: {
-                match: /(\i\|\|\i\|\|!\i\(\)\.isEmpty\(\i\)\|\|\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
-                replace: "$1||$self.keepVisible(this.id)"
+                match: /(\i)\|\|(\i)\|\|(!\i\(\)\.isEmpty\(\i\))\|\|(\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
+                replace: "$1||$2||(!this.category.isCollapsed&&$3)||$4||$self.keepVisible(this.id)"
             }
         },
         {

@@ -20,7 +20,7 @@ A flag button in the top bar, or Ctrl+B, bookmarks the channel or thread you are
 
 ## Above the channel list
 
-A row of buttons stays at the top of the channel list. "Hide threads" or "Show threads" folds or opens every channel's threads. "Close categories" or "Open categories" closes or opens every category of the server. A closed category still shows a channel that is bookmarked or where someone is typing (in it or in one of its threads), like it shows unread ones. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Ctrl+P does the same): type its name and press Enter, and it opens. It goes outside any category unless you pick one in the box; archive categories are not offered.
+A row of buttons stays at the top of the channel list. "Hide threads" or "Show threads" folds or opens every channel's threads. "Close categories" or "Open categories" closes or opens every category of the server. A closed category still shows a channel that is bookmarked or where someone is typing (in it or in one of its threads), like it shows unread ones; unread messages in a channel's threads alone do not keep it in view. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Ctrl+P does the same): type its name and press Enter, and it opens. It goes outside any category unless you pick one in the box; archive categories are not offered.
 
 ## Tidy a channel into its category
 
@@ -34,7 +34,7 @@ The mirrored panel icon in the top bar folds the whole right panel away or opens
 
 ## Copy a link
 
-A click on the # just before the channel name at the top copies the link of the channel (or thread). In the small bar that shows over a message, a link icon copies the link of that message.
+A click on the # just before the channel name at the top, or on the # of a channel in the channel list, copies the link of that channel (or thread). In the small bar that shows over a message, a link icon copies the link of that message.
 
 ## Rename a channel
 

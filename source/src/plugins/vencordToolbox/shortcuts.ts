@@ -69,11 +69,26 @@ function nameElement(header: Element, name: string): HTMLElement | null {
 }
 
 // A click on the channel name above the messages opens the rename box; a click on the # (or
-// thread sign) just before it copies the link of the channel or thread (Stephane, 7 Oct).
+// thread sign) just before it, or on a channel's # in the channel list, copies the link of
+// the channel or thread (Stephane, 7 Oct).
 function onClick(e: MouseEvent) {
     if (e.button !== 0 || e.ctrlKey || e.shiftKey || e.altKey) return;
-    const header = channelHeaderSelector();
     const target = e.target as HTMLElement | null;
+
+    // In the channel list, the # at the start of a channel copies its link instead of
+    // opening it (Stephane, 7 Oct).
+    const row = target?.closest<HTMLElement>('[data-list-item-id^="channels___"]');
+    const rowIcon = target?.closest("svg");
+    if (row && rowIcon && row.querySelector("svg") === rowIcon) {
+        const listed = ChannelStore.getChannel(row.getAttribute("data-list-item-id")!.slice("channels___".length));
+        if (listed?.guild_id && !listed.isThread?.()) {
+            stop(e);
+            copyWithToast(`https://discord.com/channels/${listed.guild_id}/${listed.id}`, "Channel link copied");
+            return;
+        }
+    }
+
+    const header = channelHeaderSelector();
     const inHeader = header ? target?.closest?.(header) : null;
     if (!inHeader || target?.closest("input, textarea, [role='textbox'], button, a")) return;
     const channel = ChannelStore.getChannel(SelectedChannelStore.getChannelId());

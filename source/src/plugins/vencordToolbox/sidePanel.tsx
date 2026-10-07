@@ -6,7 +6,7 @@
 
 import { Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { NavigationRouter, useEffect, useRef, useState } from "@webpack/common";
+import { ChannelStore, NavigationRouter, useEffect, useRef, useState } from "@webpack/common";
 
 import { type DayInfo, dayKey, linksOf, type PlaceName, placeName, useSideData } from "./sideData";
 
@@ -16,11 +16,14 @@ import { type DayInfo, dayKey, linksOf, type PlaceName, placeName, useSideData }
 //   2. a calendar marking the days he wrote in the channel or its threads; a click on a
 //      marked day opens the channel at that day's first message.
 
-const MAX_DOTS = 18;
-// With many dots, only the most linked ones keep their name; the others show it on hover.
+// The map is drawn with force-graph, the library of the Little Brain's map (Stephane,
+// 7 Oct): the wheel zooms, dragging the background moves the map, dragging a dot moves it.
+const MAX_DOTS = 60;
+// The most linked dots keep their name; the others show it when zoomed in or hovered.
 const LABELS = 8;
+const COLOURS = { centre: "#5865f2", channel: "#b5bac1", thread: "#00a8fc", hover: "#ffffff" };
 
-function short(name: string, max = 16) {
+function short(name: string, max = 18) {
     return name.length > max ? name.slice(0, max - 1) + "…" : name;
 }
 
@@ -38,52 +41,146 @@ function useWidth(ref: React.RefObject<HTMLDivElement | null>) {
     return width;
 }
 
+interface MapNode {
+    id: string;
+    name: string;
+    kind: "centre" | "channel" | "thread";
+    count: number;
+    rank: number;
+    guild: string | null;
+    x?: number;
+    y?: number;
+    fx?: number;
+    fy?: number;
+}
+
+// The library adds its own styles to the page as it loads, so it is loaded only when a map
+// is first drawn, never while Discord starts (the page has no head yet then).
+let library: Promise<any> | null = null;
+function loadForceGraph() {
+    // @ts-ignore: a plain browser bundle, used as it is
+    return library ??= import("./vendor/force-graph.min.js").then(m => m.default ?? m);
+}
+
 function LinkMap({ channel }: { channel: any; }) {
-    const [hover, setHover] = useState<string | null>(null);
-    const ref = useRef<HTMLDivElement>(null);
-    const width = useWidth(ref);
-    const height = Math.round(Math.min(300, Math.max(150, width * 0.75)));
+    const [ready, setReady] = useState(false);
+    const box = useRef<HTMLDivElement>(null);
+    const holder = useRef<HTMLDivElement>(null);
+    const graph = useRef<any>(null);
+    const hover = useRef<string | null>(null);
+    const fitted = useRef(false);
+    const width = useWidth(box);
+    const height = Math.round(Math.min(320, Math.max(170, width * 0.8)));
 
     const dots = [...linksOf(channel.id)]
         .map(([id, count]) => ({ id, count, place: placeName(id) }))
         .filter(d => d.place)
         .sort((a, b) => b.count - a.count)
         .slice(0, MAX_DOTS) as { id: string; count: number; place: PlaceName; }[];
-
-    const cx = width / 2, cy = height / 2;
-    const rx = width / 2 - 34, ry = height / 2 - 26;
     const most = Math.max(1, ...dots.map(d => d.count));
-    const placed = dots.map((d, i) => {
-        const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(dots.length, 1);
-        return { ...d, x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle), r: 3 + 3 * (d.count / most) };
-    });
-    const go = (d: { id: string; place: PlaceName; }) => NavigationRouter.transitionTo(`/channels/${d.place.guild ?? channel.guild_id ?? "@me"}/${d.id}`);
-    const threads = dots.some(d => d.place.thread);
+    const dataKey = channel.id + "|" + dots.map(d => `${d.id}:${d.count}:${d.place.name}`).join("|");
 
+    // One map per panel; it is told the new size and data rather than drawn again.
+    useEffect(() => {
+        let fg: any = null;
+        let gone = false;
+        loadForceGraph().then(ForceGraph => {
+            const el = holder.current;
+            if (gone || !el) return;
+            fg = makeGraph(ForceGraph, el);
+            graph.current = fg;
+            setReady(true);
+        }).catch(() => { });
+        return () => {
+            gone = true;
+            try {
+                fg?._destructor?.();
+            } catch { }
+            if (holder.current) holder.current.innerHTML = "";
+            graph.current = null;
+        };
+    }, []);
+
+    function makeGraph(ForceGraph: any, el: HTMLDivElement) {
+        const fg = ForceGraph()(el)
+            .backgroundColor("rgba(0,0,0,0)")
+            .nodeId("id")
+            .nodeLabel((n: MapNode) => n.kind === "centre" ? n.name : `${n.kind === "thread" ? "Thread" : "Channel"}: ${n.name} (${n.count} link${n.count > 1 ? "s" : ""})`)
+            .nodeCanvasObject((n: MapNode, ctx: CanvasRenderingContext2D, scale: number) => {
+                const r = n.kind === "centre" ? 7 : 3 + 3 * (n.count / (fg.__most || 1));
+                ctx.beginPath();
+                ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
+                ctx.fillStyle = hover.current === n.id ? COLOURS.hover : COLOURS[n.kind];
+                ctx.fill();
+                if (n.kind === "centre" || n.rank < LABELS || scale > 1.8 || hover.current === n.id) {
+                    ctx.font = `${11 / scale}px sans-serif`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "top";
+                    ctx.fillStyle = hover.current === n.id ? "#ffffff" : "rgba(219,222,225,0.85)";
+                    ctx.fillText(short(n.name), n.x!, n.y! + r + 2 / scale);
+                }
+            })
+            .nodePointerAreaPaint((n: MapNode, color: string, ctx: CanvasRenderingContext2D) => {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(n.x!, n.y!, 9, 0, 2 * Math.PI);
+                ctx.fill();
+            })
+            .linkColor(() => "rgba(255,255,255,0.16)")
+            .linkWidth(1)
+            .cooldownTicks(120)
+            .onNodeHover((n: MapNode | null) => {
+                hover.current = n?.id ?? null;
+                el.style.cursor = n && n.kind !== "centre" ? "pointer" : "grab";
+            })
+            .onNodeClick((n: MapNode) => {
+                if (n.kind !== "centre") NavigationRouter.transitionTo(`/channels/${n.guild ?? channel.guild_id ?? "@me"}/${n.id}`);
+            })
+            .onEngineStop(() => {
+                if (!fitted.current) {
+                    fitted.current = true;
+                    fg.zoomToFit(300, 24);
+                }
+            });
+        fg.d3Force("charge")?.strength(-70);
+        fg.d3Force("link")?.distance(55);
+        return fg;
+    }
+
+    useEffect(() => {
+        graph.current?.width(width).height(height);
+    }, [width, height, ready]);
+
+    useEffect(() => {
+        const fg = graph.current;
+        if (!fg) return;
+        const before = new Map<string, MapNode>((fg.graphData().nodes as MapNode[]).map(n => [n.id, n]));
+        const keep = (n: MapNode): MapNode => {
+            const old = before.get(n.id);
+            return old ? Object.assign(old, { name: n.name, kind: n.kind, count: n.count, rank: n.rank, guild: n.guild }) : n;
+        };
+        const nodes: MapNode[] = [
+            keep({ id: channel.id, name: channel.name, kind: "centre", count: 0, rank: -1, guild: channel.guild_id, fx: 0, fy: 0 }),
+            ...dots.map((d, i) => keep({ id: d.id, name: d.place.name, kind: d.place.thread ? "thread" : "channel", count: d.count, rank: i, guild: d.place.guild }))
+        ];
+        fg.__most = most;
+        fg.graphData({ nodes, links: dots.map(d => ({ source: channel.id, target: d.id })) });
+    }, [dataKey, ready]);
+
+    // A new channel starts with a fresh view.
+    useEffect(() => {
+        fitted.current = false;
+    }, [channel.id]);
+
+    const threads = dots.some(d => d.place.thread);
     return (
-        <div className="agentdisc-side-map" ref={ref}>
-            <svg viewBox={`0 0 ${width} ${height}`} className="agentdisc-side-svg">
-                {placed.map(d => (
-                    <line key={"l" + d.id} x1={cx} y1={cy} x2={d.x} y2={d.y} className={"agentdisc-side-line" + (hover === d.id ? " agentdisc-side-on" : "")} />
-                ))}
-                {placed.map((d, i) => (
-                    <g
-                        key={d.id}
-                        className={"agentdisc-side-dot" + (d.place.thread ? " agentdisc-side-thread" : "") + (hover === d.id ? " agentdisc-side-on" : "")}
-                        onMouseEnter={() => setHover(d.id)}
-                        onMouseLeave={() => setHover(null)}
-                        onClick={() => go(d)}
-                    >
-                        <title>{`${d.place.thread ? "Thread" : "Channel"}: ${d.place.name} (${d.count} link${d.count > 1 ? "s" : ""})`}</title>
-                        <circle cx={d.x} cy={d.y} r={d.r + 6} fill="transparent" />
-                        <circle cx={d.x} cy={d.y} r={d.r} />
-                        {(i < LABELS || hover === d.id) && <text x={d.x} y={d.y + d.r + 11} textAnchor="middle">{short(d.place.name, Math.round(Math.min(28, Math.max(14, width / 14))))}</text>}
-                    </g>
-                ))}
-                <circle cx={cx} cy={cy} r={8} className="agentdisc-side-centre">
-                    <title>{channel.name}</title>
-                </circle>
-            </svg>
+        <div className="agentdisc-side-map" ref={box}>
+            <div className="agentdisc-side-graph" ref={holder} style={{ height }} />
+            {dots.length > 0 && (
+                <button type="button" className="agentdisc-side-fit" title="Fit the whole map" onClick={() => graph.current?.zoomToFit(300, 24)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                </button>
+            )}
             {!dots.length && <div className="agentdisc-side-note">No channel linked with this one yet.</div>}
             {threads && <div className="agentdisc-side-legend"><span className="agentdisc-side-key" /> channel <span className="agentdisc-side-key agentdisc-side-key-thread" /> thread</div>}
         </div>
@@ -223,8 +320,10 @@ export function stopRightPanelWidth() {
     widthStyle = null;
 }
 
+// In a thread, the panel shows its channel (Stephane, 7 Oct: the panel vanished in threads).
 export function renderSidePanel(channel: any) {
-    if (!channel?.id || !channel.guild_id || channel.isThread?.()) return null;
+    if (channel?.isThread?.()) channel = ChannelStore.getChannel(channel.parent_id);
+    if (!channel?.id || !channel.guild_id) return null;
     return (
         <ErrorBoundary noop key="agentdisc-side">
             <SidePanel channel={channel} />

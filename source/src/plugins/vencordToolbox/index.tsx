@@ -298,10 +298,22 @@ export default definePlugin({
         // his days sit above the member list, inside its column.
         {
             find: "lastReportedAnalyticsChannel",
-            replacement: {
-                match: /(?<=render\(\)\{let\{groups:\i,listId:\i,channel:(\i),sectionHeight:\i\}=this\.props;.{0,300}?)component:(.{0,400}?)(?=,children:\(0,\i\.jsx\)\(\i\.\i,\{children:\i=>\{let\{ref:)/,
-                replace: "component:[$self.renderSidePanel($1),$2]"
-            }
+            replacement: [
+                {
+                    match: /(?<=render\(\)\{let\{groups:\i,listId:\i,channel:(\i),sectionHeight:\i\}=this\.props;.{0,300}?)component:(.{0,400}?)(?=,children:\(0,\i\.jsx\)\(\i\.\i,\{children:\i=>\{let\{ref:)/,
+                    replace: "component:[$self.renderSidePanel($1),$2]"
+                },
+                {
+                    // A thread's member list (Stephane, 7 Oct: the panel vanished in threads).
+                    match: /(?<=\{channel:(\i),guild:\i\}=\i,\i=`members-\$\{\i\.id\}`[\s\S]{0,4000}?)children:(\(0,\i\.jsx\)\(\i\.\i,\{ref:\i,className:\i\.\i,paddingTop:0,sectionHeight:42,[\s\S]{0,3000}?\.\.\.\i,\.\.\.\i\},\i\))/,
+                    replace: "children:[$self.renderSidePanel($1),$2]"
+                },
+                {
+                    // A thread with nobody listed (an archived one, often).
+                    match: /(function \i\(\i\)\{let\{channel:(\i)\}=\i;return\(0,\i\.jsxs\)\("div",\{className:\i\(\)\(\i\.\i,\i\.\i,\i\.\i,\i\.\i,\i\.\i\),children:\[)/,
+                    replace: "$1$self.renderSidePanel($2),"
+                }
+            ]
         },
         // A message over the length limit is attached as a text file on Enter, with no window.
         {

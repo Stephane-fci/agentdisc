@@ -527,3 +527,45 @@
     cursor: col-resize !important;
     user-select: none !important;
 }
+
+/* The zoomable map (force-graph draws on a canvas inside). */
+.agentdisc-side-map {
+    position: relative;
+}
+
+.agentdisc-side-graph {
+    width: 100%;
+    overflow: hidden;
+    cursor: grab;
+}
+
+.agentdisc-side-graph canvas {
+    display: block;
+}
+
+.agentdisc-side-fit {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: flex;
+    padding: 4px;
+    border: none;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 25%);
+    color: var(--interactive-normal, #b5bac1);
+    cursor: pointer;
+}
+
+.agentdisc-side-fit:hover {
+    color: var(--interactive-text-active, #fff);
+}
+
+/* force-graph's own hover label. */
+.agentdisc-side-graph .float-tooltip-kap {
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #111214;
+    color: #dbdee1;
+    font-size: 12px;
+    pointer-events: none;
+}

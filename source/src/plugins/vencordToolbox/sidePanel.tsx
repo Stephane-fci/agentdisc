@@ -79,9 +79,11 @@ function useMapOptions() {
 function fit(fg: any, ms: number) {
     if (!fg) return;
     fg.zoomToFit(ms, 55);
-    setTimeout(() => {
-        if (fg.zoom() > 1.6) fg.zoom(1.6, 200);
-    }, ms + 50);
+    const cap = () => {
+        if (fg.zoom() > 1.6) fg.zoom(1.6, ms ? 200 : 0);
+    };
+    if (ms) setTimeout(cap, ms + 50);
+    else cap();
 }
 
 function LinkMap({ channel }: { channel: any; }) {
@@ -90,7 +92,7 @@ function LinkMap({ channel }: { channel: any; }) {
     const holder = useRef<HTMLDivElement>(null);
     const graph = useRef<any>(null);
     const hover = useRef<string | null>(null);
-    const fitted = useRef(false);
+    const fitted = useRef("");
     const titles = useRef(true);
     const width = useWidth(box);
     const height = Math.round(Math.min(360, Math.max(190, width * 0.85)));
@@ -170,6 +172,9 @@ function LinkMap({ channel }: { channel: any; }) {
             })
             .linkColor(() => "rgba(255,255,255,0.18)")
             .linkWidth(1)
+            // The layout is worked out before it is shown, so a new channel's map appears in
+            // place, with no zoom movement (Stephane, 7 Oct).
+            .warmupTicks(150)
             .d3AlphaDecay(0.02)
             .d3VelocityDecay(0.3)
             .cooldownTime(20000)
@@ -217,22 +222,16 @@ function LinkMap({ channel }: { channel: any; }) {
         }
         fg.__most = most;
         fg.graphData({ nodes, links: [...lines.values()] });
-        // The whole map in view once it has spread out a little.
-        if (!fitted.current) {
-            fitted.current = true;
-            const t1 = setTimeout(() => fit(graph.current, 400), 1200);
-            const t2 = setTimeout(() => fit(graph.current, 600), 4500);
-            return () => {
-                clearTimeout(t1);
-                clearTimeout(t2);
-            };
+        // The whole map in view, at once and without movement: for a new channel, and when
+        // its first dots arrive; later dots leave the view as he set it.
+        const key = `${channel.id}:${dots.length > 0}`;
+        if (fitted.current !== key) {
+            fitted.current = key;
+            const t1 = setTimeout(() => fit(graph.current, 0), 30);
+            return () => clearTimeout(t1);
         }
     }, [shape, ready]);
 
-    // A new channel starts with a fresh view.
-    useEffect(() => {
-        fitted.current = false;
-    }, [channel.id]);
 
     const hasThreads = all.some(d => d.place.thread);
     return (

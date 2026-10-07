@@ -42,7 +42,7 @@ const BUTTONS: [string, string][] = [
     ["Magnifier", "Above the channels: filter the channel list as you type"],
     ["Plus", "Above the channels: create a channel"],
     ["Arrow left of a channel", "Fold or open that channel's threads"],
-    ["Map above the members", "Channels (grey) and threads (blue) linked with this channel, both ways; drag dots, zoom with the wheel, click a dot to open it; tick boxes for channels, threads and names"],
+    ["Map above the members", "Channels (purple) and threads (orange) linked with this channel, both ways; drag dots, zoom with the wheel, click a dot to open it; tick boxes for channels, threads and names"],
     ["Right panel edge", "Drag it to make the right panel wider or narrower"],
     ["Calendar above the members", "The days you wrote here; click a marked day to open its first message"],
     ["Play button on a message", "Read it aloud; the words light up as they are read"]

@@ -480,7 +480,7 @@
 
 /* Threads in the map: their own colour. */
 .agentdisc-side-thread circle:not([fill]) {
-    fill: #00a8fc;
+    fill: #f0883e;
 }
 
 .agentdisc-side-legend {
@@ -499,11 +499,11 @@
     height: 7px;
     margin-left: 6px;
     border-radius: 50%;
-    background: #b5bac1;
+    background: #5865f2;
 }
 
 .agentdisc-side-key-thread {
-    background: #00a8fc;
+    background: #f0883e;
 }
 
 /* The drag handle on the column's left edge. */
@@ -560,8 +560,12 @@
     color: var(--interactive-text-active, #fff);
 }
 
-/* force-graph's own hover label. */
+/* force-graph's own hover label: never shown (Stephane, 7 Oct). */
 .agentdisc-side-graph .float-tooltip-kap {
+    display: none !important;
+}
+
+.agentdisc-side-graph .float-tooltip-kap-unused {
     padding: 4px 8px;
     border-radius: 6px;
     background: #111214;

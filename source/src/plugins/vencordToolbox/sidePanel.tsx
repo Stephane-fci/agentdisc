@@ -21,7 +21,8 @@ import { type DayInfo, dayKey, linksOf, pairsAmong, type PlaceName, placeName, u
 // dragging the background moves the view, dragging a dot moves it and the dots tied to it
 // follow. Tick boxes show channels, threads and names (kept in the settings).
 const MAX_DOTS = 60;
-const COLOURS = { centre: "#5865f2", channel: "#b5bac1", thread: "#00a8fc", hover: "#ffffff" };
+// Channels in Discord purple, threads in orange, the open channel in white (Stephane, 7 Oct).
+const COLOURS = { centre: "#ffffff", channel: "#5865f2", thread: "#f0883e" };
 
 function short(name: string, max = 22) {
     return name.length > max ? name.slice(0, max - 1) + "…" : name;
@@ -123,14 +124,20 @@ function LinkMap({ channel }: { channel: any; }) {
         const fg = ForceGraph()(el)
             .backgroundColor("rgba(0,0,0,0)")
             .nodeId("id")
-            .nodeLabel((n: MapNode) => n.kind === "centre" ? n.name : `${n.kind === "thread" ? "Thread" : "Channel"}: ${n.name} (${n.count} link${n.count > 1 ? "s" : ""})`)
+            // No hover box (Stephane, 7 Oct); the hovered dot gets a ring and its name.
+            .nodeLabel(() => "")
             .nodeCanvasObject((n: MapNode, ctx: CanvasRenderingContext2D, scale: number) => {
                 const r = n.kind === "centre" ? 8 : 4 + 4 * (n.count / (fg.__most || 1));
                 const on = hover.current === n.id;
                 ctx.beginPath();
                 ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
-                ctx.fillStyle = on ? COLOURS.hover : COLOURS[n.kind];
+                ctx.fillStyle = COLOURS[n.kind];
                 ctx.fill();
+                if (on) {
+                    ctx.lineWidth = 2 / scale;
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.stroke();
+                }
                 if (titles.current || on || n.kind === "centre") {
                     const size = 12 / scale;
                     ctx.font = `600 ${size}px sans-serif`;

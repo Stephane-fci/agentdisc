@@ -28,7 +28,9 @@ Ctrl+K on a channel outside any category moves it into the first category whose 
 
 ## Map and calendar above the members
 
-When the member list is open, two things sit above it. First a map: the channel you are in is the orange dot in the middle, and around it are the channels linked from it (a channel mentioned by name, a link to a channel or a message, a forwarded message); a click on a dot opens that channel. Then a calendar of the month, like Obsidian's: a dot under a day means you wrote in this channel or its threads that day, and a click on it opens the channel at that day's first message. The first visit to a long channel takes a few seconds to read it; after that, only new messages are read.
+When the right panel is open, two things sit above the member list. First a map: the channel you are in is the purple dot in the middle, and around it are the channels (grey) and threads (blue) linked with it, both ways: a channel or thread mentioned, a link to a channel, thread or message, or a forwarded message, posted here or posted elsewhere about this channel. A click on a dot opens it. Then a calendar of the month: a dot under a day means you wrote in this channel or its threads that day, and a click on it opens the channel at that day's first message. The first visit to a long channel takes a few seconds to read; the other channels of the server are then read slowly in the background to find the links made to this one.
+
+The mirrored panel icon in the top bar folds the whole right panel away or opens it again, and dragging its left edge makes it wider or narrower; the width is kept.
 
 ## Rename a channel
 

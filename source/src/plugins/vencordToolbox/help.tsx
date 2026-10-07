@@ -32,7 +32,7 @@ const BUTTONS: [string, string][] = [
     ["Magnifier with lines", "Top bar: find a channel"],
     ["Magnifier", "Top bar: Discord's message search"],
     ["Chain link", "Top bar: every link posted in this channel and its threads"],
-    ["Servers and people", "Top bar: show or hide the server list and the member list"],
+    ["Two panel icons", "Top bar: fold or open the server list, and the whole right panel"],
     ["AgentDisc", "Top bar: every AgentDisc switch and setting"],
     ["Hide / Show threads", "Above the channels: fold or open every channel's threads"],
     ["Clear", "Above the channels: remove every bookmark"],
@@ -40,7 +40,8 @@ const BUTTONS: [string, string][] = [
     ["Magnifier", "Above the channels: filter the channel list as you type"],
     ["Plus", "Above the channels: create a channel"],
     ["Arrow left of a channel", "Fold or open that channel's threads"],
-    ["Map above the members", "The channels linked from this channel; click a dot to open it"],
+    ["Map above the members", "Channels (grey) and threads (blue) linked with this channel, both ways; click a dot to open it"],
+    ["Right panel edge", "Drag it to make the right panel wider or narrower"],
     ["Calendar above the members", "The days you wrote here; click a marked day to open its first message"],
     ["Play button on a message", "Read it aloud; the words light up as they are read"]
 ];

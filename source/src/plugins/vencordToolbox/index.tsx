@@ -36,7 +36,7 @@ import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
 import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
-import { renderSidePanel } from "./sidePanel";
+import { renderSidePanel, startRightPanelWidth, stopRightPanelWidth } from "./sidePanel";
 
 const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_BOTTOM,", 'position:"bottom"');
 
@@ -68,6 +68,12 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         default: true,
         description: "Links panel: also group links that only differ by tracking codes",
+        hidden: true
+    },
+    rightPanelWidth: {
+        type: OptionType.NUMBER,
+        default: 0,
+        description: "Width of the right column (member list, map and calendar); 0 is Discord's own",
         hidden: true
     }
 });
@@ -199,11 +205,12 @@ const ServersIcon = () => (
     </TopIcon>
 );
 
+// The right column (member list, map and calendar): the servers icon mirrored (7 Oct).
 const MembersIcon = () => (
     <TopIcon>
-        <circle cx="9" cy="8" r="3.5" fill="currentColor" />
-        <path d="M2 19.2c0-3.4 3.1-5.9 7-5.9s7 2.5 7 5.9V20H2z" fill="currentColor" />
-        <path d="M16.3 5.2a3 3 0 1 1 .9 5.8a5 5 0 0 0-.9-5.8zM17.4 13.5c2.7.4 4.6 2.5 4.6 5.3V20h-4.1v-.8c0-2.2-.9-4.2-2.5-5.6z" fill="currentColor" />
+        <rect x="2.5" y="3.5" width="19" height="17" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path d="M15 4v16" stroke="currentColor" strokeWidth="2" />
+        <path d="M17 8h2.5M17 12h2.5M17 16h2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </TopIcon>
 );
 
@@ -229,7 +236,7 @@ function PanelButtons() {
             {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
             {channelType != null && !NO_MEMBER_LIST.has(channelType) && (
-                <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide Member List" : "Show Member List"} icon={MembersIcon} selected={membersShown} />
+                <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide the right panel" : "Show the right panel"} icon={MembersIcon} selected={membersShown} />
             )}
         </>
     );
@@ -329,6 +336,7 @@ export default definePlugin({
         startFeedbackShortcut();
         startChannelShortcuts();
         startSideData();
+        startRightPanelWidth();
     },
 
     stop() {
@@ -336,6 +344,7 @@ export default definePlugin({
         stopFeedbackShortcut();
         stopChannelShortcuts();
         stopSideData();
+        stopRightPanelWidth();
         setFeedback(false);
     },
 

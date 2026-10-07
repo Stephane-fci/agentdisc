@@ -6,21 +6,24 @@
 
 import * as DataStore from "@api/DataStore";
 import { Logger } from "@utils/Logger";
-import { ChannelStore, FluxDispatcher, RestAPI, useEffect, UserStore, useState } from "@webpack/common";
+import { ChannelStore, FluxDispatcher, GuildChannelStore, RestAPI, useEffect, UserStore, useState } from "@webpack/common";
 
 import { placesOf } from "./links";
 
-// What the right panel shows for a channel (Stephane, 7 Oct): the channels linked from it
-// (a channel mention, a link to a channel or message, a forwarded message), and the days he
-// wrote in it. Both come from reading the channel and its threads once, newest first; what
-// was read is kept in the browser, so the next visit only reads the new messages. A long
-// channel fills in while it is read.
+// What the right panel shows for a channel (Stephane, 7 Oct): the channels and threads it
+// is linked with, both ways (a channel mention, a link to a channel, thread or message, a
+// forwarded message, from this channel or from another one to it), and the days he wrote
+// in it. Everything comes from reading channels and their threads once, newest first; what
+// was read is kept in the browser, so later visits only read new messages. The open
+// channel is read first; then the other channels of the server are read slowly in the
+// background, so links made to this channel from elsewhere appear too.
 
 const logger = new Logger("AgentDiscSidePanel");
-const VERSION = 1;
+const VERSION = 2;
 const PAGE = 100;
 const MAX_PAGES_MAIN = 300;
 const MAX_PAGES_THREAD = 40;
+const SELECTABLE = "SELECTABLE";
 
 interface PlaceState {
     newest: string | null; // newest message read
@@ -37,20 +40,38 @@ export interface DayInfo {
 export interface SideData {
     v: number;
     places: Record<string, PlaceState>;
-    links: Record<string, number>;
+    links: Record<string, number>; // channel or thread linked from here -> how many times
     days: Record<string, DayInfo>;
+}
+
+// A channel or thread named in a link, as far as it could be found out.
+export interface PlaceName {
+    name: string;
+    thread: boolean;
+    parent: string | null;
+    guild: string | null;
 }
 
 const empty = (): SideData => ({ v: VERSION, places: {}, links: {}, days: {} });
 const key = (channelId: string) => `agentdisc-side-${channelId}`;
+const NAMES_KEY = "agentdisc-side-names";
 
 const loaded = new Map<string, SideData>();
 const running = new Set<string>();
-const reading = new Set<string>();
-const listeners = new Map<string, Set<() => void>>();
+const listeners = new Set<() => void>();
+let names: Record<string, PlaceName | null> | null = null;
+const naming = new Set<string>();
+let crawling: string | null = null;
+let crawlLeft = 0;
 
-function notify(channelId: string) {
-    listeners.get(channelId)?.forEach(fn => fn());
+let notifyQueued = false;
+function notify() {
+    if (notifyQueued) return;
+    notifyQueued = true;
+    requestAnimationFrame(() => {
+        notifyQueued = false;
+        listeners.forEach(fn => fn());
+    });
 }
 
 // Message ids grow with time; a shorter id is older.
@@ -68,7 +89,7 @@ const LINK = /https?:\/\/(?:[\w-]+\.)?discord(?:app)?\.com\/channels\/(?:\d+|@me
 // The channels and threads a message points to.
 function targets(m: any): string[] {
     const out = new Set<string>();
-    const text = [String(m?.content ?? ""), ...(m?.embeds ?? []).map((e: any) => e?.url ?? "")].join(" ");
+    const text = [String(m?.content ?? ""), ...(m?.embeds ?? []).flatMap((e: any) => [e?.url ?? "", e?.description ?? ""])].join(" ");
     for (const x of text.matchAll(MENTION)) out.add(x[1]);
     for (const x of text.matchAll(LINK)) out.add(x[1]);
     // A forwarded message comes from another channel.
@@ -85,9 +106,6 @@ function take(data: SideData, channelId: string, place: string, m: any, me: stri
     if (!info.any || older(m.id, info.any[1])) info.any = [place, m.id];
     for (const t of targets(m)) {
         if (t === channelId || t === place) continue;
-        // The channel's own threads are part of it, not another place.
-        const target = ChannelStore.getChannel(t);
-        if (target?.parent_id === channelId && target.isThread?.()) continue;
         data.links[t] = (data.links[t] ?? 0) + 1;
     }
 }
@@ -96,30 +114,44 @@ function take(data: SideData, channelId: string, place: string, m: any, me: stri
 let inFlight = 0;
 const waiting: (() => void)[] = [];
 
-async function page(place: string, query: Record<string, string | number>) {
+async function slot<T>(fn: () => Promise<T>): Promise<T> {
     if (inFlight >= 3) await new Promise<void>(resolve => waiting.push(resolve));
     inFlight++;
     try {
-        const res: any = await RestAPI.get({ url: `/channels/${place}/messages`, query: { limit: PAGE, ...query } } as any);
-        return Array.isArray(res?.body) ? res.body as any[] : [];
+        return await fn();
     } finally {
         inFlight--;
         waiting.shift()?.();
     }
 }
 
-async function readPlace(data: SideData, channelId: string, place: string, me: string | undefined, maxPages: number) {
-    const state = data.places[place] ??= { newest: null, oldest: null, complete: false };
+async function readPage(place: string, query: Record<string, string | number>) {
+    return slot(async () => {
+        const res: any = await RestAPI.get({ url: `/channels/${place}/messages`, query: { limit: PAGE, ...query } } as any);
+        return Array.isArray(res?.body) ? res.body as any[] : [];
+    });
+}
 
-    // New messages since the last visit.
-    if (state.newest) {
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// The background reading of other channels goes at about one page a second, like a person
+// scrolling, never in bursts.
+async function readPlace(data: SideData, channelId: string, place: string, me: string | undefined, maxPages: number, archived: boolean, slow: boolean) {
+    const state = data.places[place] ??= { newest: null, oldest: null, complete: false };
+    const page = async (p: string, q: Record<string, string | number>) => {
+        if (slow) await sleep(1000);
+        return readPage(p, q);
+    };
+
+    // New messages since the last visit (an archived thread read to its start has none).
+    if (state.newest && !(archived && state.complete)) {
         let after = state.newest;
         for (let i = 0; i < maxPages; i++) {
             const batch = await page(place, { after });
             for (const m of batch) take(data, channelId, place, m, me);
             for (const m of batch) if (older(after, m.id)) after = m.id;
             state.newest = after;
-            notify(channelId);
+            notify();
             if (batch.length < PAGE) break;
         }
     }
@@ -133,7 +165,7 @@ async function readPlace(data: SideData, channelId: string, place: string, me: s
             if (!state.oldest || older(m.id, state.oldest)) state.oldest = m.id;
         }
         if (batch.length < PAGE) state.complete = true;
-        notify(channelId);
+        notify();
         if (i % 5 === 4) await save(channelId, data);
     }
 }
@@ -155,42 +187,79 @@ async function load(channelId: string): Promise<SideData> {
     } catch {
         data = empty();
     }
-    loaded.set(channelId, data);
-    return data;
+    if (!loaded.has(channelId)) loaded.set(channelId, data);
+    return loaded.get(channelId)!;
 }
 
-// Reads what is new (and what is still unread) for a channel and its threads, three
-// places at a time. One reading per channel at once.
-async function refresh(channelId: string, guildId: string) {
+// Reads what is new (and what is still unread) for a channel and its threads.
+async function refresh(channelId: string, guildId: string, slow = false) {
     if (running.has(channelId)) return;
     running.add(channelId);
-    reading.add(channelId);
-    notify(channelId);
+    notify();
     try {
         const data = await load(channelId);
         const me = UserStore.getCurrentUser()?.id;
-        const { ids } = await placesOf(channelId, guildId);
+        const { ids, names: archivedNames } = await placesOf(channelId, guildId);
+        for (const [id, name] of archivedNames) rememberName(id, { name, thread: true, parent: channelId, guild: guildId });
         let next = 0;
         const worker = async () => {
             while (next < ids.length) {
                 const place = ids[next++];
                 try {
-                    await readPlace(data, channelId, place, me, place === channelId ? MAX_PAGES_MAIN : MAX_PAGES_THREAD);
+                    await readPlace(data, channelId, place, me, place === channelId ? MAX_PAGES_MAIN : MAX_PAGES_THREAD, archivedNames.has(place), slow);
                 } catch (e) {
                     logger.warn("Could not read", place, e);
                 }
             }
         };
-        await Promise.all([worker(), worker(), worker()]);
+        await Promise.all(slow ? [worker()] : [worker(), worker(), worker()]);
         await save(channelId, data);
     } finally {
         running.delete(channelId);
-        reading.delete(channelId);
-        notify(channelId);
+        notify();
     }
 }
 
-// A message posted while the panel knows the channel counts at once.
+function textChannels(guildId: string): string[] {
+    try {
+        return ((GuildChannelStore.getChannels(guildId) as any)?.[SELECTABLE] ?? []).map((e: any) => e.channel?.id).filter(Boolean);
+    } catch {
+        return [];
+    }
+}
+
+// The other channels of the server, read one after the other in the background, so
+// links made from them to the open channel are found. Each is read once to its start;
+// later only when it is opened, or as new messages come in.
+async function crawl(guildId: string) {
+    if (crawling === guildId) return;
+    crawling = guildId;
+    try {
+        const ids = textChannels(guildId);
+        const kept = await DataStore.getMany<SideData>(ids.map(key)).catch(() => [] as (SideData | undefined)[]);
+        ids.forEach((id, i) => {
+            const d = kept[i];
+            if (d?.v === VERSION && !loaded.has(id)) loaded.set(id, d);
+        });
+        notify();
+        const todo = ids.filter(id => !loaded.get(id)?.places[id]?.complete);
+        crawlLeft = todo.length;
+        for (const id of todo) {
+            if (crawling !== guildId) return;
+            await refresh(id, guildId, true);
+            crawlLeft--;
+            notify();
+        }
+    } catch (e) {
+        logger.warn("Could not read the other channels", e);
+    } finally {
+        if (crawling === guildId) crawling = null;
+        crawlLeft = 0;
+        notify();
+    }
+}
+
+// A message posted while its channel is known counts at once.
 function onMessage({ message }: { message?: any; }) {
     const place = message?.channel_id;
     if (!place) return;
@@ -202,8 +271,72 @@ function onMessage({ message }: { message?: any; }) {
     if (!state?.newest || !older(state.newest, message.id)) return;
     take(data, channelId, place, message, UserStore.getCurrentUser()?.id);
     state.newest = message.id;
-    notify(channelId);
+    notify();
     save(channelId, data);
+}
+
+// Names of linked channels and threads Discord has not loaded (old threads, mostly), asked
+// once and kept.
+function rememberName(id: string, name: PlaceName | null) {
+    if (!names) names = {};
+    names[id] = name;
+}
+
+async function loadNames() {
+    if (names) return;
+    try {
+        names = (await DataStore.get<Record<string, PlaceName | null>>(NAMES_KEY)) ?? {};
+    } catch {
+        names = {};
+    }
+}
+
+let namesSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function saveNamesSoon() {
+    if (namesSaveTimer) return;
+    namesSaveTimer = setTimeout(() => {
+        namesSaveTimer = null;
+        DataStore.set(NAMES_KEY, names ?? {}).catch(() => { });
+    }, 2000);
+}
+
+export function placeName(id: string): PlaceName | null | undefined {
+    const c = ChannelStore.getChannel(id);
+    if (c?.name) return { name: c.name, thread: !!c.isThread?.(), parent: c.parent_id ?? null, guild: c.guild_id ?? null };
+    if (names && id in names) return names[id];
+    if (names && !naming.has(id)) {
+        naming.add(id);
+        slot(() => RestAPI.get({ url: `/channels/${id}` }))
+            .then((res: any) => {
+                const b = res?.body;
+                rememberName(id, b?.name ? { name: b.name, thread: [10, 11, 12].includes(b.type), parent: b.parent_id ?? null, guild: b.guild_id ?? null } : null);
+            })
+            .catch(() => rememberName(id, null))
+            .finally(() => {
+                saveNamesSoon();
+                notify();
+            });
+    }
+    return undefined;
+}
+
+// Every channel or thread linked with this channel, both ways, with how often.
+export function linksOf(channelId: string): Map<string, number> {
+    const out = new Map<string, number>();
+    const own = loaded.get(channelId);
+    for (const [id, n] of Object.entries(own?.links ?? {})) out.set(id, (out.get(id) ?? 0) + n);
+    // This channel and its threads (every place read for it), as targets of other channels.
+    const here = new Set([channelId, ...Object.keys(own?.places ?? {})]);
+    for (const [other, data] of loaded) {
+        if (other === channelId) continue;
+        let n = 0;
+        for (const [target, count] of Object.entries(data.links)) {
+            if (here.has(target)) n += count;
+        }
+        if (n) out.set(other, (out.get(other) ?? 0) + n);
+    }
+    out.delete(channelId);
+    return out;
 }
 
 export function startSideData() {
@@ -212,26 +345,25 @@ export function startSideData() {
 
 export function stopSideData() {
     FluxDispatcher.unsubscribe("MESSAGE_CREATE", onMessage);
+    crawling = null;
 }
 
 export function useSideData(channelId: string, guildId: string | null | undefined) {
     const [, rerender] = useState(0);
     useEffect(() => {
-        let queued = false;
-        const fn = () => {
-            if (queued) return;
-            queued = true;
-            requestAnimationFrame(() => {
-                queued = false;
-                rerender(x => x + 1);
-            });
-        };
-        const set = listeners.get(channelId) ?? new Set();
-        set.add(fn);
-        listeners.set(channelId, set);
-        if (guildId) refresh(channelId, guildId);
-        else load(channelId).then(fn);
-        return () => void set.delete(fn);
+        const fn = () => rerender(x => x + 1);
+        listeners.add(fn);
+        loadNames().then(async () => {
+            if (!guildId) return load(channelId).then(fn);
+            await refresh(channelId, guildId);
+            crawl(guildId);
+        });
+        return () => void listeners.delete(fn);
     }, [channelId, guildId]);
-    return { data: loaded.get(channelId) ?? null, reading: reading.has(channelId) };
+    const data = loaded.get(channelId) ?? null;
+    return {
+        data,
+        reading: running.has(channelId) && !data?.places[channelId]?.complete,
+        crawlLeft: crawling === guildId ? crawlLeft : 0
+    };
 }

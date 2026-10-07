@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { ChannelStore, NavigationRouter, useMemo, useState } from "@webpack/common";
+import { NavigationRouter, useEffect, useRef, useState } from "@webpack/common";
 
-import { type DayInfo, dayKey, useSideData } from "./sideData";
+import { type DayInfo, dayKey, linksOf, type PlaceName, placeName, useSideData } from "./sideData";
 
 // The right panel (Stephane, 7 Oct), above the member list like Obsidian's side panel:
 //   1. a map of the channels linked from this channel, this channel in the middle; a
@@ -18,55 +19,73 @@ import { type DayInfo, dayKey, useSideData } from "./sideData";
 const MAX_DOTS = 18;
 // With many dots, only the most linked ones keep their name; the others show it on hover.
 const LABELS = 8;
-const WIDTH = 224;
-const HEIGHT = 168;
 
 function short(name: string, max = 16) {
     return name.length > max ? name.slice(0, max - 1) + "…" : name;
 }
 
-function LinkMap({ channel, links }: { channel: any; links: Record<string, number>; }) {
-    const [hover, setHover] = useState<string | null>(null);
-    const dots = useMemo(() => Object.entries(links)
-        .map(([id, count]) => ({ id, count, channel: ChannelStore.getChannel(id) }))
-        .filter(d => d.channel?.name)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, MAX_DOTS), [links]);
+// The panel's own width, to draw the map across it.
+function useWidth(ref: React.RefObject<HTMLDivElement | null>) {
+    const [width, setWidth] = useState(224);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        // The map follows the column's width and never sets it.
+        const ro = new ResizeObserver(() => setWidth(Math.max(160, Math.round(el.getBoundingClientRect().width))));
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+    return width;
+}
 
-    const cx = WIDTH / 2, cy = HEIGHT / 2;
-    const rx = WIDTH / 2 - 34, ry = HEIGHT / 2 - 26;
+function LinkMap({ channel }: { channel: any; }) {
+    const [hover, setHover] = useState<string | null>(null);
+    const ref = useRef<HTMLDivElement>(null);
+    const width = useWidth(ref);
+    const height = Math.round(Math.min(300, Math.max(150, width * 0.75)));
+
+    const dots = [...linksOf(channel.id)]
+        .map(([id, count]) => ({ id, count, place: placeName(id) }))
+        .filter(d => d.place)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, MAX_DOTS) as { id: string; count: number; place: PlaceName; }[];
+
+    const cx = width / 2, cy = height / 2;
+    const rx = width / 2 - 34, ry = height / 2 - 26;
     const most = Math.max(1, ...dots.map(d => d.count));
     const placed = dots.map((d, i) => {
         const angle = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(dots.length, 1);
         return { ...d, x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle), r: 3 + 3 * (d.count / most) };
     });
-    const go = (c: any) => NavigationRouter.transitionTo(`/channels/${c.guild_id ?? "@me"}/${c.id}`);
+    const go = (d: { id: string; place: PlaceName; }) => NavigationRouter.transitionTo(`/channels/${d.place.guild ?? channel.guild_id ?? "@me"}/${d.id}`);
+    const threads = dots.some(d => d.place.thread);
 
     return (
-        <div className="agentdisc-side-map">
-            <svg width={WIDTH} height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
+        <div className="agentdisc-side-map" ref={ref}>
+            <svg viewBox={`0 0 ${width} ${height}`} className="agentdisc-side-svg">
                 {placed.map(d => (
                     <line key={"l" + d.id} x1={cx} y1={cy} x2={d.x} y2={d.y} className={"agentdisc-side-line" + (hover === d.id ? " agentdisc-side-on" : "")} />
                 ))}
                 {placed.map((d, i) => (
                     <g
                         key={d.id}
-                        className={"agentdisc-side-dot" + (hover === d.id ? " agentdisc-side-on" : "")}
+                        className={"agentdisc-side-dot" + (d.place.thread ? " agentdisc-side-thread" : "") + (hover === d.id ? " agentdisc-side-on" : "")}
                         onMouseEnter={() => setHover(d.id)}
                         onMouseLeave={() => setHover(null)}
-                        onClick={() => go(d.channel)}
+                        onClick={() => go(d)}
                     >
-                        <title>{`${d.channel.name} (${d.count})`}</title>
+                        <title>{`${d.place.thread ? "Thread" : "Channel"}: ${d.place.name} (${d.count} link${d.count > 1 ? "s" : ""})`}</title>
                         <circle cx={d.x} cy={d.y} r={d.r + 6} fill="transparent" />
                         <circle cx={d.x} cy={d.y} r={d.r} />
-                        {(i < LABELS || hover === d.id) && <text x={d.x} y={d.y + d.r + 11} textAnchor="middle">{short(d.channel.name)}</text>}
+                        {(i < LABELS || hover === d.id) && <text x={d.x} y={d.y + d.r + 11} textAnchor="middle">{short(d.place.name, Math.round(Math.min(28, Math.max(14, width / 14))))}</text>}
                     </g>
                 ))}
                 <circle cx={cx} cy={cy} r={8} className="agentdisc-side-centre">
                     <title>{channel.name}</title>
                 </circle>
             </svg>
-            {!dots.length && <div className="agentdisc-side-note">No other channel linked here yet.</div>}
+            {!dots.length && <div className="agentdisc-side-note">No channel linked with this one yet.</div>}
+            {threads && <div className="agentdisc-side-legend"><span className="agentdisc-side-key" /> channel <span className="agentdisc-side-key agentdisc-side-key-thread" /> thread</div>}
         </div>
     );
 }
@@ -108,7 +127,7 @@ function Calendar({ channel, days }: { channel: any; days: Record<string, DayInf
     return (
         <div className="agentdisc-side-cal">
             <div className="agentdisc-side-cal-head">
-                <span className="agentdisc-side-cal-title">{MONTHS[month]} <span className="agentdisc-side-cal-year">{first.getFullYear()}</span></span>
+                <span className="agentdisc-side-cal-title">{MONTHS[month]} {first.getFullYear()}</span>
                 <span className="agentdisc-side-cal-nav">
                     <button type="button" aria-label="Previous month" onClick={() => setShift(s => s - 1)}>‹</button>
                     <button type="button" onClick={() => setShift(0)}>TODAY</button>
@@ -145,15 +164,63 @@ function Calendar({ channel, days }: { channel: any; days: Record<string, DayInf
     );
 }
 
+// The handle on the panel's left edge: drag it to make the column wider or narrower, like
+// the channel list (Stephane, 7 Oct). The width is kept.
+function ResizeHandle() {
+    const onDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const aside = (e.currentTarget as HTMLElement).closest<HTMLElement>('[class*="membersWrap_"]');
+        const start = e.clientX;
+        const startWidth = aside?.getBoundingClientRect().width ?? 240;
+        let width = startWidth;
+        const move = (ev: MouseEvent) => {
+            width = Math.round(Math.min(640, Math.max(200, startWidth + start - ev.clientX)));
+            setRightPanelWidth(width, false);
+        };
+        const up = () => {
+            document.removeEventListener("mousemove", move);
+            document.removeEventListener("mouseup", up);
+            document.documentElement.classList.remove("agentdisc-resizing");
+            setRightPanelWidth(width, true);
+        };
+        document.addEventListener("mousemove", move);
+        document.addEventListener("mouseup", up);
+        document.documentElement.classList.add("agentdisc-resizing");
+    };
+    return <div className="agentdisc-side-resize" onMouseDown={onDown} title="Drag to resize" />;
+}
+
 function SidePanel({ channel }: { channel: any; }) {
-    const { data, reading } = useSideData(channel.id, channel.guild_id);
+    const { data, reading, crawlLeft } = useSideData(channel.id, channel.guild_id);
     return (
         <div className="agentdisc-side">
-            <LinkMap channel={channel} links={data?.links ?? {}} />
+            <ResizeHandle />
+            <LinkMap channel={channel} />
             <Calendar channel={channel} days={data?.days ?? {}} />
-            {reading && !data?.places[channel.id]?.complete && <div className="agentdisc-side-note agentdisc-side-reading">Reading the channel…</div>}
+            {reading && <div className="agentdisc-side-note agentdisc-side-reading">Reading the channel…</div>}
+            {!reading && crawlLeft > 0 && <div className="agentdisc-side-note agentdisc-side-reading">Looking for links in other channels ({crawlLeft} left)…</div>}
         </div>
     );
+}
+
+// The column's width, kept in the AgentDisc settings; Discord sizes the member list from
+// one width value, which is set here.
+let widthStyle: HTMLStyleElement | null = null;
+
+export function setRightPanelWidth(width: number, keep: boolean) {
+    widthStyle ??= document.head.appendChild(Object.assign(document.createElement("style"), { id: "agentdisc-right-width" }));
+    widthStyle.textContent = width > 0 ? `[class*="membersWrap_"]:has(> .agentdisc-side){--custom-member-list-width:${width}px}` : "";
+    if (keep) Settings.plugins.VencordToolbox.rightPanelWidth = width;
+}
+
+export function startRightPanelWidth() {
+    const width = Settings.plugins.VencordToolbox?.rightPanelWidth;
+    if (typeof width === "number" && width > 0) setRightPanelWidth(width, false);
+}
+
+export function stopRightPanelWidth() {
+    widthStyle?.remove();
+    widthStyle = null;
 }
 
 export function renderSidePanel(channel: any) {

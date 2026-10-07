@@ -74,6 +74,16 @@ function useMapOptions() {
     return { options, flip };
 }
 
+// The whole map in view, but never zoomed in further than a little: with one or two dots,
+// fitting alone would blow them up to fill the box (Stephane, 7 Oct, on a new channel).
+function fit(fg: any, ms: number) {
+    if (!fg) return;
+    fg.zoomToFit(ms, 55);
+    setTimeout(() => {
+        if (fg.zoom() > 1.6) fg.zoom(1.6, 200);
+    }, ms + 50);
+}
+
 function LinkMap({ channel }: { channel: any; }) {
     const [ready, setReady] = useState(false);
     const box = useRef<HTMLDivElement>(null);
@@ -210,8 +220,8 @@ function LinkMap({ channel }: { channel: any; }) {
         // The whole map in view once it has spread out a little.
         if (!fitted.current) {
             fitted.current = true;
-            const t1 = setTimeout(() => graph.current?.zoomToFit(400, 55), 1200);
-            const t2 = setTimeout(() => graph.current?.zoomToFit(600, 55), 4500);
+            const t1 = setTimeout(() => fit(graph.current, 400), 1200);
+            const t2 = setTimeout(() => fit(graph.current, 600), 4500);
             return () => {
                 clearTimeout(t1);
                 clearTimeout(t2);
@@ -227,13 +237,14 @@ function LinkMap({ channel }: { channel: any; }) {
     const hasThreads = all.some(d => d.place.thread);
     return (
         <div className="agentdisc-side-map" ref={box}>
-            <div className="agentdisc-side-graph" ref={holder} style={{ height }} />
+            <div className="agentdisc-side-graph" ref={holder} style={{ height, display: dots.length ? undefined : "none" }} />
             {all.length > 0 && (
-                <button type="button" className="agentdisc-side-fit" title="Fit the whole map" onClick={() => graph.current?.zoomToFit(400, 55)}>
+                <button type="button" className="agentdisc-side-fit" title="Fit the whole map" onClick={() => fit(graph.current, 400)}>
                     <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
                 </button>
             )}
             {!all.length && <div className="agentdisc-side-note">No channel linked with this one yet.</div>}
+            {all.length > 0 && !dots.length && <div className="agentdisc-side-note">Tick channels or threads to see them.</div>}
             {all.length > 0 && (
                 <div className="agentdisc-side-options">
                     <label><input type="checkbox" checked={options.mapChannels} onChange={() => flip("mapChannels")} /><span className="agentdisc-side-key" />Channels</label>

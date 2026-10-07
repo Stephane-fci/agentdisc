@@ -24,13 +24,17 @@ A row of buttons stays at the top of the channel list. "Hide threads" or "Show t
 
 ## Tidy a channel into its category
 
-Ctrl+K on a channel outside any category moves it into the first category whose name starts with the same emoji (never an archive category), at the top of that category: "🥑-discord-app" goes into "🥑 Tools & Skills". Ctrl+K on a channel inside a category takes it out, to the top of the channel list. In a thread, its channel moves.
+Ctrl+K on a channel outside any category moves it into the first category whose name starts with the same emoji (never an archive category), at the top of that category: "🥑-discord-app" goes into "🥑 Tools & Skills". Ctrl+K on a channel inside a category takes it out, under the other channels above the categories. In a thread, its channel moves.
 
 ## Map and calendar above the members
 
-When the right panel is open, two things sit above the member list. First a map: the channel you are in is the purple dot in the middle, and around it are the channels (grey) and threads (blue) linked with it, both ways: a channel or thread mentioned, a link to a channel, thread or message, or a forwarded message, posted here or posted elsewhere about this channel. The map moves like the Little Brain's: the mouse wheel zooms, dragging the background moves it, dots can be dragged, hovering a dot shows its full name, and the corner button fits the whole map again. A click on a dot opens it. In a thread, the panel shows the thread's channel. Then a calendar of the month: a dot under a day means you wrote in this channel or its threads that day, and a click on it opens the channel at that day's first message. The first visit to a long channel takes a few seconds to read; the other channels of the server are then read slowly in the background to find the links made to this one.
+When the right panel is open, two things sit above the member list. First a map: the channel you are in is the purple dot in the middle, and around it are the channels (grey) and threads (blue) linked with it, both ways: a channel or thread mentioned, a link to a channel, thread or message, or a forwarded message, posted here or posted elsewhere about this channel. The map moves like Obsidian's graph: the dots float and pull on each other, dragging a dot moves it and the dots tied to it follow, the mouse wheel zooms, dragging the background moves the view, and the corner button fits the whole map again. Lines also join dots that link to each other. Tick boxes under the map show or hide channels, threads and names. A click on a dot opens it. In a thread, the panel shows the thread's channel. Then a calendar of the month: a dot under a day means you wrote in this channel or its threads that day, and a click on it opens the channel at that day's first message. The first visit to a long channel takes a few seconds to read; the other channels of the server are then read slowly in the background to find the links made to this one.
 
 The mirrored panel icon in the top bar folds the whole right panel away or opens it again, and dragging its left edge makes it wider or narrower; the width is kept.
+
+## Copy a link
+
+A click on the # just before the channel name at the top copies the link of the channel (or thread). In the small bar that shows over a message, a link icon copies the link of that message.
 
 ## Rename a channel
 
@@ -76,7 +80,7 @@ Midnight: a near-black channel list, a slightly lighter chat so the two stand ap
 
 Discord's own shortcuts: Alt with the up and down arrows moves to the channel above or below, Alt with left and right goes back and forward through the channels you visited, and Alt with Shift and the arrows jumps between unread channels.
 
-AgentDisc adds the same moves for the left hand: Alt with Z (up), S (down), Q (back) and D (forward) on an AZERTY keyboard, or Alt with W, S, A and D on a QWERTY keyboard.
+AgentDisc adds the same moves for the left hand: Alt with Z (up), S (down), Q (back) and D (forward) on an AZERTY keyboard, or Alt with W, S, A and D on a QWERTY keyboard. Moving up and down follows the list as you see it: the threads of a folded channel are skipped.
 
 More AgentDisc shortcuts: Ctrl+O finds a channel, Ctrl+L turns feedback mode on and off, Ctrl+B bookmarks the channel you are in (with text selected in the message box it still makes the text bold), Ctrl+R renames it, Ctrl+P creates a channel, Ctrl+K moves it into or out of its category, and Ctrl+H shows a window with every shortcut and button. Discord's own Ctrl+K (quick switcher, use Ctrl+O instead) and Ctrl+P (pinned messages, the pin button stays) give way to these.
 

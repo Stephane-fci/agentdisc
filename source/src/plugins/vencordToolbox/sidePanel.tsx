@@ -8,7 +8,7 @@ import { Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { ChannelStore, NavigationRouter, useEffect, useRef, useState } from "@webpack/common";
 
-import { type DayInfo, dayKey, linksOf, type PlaceName, placeName, useSideData } from "./sideData";
+import { type DayInfo, dayKey, linksOf, pairsAmong, type PlaceName, placeName, useSideData } from "./sideData";
 
 // The right panel (Stephane, 7 Oct), above the member list like Obsidian's side panel:
 //   1. a map of the channels linked from this channel, this channel in the middle; a
@@ -17,13 +17,13 @@ import { type DayInfo, dayKey, linksOf, type PlaceName, placeName, useSideData }
 //      marked day opens the channel at that day's first message.
 
 // The map is drawn with force-graph, the library of the Little Brain's map (Stephane,
-// 7 Oct): the wheel zooms, dragging the background moves the map, dragging a dot moves it.
+// 7 Oct). Like Obsidian's graph, the dots float and pull on each other: the wheel zooms,
+// dragging the background moves the view, dragging a dot moves it and the dots tied to it
+// follow. Tick boxes show channels, threads and names (kept in the settings).
 const MAX_DOTS = 60;
-// The most linked dots keep their name; the others show it when zoomed in or hovered.
-const LABELS = 8;
 const COLOURS = { centre: "#5865f2", channel: "#b5bac1", thread: "#00a8fc", hover: "#ffffff" };
 
-function short(name: string, max = 18) {
+function short(name: string, max = 22) {
     return name.length > max ? name.slice(0, max - 1) + "…" : name;
 }
 
@@ -46,12 +46,9 @@ interface MapNode {
     name: string;
     kind: "centre" | "channel" | "thread";
     count: number;
-    rank: number;
     guild: string | null;
     x?: number;
     y?: number;
-    fx?: number;
-    fy?: number;
 }
 
 // The library adds its own styles to the page as it loads, so it is loaded only when a map
@@ -62,6 +59,20 @@ function loadForceGraph() {
     return library ??= import("./vendor/force-graph.min.js").then(m => m.default ?? m);
 }
 
+type MapOption = "mapChannels" | "mapThreads" | "mapTitles";
+function useMapOptions() {
+    const read = () => {
+        const s = Settings.plugins.VencordToolbox ?? {};
+        return { mapChannels: s.mapChannels !== false, mapThreads: s.mapThreads !== false, mapTitles: s.mapTitles !== false };
+    };
+    const [options, setOptions] = useState(read);
+    const flip = (k: MapOption) => {
+        Settings.plugins.VencordToolbox[k] = !options[k];
+        setOptions(read());
+    };
+    return { options, flip };
+}
+
 function LinkMap({ channel }: { channel: any; }) {
     const [ready, setReady] = useState(false);
     const box = useRef<HTMLDivElement>(null);
@@ -69,18 +80,25 @@ function LinkMap({ channel }: { channel: any; }) {
     const graph = useRef<any>(null);
     const hover = useRef<string | null>(null);
     const fitted = useRef(false);
+    const titles = useRef(true);
     const width = useWidth(box);
-    const height = Math.round(Math.min(320, Math.max(170, width * 0.8)));
+    const height = Math.round(Math.min(360, Math.max(190, width * 0.85)));
+    const { options, flip } = useMapOptions();
+    titles.current = options.mapTitles;
 
-    const dots = [...linksOf(channel.id)]
+    const all = [...linksOf(channel.id)]
         .map(([id, count]) => ({ id, count, place: placeName(id) }))
         .filter(d => d.place)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, MAX_DOTS) as { id: string; count: number; place: PlaceName; }[];
+        .sort((a, b) => b.count - a.count) as { id: string; count: number; place: PlaceName; }[];
+    const dots = all
+        .filter(d => d.place.thread ? options.mapThreads : options.mapChannels)
+        .slice(0, MAX_DOTS);
     const most = Math.max(1, ...dots.map(d => d.count));
-    const dataKey = channel.id + "|" + dots.map(d => `${d.id}:${d.count}:${d.place.name}`).join("|");
+    const counts = new Map(dots.map(d => [d.id, d.count]));
+    // The map is laid out again only when its dots or lines change, never for a new count,
+    // so a dot being dragged is never pulled from under the mouse.
+    const shape = channel.id + "|" + dots.map(d => `${d.id}:${d.place.thread ? 1 : 0}:${d.place.name}`).join("|");
 
-    // One map per panel; it is told the new size and data rather than drawn again.
     useEffect(() => {
         let fg: any = null;
         let gone = false;
@@ -107,43 +125,47 @@ function LinkMap({ channel }: { channel: any; }) {
             .nodeId("id")
             .nodeLabel((n: MapNode) => n.kind === "centre" ? n.name : `${n.kind === "thread" ? "Thread" : "Channel"}: ${n.name} (${n.count} link${n.count > 1 ? "s" : ""})`)
             .nodeCanvasObject((n: MapNode, ctx: CanvasRenderingContext2D, scale: number) => {
-                const r = n.kind === "centre" ? 7 : 3 + 3 * (n.count / (fg.__most || 1));
+                const r = n.kind === "centre" ? 8 : 4 + 4 * (n.count / (fg.__most || 1));
+                const on = hover.current === n.id;
                 ctx.beginPath();
                 ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
-                ctx.fillStyle = hover.current === n.id ? COLOURS.hover : COLOURS[n.kind];
+                ctx.fillStyle = on ? COLOURS.hover : COLOURS[n.kind];
                 ctx.fill();
-                if (n.kind === "centre" || n.rank < LABELS || scale > 1.8 || hover.current === n.id) {
-                    ctx.font = `${11 / scale}px sans-serif`;
+                if (titles.current || on || n.kind === "centre") {
+                    const size = 12 / scale;
+                    ctx.font = `600 ${size}px sans-serif`;
                     ctx.textAlign = "center";
                     ctx.textBaseline = "top";
-                    ctx.fillStyle = hover.current === n.id ? "#ffffff" : "rgba(219,222,225,0.85)";
-                    ctx.fillText(short(n.name), n.x!, n.y! + r + 2 / scale);
+                    ctx.lineWidth = 3 / scale;
+                    ctx.strokeStyle = "rgba(0,0,0,0.85)";
+                    const text = short(n.name);
+                    const y = n.y! + r + 3 / scale;
+                    ctx.strokeText(text, n.x!, y);
+                    ctx.fillStyle = on ? "#ffffff" : "rgba(231,233,236,0.95)";
+                    ctx.fillText(text, n.x!, y);
                 }
             })
             .nodePointerAreaPaint((n: MapNode, color: string, ctx: CanvasRenderingContext2D) => {
                 ctx.fillStyle = color;
                 ctx.beginPath();
-                ctx.arc(n.x!, n.y!, 9, 0, 2 * Math.PI);
+                ctx.arc(n.x!, n.y!, 11, 0, 2 * Math.PI);
                 ctx.fill();
             })
-            .linkColor(() => "rgba(255,255,255,0.16)")
+            .linkColor(() => "rgba(255,255,255,0.18)")
             .linkWidth(1)
-            .cooldownTicks(120)
+            .d3AlphaDecay(0.02)
+            .d3VelocityDecay(0.3)
+            .cooldownTime(20000)
             .onNodeHover((n: MapNode | null) => {
                 hover.current = n?.id ?? null;
-                el.style.cursor = n && n.kind !== "centre" ? "pointer" : "grab";
+                el.style.cursor = n ? "pointer" : "grab";
             })
             .onNodeClick((n: MapNode) => {
                 if (n.kind !== "centre") NavigationRouter.transitionTo(`/channels/${n.guild ?? channel.guild_id ?? "@me"}/${n.id}`);
             })
-            .onEngineStop(() => {
-                if (!fitted.current) {
-                    fitted.current = true;
-                    fg.zoomToFit(300, 24);
-                }
-            });
-        fg.d3Force("charge")?.strength(-70);
-        fg.d3Force("link")?.distance(55);
+            .onNodeDrag(() => fg.d3ReheatSimulation?.());
+        fg.d3Force("charge")?.strength(-80);
+        fg.d3Force("link")?.distance(42).strength(0.6);
         return fg;
     }
 
@@ -151,38 +173,67 @@ function LinkMap({ channel }: { channel: any; }) {
         graph.current?.width(width).height(height);
     }, [width, height, ready]);
 
+    // New counts change the dots' size without moving anything.
+    const fg = graph.current;
+    if (fg) {
+        fg.__most = most;
+        for (const n of fg.graphData().nodes as MapNode[]) if (counts.has(n.id)) n.count = counts.get(n.id)!;
+    }
+
     useEffect(() => {
         const fg = graph.current;
         if (!fg) return;
         const before = new Map<string, MapNode>((fg.graphData().nodes as MapNode[]).map(n => [n.id, n]));
         const keep = (n: MapNode): MapNode => {
             const old = before.get(n.id);
-            return old ? Object.assign(old, { name: n.name, kind: n.kind, count: n.count, rank: n.rank, guild: n.guild }) : n;
+            return old ? Object.assign(old, { name: n.name, kind: n.kind, count: n.count, guild: n.guild }) : n;
         };
         const nodes: MapNode[] = [
-            keep({ id: channel.id, name: channel.name, kind: "centre", count: 0, rank: -1, guild: channel.guild_id, fx: 0, fy: 0 }),
-            ...dots.map((d, i) => keep({ id: d.id, name: d.place.name, kind: d.place.thread ? "thread" : "channel", count: d.count, rank: i, guild: d.place.guild }))
+            keep({ id: channel.id, name: channel.name, kind: "centre", count: 0, guild: channel.guild_id }),
+            ...dots.map(d => keep({ id: d.id, name: d.place.name, kind: d.place.thread ? "thread" : "channel", count: d.count, guild: d.place.guild }))
         ];
+        const ids = nodes.map(n => n.id);
+        const lines = new Map<string, { source: string; target: string; }>();
+        for (const d of dots) lines.set(channel.id + "|" + d.id, { source: channel.id, target: d.id });
+        for (const [a, b] of pairsAmong(ids)) {
+            if (!lines.has(a + "|" + b) && !lines.has(b + "|" + a)) lines.set(a + "|" + b, { source: a, target: b });
+        }
         fg.__most = most;
-        fg.graphData({ nodes, links: dots.map(d => ({ source: channel.id, target: d.id })) });
-    }, [dataKey, ready]);
+        fg.graphData({ nodes, links: [...lines.values()] });
+        // The whole map in view once it has spread out a little.
+        if (!fitted.current) {
+            fitted.current = true;
+            const t1 = setTimeout(() => graph.current?.zoomToFit(400, 55), 1200);
+            const t2 = setTimeout(() => graph.current?.zoomToFit(600, 55), 4500);
+            return () => {
+                clearTimeout(t1);
+                clearTimeout(t2);
+            };
+        }
+    }, [shape, ready]);
 
     // A new channel starts with a fresh view.
     useEffect(() => {
         fitted.current = false;
     }, [channel.id]);
 
-    const threads = dots.some(d => d.place.thread);
+    const hasThreads = all.some(d => d.place.thread);
     return (
         <div className="agentdisc-side-map" ref={box}>
             <div className="agentdisc-side-graph" ref={holder} style={{ height }} />
-            {dots.length > 0 && (
-                <button type="button" className="agentdisc-side-fit" title="Fit the whole map" onClick={() => graph.current?.zoomToFit(300, 24)}>
+            {all.length > 0 && (
+                <button type="button" className="agentdisc-side-fit" title="Fit the whole map" onClick={() => graph.current?.zoomToFit(400, 55)}>
                     <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
                 </button>
             )}
-            {!dots.length && <div className="agentdisc-side-note">No channel linked with this one yet.</div>}
-            {threads && <div className="agentdisc-side-legend"><span className="agentdisc-side-key" /> channel <span className="agentdisc-side-key agentdisc-side-key-thread" /> thread</div>}
+            {!all.length && <div className="agentdisc-side-note">No channel linked with this one yet.</div>}
+            {all.length > 0 && (
+                <div className="agentdisc-side-options">
+                    <label><input type="checkbox" checked={options.mapChannels} onChange={() => flip("mapChannels")} /><span className="agentdisc-side-key" />Channels</label>
+                    {hasThreads && <label><input type="checkbox" checked={options.mapThreads} onChange={() => flip("mapThreads")} /><span className="agentdisc-side-key agentdisc-side-key-thread" />Threads</label>}
+                    <label><input type="checkbox" checked={options.mapTitles} onChange={() => flip("mapTitles")} />Names</label>
+                </div>
+            )}
         </div>
     );
 }

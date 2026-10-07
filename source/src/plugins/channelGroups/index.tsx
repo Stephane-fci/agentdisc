@@ -317,6 +317,23 @@ function redrawList() {
     }
 }
 
+// The channels and threads Alt+Up and Alt+Down go through, as the list shows them: the
+// threads under a folded channel are left out, except the one being read and bookmarked ones.
+function visibleOnly(_guildId: string, ids: string[]) {
+    try {
+        if (!isPluginEnabled("ChannelGroups") || !Array.isArray(ids)) return ids;
+        const selected = SelectedChannelStore.getChannelId();
+        return ids.filter(id => {
+            const c = ChannelStore.getChannel(id);
+            if (!c?.isThread?.()) return true;
+            return !isFolded(c.parent_id) || id === selected || isPriority(id);
+        });
+    } catch (e) {
+        logger.warn("Could not leave out folded threads", e);
+        return ids;
+    }
+}
+
 // The threads the channel list shows under a channel (the links panel reads them too).
 export function listedThreads(channelId: string): string[] {
     return listed.get(channelId) ?? NONE;
@@ -668,6 +685,15 @@ export default definePlugin({
             }
         },
         {
+            // Alt with the arrows (and Alt+Z / Alt+S) moves through the channel list as it
+            // is shown: the threads of a folded channel are skipped (Stephane, 7 Oct).
+            find: 'binds:["alt+down"],comboKeysBindGlobal',
+            replacement: {
+                match: /\(0,\i\.\i\)\((\i),\{withCurrentVoiceChannel:!0\}\)\.map\((\i)=>\2\.id\)/,
+                replace: "$self.visibleOnly($1,$&)"
+            }
+        },
+        {
             // A closed category keeps a bookmarked channel, and one where someone is typing,
             // in view, like the open, unread or mentioned ones.
             find: "suggestedFavoriteChannelId;",
@@ -688,6 +714,7 @@ export default definePlugin({
 
     shownThreads,
     rowHeight,
+    visibleOnly,
     keepVisible,
     hideTopLine,
     onlyHiddenTopLines,

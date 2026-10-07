@@ -8,6 +8,7 @@ import { isPluginEnabled } from "@api/PluginManager";
 import { isBookmarked, togglePriority } from "@plugins/channelGroups";
 import { openNewChannel, openRename, tidyChannel } from "@plugins/channelGroups/boxes";
 import { channelHeaderSelector } from "@plugins/panelSwitches";
+import { copyWithToast } from "@utils/discord";
 import { ChannelStore, SelectedChannelStore, showToast, Toasts } from "@webpack/common";
 
 import { plain } from "./channelSearch";
@@ -58,7 +59,17 @@ function onKey(e: KeyboardEvent) {
     }
 }
 
-// A click on the channel name above the messages opens the rename box.
+// The element above the messages that shows exactly the channel's name.
+function nameElement(header: Element, name: string): HTMLElement | null {
+    let found: HTMLElement | null = null;
+    for (const el of header.querySelectorAll<HTMLElement>("*")) {
+        if (plain(el.textContent ?? "") === name) found = el; // the deepest one wins
+    }
+    return found;
+}
+
+// A click on the channel name above the messages opens the rename box; a click on the # (or
+// thread sign) just before it copies the link of the channel or thread (Stephane, 7 Oct).
 function onClick(e: MouseEvent) {
     if (e.button !== 0 || e.ctrlKey || e.shiftKey || e.altKey) return;
     const header = channelHeaderSelector();
@@ -69,6 +80,19 @@ function onClick(e: MouseEvent) {
     if (!channel?.guild_id) return;
     const name = plain(channel.name);
     if (!name) return;
+
+    const icon = target?.closest("svg");
+    if (icon) {
+        const label = nameElement(inHeader, name);
+        const a = icon.getBoundingClientRect();
+        const b = label?.getBoundingClientRect();
+        if (b && a.right <= b.left + 4 && b.left - a.right < 48 && Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 16) {
+            stop(e);
+            copyWithToast(`https://discord.com/channels/${channel.guild_id}/${channel.id}`, channel.isThread?.() ? "Thread link copied" : "Channel link copied");
+            return;
+        }
+    }
+
     for (let el: HTMLElement | null = target; el && el !== inHeader; el = el.parentElement) {
         if (plain(el.textContent ?? "") === name) {
             stop(e);

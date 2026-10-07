@@ -24,6 +24,7 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { togglePriority, usePriority } from "@plugins/channelGroups";
 import { ChannelSectionStore, isHidden, settings as panelSettings, startSearch, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
 import { Devs } from "@utils/constants";
+import { copyWithToast } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
 import { findComponentByCodeLazy } from "@webpack";
 import { ChannelStore, Popout, SelectedChannelStore, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
@@ -70,6 +71,9 @@ export const settings = definePluginSettings({
         description: "Links panel: also group links that only differ by tracking codes",
         hidden: true
     },
+    mapChannels: { type: OptionType.BOOLEAN, default: true, description: "Map: show channels", hidden: true },
+    mapThreads: { type: OptionType.BOOLEAN, default: true, description: "Map: show threads", hidden: true },
+    mapTitles: { type: OptionType.BOOLEAN, default: true, description: "Map: show names", hidden: true },
     rightPanelWidth: {
         type: OptionType.NUMBER,
         default: 0,
@@ -342,6 +346,22 @@ export default definePlugin({
 
     attachLongMessage,
     renderSidePanel,
+
+    // A link icon in the bar that shows over a message copies the message's link (7 Oct).
+    messagePopoverButton: {
+        icon: LinksIcon,
+        render(message: any) {
+            const channel = ChannelStore.getChannel(message?.channel_id);
+            if (!channel || !message?.id) return null;
+            return {
+                label: "Copy message link",
+                icon: LinksIcon,
+                message,
+                channel,
+                onClick: () => copyWithToast(`https://discord.com/channels/${channel.guild_id ?? "@me"}/${channel.id}/${message.id}`, "Message link copied")
+            };
+        }
+    },
 
     start() {
         startFindShortcut();

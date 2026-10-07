@@ -207,8 +207,8 @@ export function openRename(): boolean {
 }
 
 // Ctrl+K (Stephane, 6 Oct): a channel outside any category goes into the first category
-// whose name starts with the same emoji; a channel in a category comes out of it, to the
-// top of the list. In a thread, its channel moves. It lands first in its new place.
+// whose name starts with the same emoji, first in it; a channel in a category comes out of
+// it, last of the channels above the categories (7 Oct). In a thread, its channel moves.
 function leadingEmoji(name: string): string | null {
     const first = new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(name.trim())[Symbol.iterator]().next().value?.segment;
     if (!first || !/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(first)) return null;
@@ -247,12 +247,13 @@ export async function tidyChannel(): Promise<boolean> {
     try {
         await RestAPI.patch({
             url: `/guilds/${guildId}/channels`,
-            body: [
-                { id: channel.id, parent_id: parentId, position: 0, lock_permissions: false },
-                ...others.map((c, i) => ({ id: c.id, position: i + 1 }))
-            ]
+            // Into a category: first in it. Out of one: last of the channels above the
+            // categories (Stephane, 7 Oct), not first.
+            body: category
+                ? [{ id: channel.id, parent_id: parentId, position: 0, lock_permissions: false }, ...others.map((c, i) => ({ id: c.id, position: i + 1 }))]
+                : [...others.map((c, i) => ({ id: c.id, position: i })), { id: channel.id, parent_id: null, position: others.length, lock_permissions: false }]
         });
-        showToast(category ? `Moved into ${category.name}` : "Moved out of its category, to the top", Toasts.Type.SUCCESS);
+        showToast(category ? `Moved into ${category.name}` : "Moved out of its category", Toasts.Type.SUCCESS);
     } catch (e) {
         showToast(`Could not move it: ${errorText(e)}`, Toasts.Type.FAILURE);
     }

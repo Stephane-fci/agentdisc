@@ -367,3 +367,24 @@ export function useSideData(channelId: string, guildId: string | null | undefine
         crawlLeft: crawling === guildId ? crawlLeft : 0
     };
 }
+
+// Lines between the dots themselves: a channel that links to another one on the map (from
+// what was read of it), and a thread with its channel when both are on the map.
+export function pairsAmong(ids: string[]): [string, string][] {
+    const set = new Set(ids);
+    const seen = new Set<string>();
+    const out: [string, string][] = [];
+    const add = (a: string, b: string) => {
+        if (a === b || !set.has(a) || !set.has(b)) return;
+        const k = a < b ? a + "|" + b : b + "|" + a;
+        if (seen.has(k)) return;
+        seen.add(k);
+        out.push([a, b]);
+    };
+    for (const id of ids) {
+        for (const target of Object.keys(loaded.get(id)?.links ?? {})) add(id, target);
+        const parent = placeName(id)?.parent;
+        if (parent) add(parent, id);
+    }
+    return out;
+}

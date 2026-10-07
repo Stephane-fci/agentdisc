@@ -26,7 +26,8 @@ export default definePlugin({
         {
             find: /="ltr",orientation:\i="vertical"[^}]+?customTheme:/,
             replacement: {
-                match: /(?=function (\i)\(\i,\i,\i\)\{.{0,20}?return \i\.forwardRef\(function\(\i,\i\)\{let\{[^}]+?="ltr",orientation:)/,
+                // Discord dropped forwardRef here on 7 Oct 2026 (the ref is now a prop); both forms fit.
+                match: /(?=function (\i)\(\i,\i,\i\)\{.{0,20}?return (?:\i\.forwardRef\()?function\(\i(?:,\i)?\)\{let\{[^}]+?="ltr",orientation:)/,
                 replace: "$self.setCreateScroller($1);"
             }
         },

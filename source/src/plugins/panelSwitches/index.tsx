@@ -322,7 +322,7 @@ export function toggleServerList() {
     }
 }
 
-// The left panel button and Caps Lock + ← (Stephane, 12 Oct): the servers and the channel
+// The left panel button and Shift + ← (Stephane, 12 Oct): the servers and the channel
 // list go away together and come back together.
 export function isLeftPanelHidden() {
     return isHidden("serverList") && isHidden("channelList");

@@ -31,12 +31,12 @@ import { ChannelStore, Popout, SelectedChannelStore, useEffect, useRef, useState
 import type { PropsWithChildren } from "react";
 
 import { startBusyBar, stopBusyBar } from "./busyBar";
-import { startCapsKeys, stopCapsKeys } from "./capsKeys";
 import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
 import { isFeedbackOn, onFeedbackChange, setFeedback } from "./feedback";
 import { LinksPanel } from "./links";
 import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
+import { startShiftKeys, stopShiftKeys } from "./shiftKeys";
 import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
 import { renderSidePanel, startRightPanelWidth, stopRightPanelWidth } from "./sidePanel";
@@ -192,7 +192,7 @@ function FeedbackButton() {
     const [on, setOn] = useState(isFeedbackOn());
     useEffect(() => onFeedbackChange(setOn), []);
     return (
-        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click to quote. Tap Ctrl: paragraph, sentence, piece. Caps Lock twice or Esc to stop" : "Feedback mode (Caps Lock twice): quote paragraphs, sentences or pieces into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
+        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click to quote. Tap Ctrl: paragraph, sentence, piece. Shift twice or Esc to stop" : "Feedback mode (Shift twice): quote paragraphs, sentences or pieces into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
     );
 }
 
@@ -244,9 +244,9 @@ function PanelButtons() {
             <FindButton />
             {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
-            <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleLeftPanel} tooltip={leftShown ? "Hide the left panel (Caps Lock + ←)" : "Show the left panel (Caps Lock + ←)"} icon={LeftPanelIcon} selected={leftShown} />
+            <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleLeftPanel} tooltip={leftShown ? "Hide the left panel (Shift + ←)" : "Show the left panel (Shift + ←)"} icon={LeftPanelIcon} selected={leftShown} />
             {channelType != null && !NO_MEMBER_LIST.has(channelType) && (
-                <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide the right panel (Caps Lock + →)" : "Show the right panel (Caps Lock + →)"} icon={MembersIcon} selected={membersShown} />
+                <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide the right panel (Shift + →)" : "Show the right panel (Shift + →)"} icon={MembersIcon} selected={membersShown} />
             )}
         </>
     );
@@ -406,7 +406,7 @@ export default definePlugin({
 
     start() {
         startFindShortcut();
-        startCapsKeys();
+        startShiftKeys();
         startChannelShortcuts();
         startSideData();
         startRightPanelWidth();
@@ -415,7 +415,7 @@ export default definePlugin({
 
     stop() {
         stopFindShortcut();
-        stopCapsKeys();
+        stopShiftKeys();
         stopChannelShortcuts();
         stopSideData();
         stopRightPanelWidth();

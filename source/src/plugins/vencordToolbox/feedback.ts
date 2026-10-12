@@ -16,7 +16,7 @@ import { ComponentDispatch } from "@webpack/common";
 // sentence under the mouse (Stephane, 3 Oct), the piece of the sentence between commas,
 // colons or semicolons (12 Oct: "just the title before the colon"); Ctrl used in a
 // shortcut such as Ctrl+V does not count. Text he selects himself is taken as it is.
-// Caps Lock pressed twice turns the mode on and off (capsKeys.ts), like the button in the
+// Shift pressed twice turns the mode on and off (shiftKeys.ts), like the button in the
 // channel bar; Esc turns it off.
 
 const HIGHLIGHT = "agentdisc-feedback";

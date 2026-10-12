@@ -322,6 +322,20 @@ export function toggleServerList() {
     }
 }
 
+// The left panel button and Caps Lock + ← (Stephane, 12 Oct): the servers and the channel
+// list go away together and come back together.
+export function isLeftPanelHidden() {
+    return isHidden("serverList") && isHidden("channelList");
+}
+
+export function toggleLeftPanel() {
+    const s = settings.store;
+    const show = isLeftPanelHidden();
+    s.hideServerList = !show;
+    s.hideChannelList = !show;
+    if (show && s.chatOnly) s.chatOnly = false;
+}
+
 function onKeyDown(e: KeyboardEvent) {
     // Discord's own search shortcut also brings a hidden channel header back.
     if (e.code === "KeyF" && (e.ctrlKey || e.metaKey) && !e.altKey && isHidden("channelHeader")) setSearching(true);

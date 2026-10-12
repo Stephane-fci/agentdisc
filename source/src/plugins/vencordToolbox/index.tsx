@@ -22,7 +22,7 @@ import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { togglePriority, usePriority } from "@plugins/channelGroups";
-import { ChannelSectionStore, isHidden, settings as panelSettings, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
+import { ChannelSectionStore, isHidden, isLeftPanelHidden, settings as panelSettings, toggleLeftPanel, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
 import { Devs } from "@utils/constants";
 import { copyWithToast } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
@@ -31,8 +31,9 @@ import { ChannelStore, Popout, SelectedChannelStore, useEffect, useRef, useState
 import type { PropsWithChildren } from "react";
 
 import { startBusyBar, stopBusyBar } from "./busyBar";
+import { startCapsKeys, stopCapsKeys } from "./capsKeys";
 import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
-import { isFeedbackOn, onFeedbackChange, setFeedback, startFeedbackShortcut, stopFeedbackShortcut } from "./feedback";
+import { isFeedbackOn, onFeedbackChange, setFeedback } from "./feedback";
 import { LinksPanel } from "./links";
 import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
@@ -191,17 +192,25 @@ function FeedbackButton() {
     const [on, setOn] = useState(isFeedbackOn());
     useEffect(() => onFeedbackChange(setOn), []);
     return (
-        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click a paragraph to quote it (tap Ctrl: sentence or paragraph). Ctrl+L or Esc to stop" : "Feedback mode (Ctrl+L): quote paragraphs or sentences into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
+        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => setFeedback(!on)} tooltip={on ? "Feedback mode on: click to quote. Tap Ctrl: paragraph, sentence, piece. Caps Lock twice or Esc to stop" : "Feedback mode (Caps Lock twice): quote paragraphs, sentences or pieces into your reply"} icon={() => <FeedbackIcon on={on} />} selected={on} />
     );
 }
 
-const ServersIcon = () => (
+// The left panel (servers and channels together, 12 Oct): the right panel icon mirrored.
+const LeftPanelIcon = () => (
     <TopIcon>
         <rect x="2.5" y="3.5" width="19" height="17" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
         <path d="M9 4v16" stroke="currentColor" strokeWidth="2" />
-        <circle cx="5.8" cy="7.6" r="1.4" fill="currentColor" />
-        <circle cx="5.8" cy="12" r="1.4" fill="currentColor" />
-        <circle cx="5.8" cy="16.4" r="1.4" fill="currentColor" />
+        <path d="M4.5 8H7M4.5 12H7M4.5 16H7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </TopIcon>
+);
+
+// The server list alone: a column of server pictures.
+const ServersIcon = () => (
+    <TopIcon>
+        <rect x="8" y="2.5" width="8" height="5.5" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+        <rect x="8" y="9.25" width="8" height="5.5" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+        <rect x="8" y="16" width="8" height="5.5" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
     </TopIcon>
 );
 
@@ -220,13 +229,14 @@ const NO_MEMBER_LIST = new Set([1, 2, 13]);
 
 function PanelButtons() {
     // Read the settings through the hook, so the buttons redraw when a switch changes.
-    panelSettings.use(["hideServerList", "chatOnly", "chatOnlyHides", "hideChannelHeader"]);
+    panelSettings.use(["hideServerList", "hideChannelList", "chatOnly", "chatOnlyHides", "hideChannelHeader"]);
     const membersShown = useStateFromStores([ChannelSectionStore as any], () => ChannelSectionStore.getState().isMembersOpen);
     const channelType = useStateFromStores([SelectedChannelStore, ChannelStore], () => ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.type);
     const channelId = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
     const guildId = useStateFromStores([SelectedChannelStore, ChannelStore], () => ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.guild_id ?? null);
     const inServer = !!guildId;
     const serversShown = !isHidden("serverList");
+    const leftShown = !isLeftPanelHidden();
     return (
         <>
             {inServer && channelId && isPluginEnabled("ChannelGroups") && <PriorityButton channelId={channelId} />}
@@ -234,8 +244,9 @@ function PanelButtons() {
             <FindButton />
             {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
+            <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleLeftPanel} tooltip={leftShown ? "Hide the left panel (Caps Lock + ←)" : "Show the left panel (Caps Lock + ←)"} icon={LeftPanelIcon} selected={leftShown} />
             {channelType != null && !NO_MEMBER_LIST.has(channelType) && (
-                <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide the right panel" : "Show the right panel"} icon={MembersIcon} selected={membersShown} />
+                <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide the right panel (Caps Lock + →)" : "Show the right panel (Caps Lock + →)"} icon={MembersIcon} selected={membersShown} />
             )}
         </>
     );
@@ -395,7 +406,7 @@ export default definePlugin({
 
     start() {
         startFindShortcut();
-        startFeedbackShortcut();
+        startCapsKeys();
         startChannelShortcuts();
         startSideData();
         startRightPanelWidth();
@@ -404,7 +415,7 @@ export default definePlugin({
 
     stop() {
         stopFindShortcut();
-        stopFeedbackShortcut();
+        stopCapsKeys();
         stopChannelShortcuts();
         stopSideData();
         stopRightPanelWidth();

@@ -4,7 +4,7 @@ AgentDisc makes Discord in the browser calmer and easier when you work with AI a
 
 ## Feedback mode
 
-A speech-bubble button in the channel bar (the bar above the messages), or Ctrl+L, turns feedback mode on (the button turns orange). Move the mouse over any message and the paragraph under it lights up orange (a bullet point counts as a paragraph). Tap Ctrl to switch to the single sentence under the mouse, and tap it again to go back to the whole paragraph. A click puts it in your message box as "the text" >> , ready for your answer; each new click adds the next one on its own line. Text you select yourself goes in as it is. Click the button again, press Ctrl+L again or press Esc to stop.
+A speech-bubble button in the channel bar (the bar above the messages), or Caps Lock pressed twice, turns feedback mode on (the button turns orange). Move the mouse over any message and the paragraph under it lights up orange (a bullet point counts as a paragraph). Each tap on Ctrl goes one step smaller: the sentence under the mouse, then the piece of that sentence between commas, colons or semicolons (handy for a title before a colon), then back to the whole paragraph. A click puts it in your message box as "the text" >> , ready for your answer; each new click adds the next one on its own line. Text you select yourself goes in as it is. Click the button again, press Caps Lock twice again or press Esc to stop. Pressing Caps Lock twice leaves capitals as they were.
 
 ## Find a channel
 
@@ -34,7 +34,7 @@ The mirrored panel icon in the channel bar folds the whole right panel away or o
 
 ## Copy a link
 
-A click on the # just before the channel name at the top, or on the # of a channel in the channel list, copies the link of that channel (or thread). In the small bar that shows over a message, a link icon copies the link of that message.
+A click on the # just before the channel name at the top, or on the # of a channel in the channel list, copies the link of that channel (or thread); under the mouse, the # turns into a link icon of the same size to show it. In the small bar that shows over a message, a link icon copies the link of that message.
 
 ## Rename a channel
 
@@ -42,7 +42,7 @@ Ctrl+R, or a click on the channel name above the messages, opens a small box wit
 
 ## No top bar, a busy bar instead
 
-Discord's bar across the top of the window is gone, and its pieces moved closer to where you work. The server's picture sits before its name at the top of the channel list, with the back and forward arrows right after the name. Every icon that sat at the top right now sits in the channel bar, the bar above the messages: first AgentDisc's own (bookmark, feedback mode, find a channel, links, the server list and the right panel), then Discord's own channel icons, then Discord's inbox and help and the AgentDisc robot. The server list button shows or hides the servers; the right panel button opens or folds the member list column.
+Discord's bar across the top of the window is gone, and its pieces moved closer to where you work. The server's picture sits before its name at the top of the channel list, with the back and forward arrows right after the name. Every icon that sat at the top right now sits in the channel bar, the bar above the messages: first AgentDisc's own (bookmark, feedback mode, find a channel, links, and three panel buttons), then Discord's own channel icons, then Discord's inbox and help and the AgentDisc robot. The three panel buttons hide or show the server list alone, the whole left panel (servers and channels together), and the right panel with the member list. Holding Caps Lock and pressing the left arrow does the same as the left panel button, and the right arrow the same as the right panel button. Caps Lock still switches capitals on or off when it is used this way, since a web page cannot stop that.
 
 Where the top bar was, a thin busy bar runs across the screen. It counts the conversations, channels and threads of the server you are in, where an agent (Claude Code, Codex or any bot) is working right now, and fills a little more with each one. Its colour and words change in steps: green with a few ("Easy mode", "I'm cheating"), yellow from 4 ("Okay, now we're getting into it"), orange from 8 ("Okay, this is serious work"), red from 13 ("Things are heating up"), and at 20 it is full and burns, with flames along it ("The system is burning"). Beyond 20 it turns purple ("Beyond burning"). Each step has a few phrases and picks one at random, so the words change. When a new conversation starts, the bar jumps, flashes and a "+1" pops out of its end; when one ends, it eases down. A conversation counts while its agent shows "typing", and for a few seconds after, so a short pause does not drop it.
 
@@ -84,7 +84,7 @@ Discord's own shortcuts: Alt with the up and down arrows moves to the channel ab
 
 AgentDisc adds the same moves for the left hand: Alt with Z (up), S (down), Q (back) and D (forward) on an AZERTY keyboard, or Alt with W, S, A and D on a QWERTY keyboard. Moving up and down follows the list as you see it: the threads of a folded channel are skipped.
 
-More AgentDisc shortcuts: Ctrl+O finds a channel, Ctrl+L turns feedback mode on and off, Ctrl+B bookmarks the channel you are in (with text selected in the message box it still makes the text bold), Ctrl+R renames it, Ctrl+P creates a channel, Ctrl+K moves it into or out of its category, and Ctrl+H shows a window with every shortcut and button. Discord's own Ctrl+K (quick switcher, use Ctrl+O instead) and Ctrl+P (pinned messages, the pin button stays) give way to these.
+More AgentDisc shortcuts: Ctrl+O finds a channel, Caps Lock pressed twice turns feedback mode on and off, Caps Lock held with the left or right arrow hides or shows the left or right panel, Ctrl+B bookmarks the channel you are in (with text selected in the message box it still makes the text bold), Ctrl+R renames it, Ctrl+P creates a channel, Ctrl+K moves it into or out of its category, and Ctrl+H shows a window with every shortcut and button. Discord's own Ctrl+K (quick switcher, use Ctrl+O instead) and Ctrl+P (pinned messages, the pin button stays) give way to these.
 
 ## Long messages
 

@@ -12,18 +12,24 @@ import { ComponentDispatch } from "@webpack/common";
 // it in the message box as
 //   "the paragraph" >>
 // ready for his answer, each new one on its own line, the way he already answers long
-// messages by hand. A tap on Ctrl switches to the sentence under the mouse, the next tap
-// back to the paragraph (Stephane, 3 Oct); Ctrl used in a shortcut such as Ctrl+V does not
-// count. Text he selects himself is taken as it is. Ctrl+L (the L key, whatever the
-// keyboard) turns the mode on and off, like the top-bar button; Esc turns it off.
+// messages by hand. Each tap on Ctrl goes one step smaller, then back: the paragraph, the
+// sentence under the mouse (Stephane, 3 Oct), the piece of the sentence between commas,
+// colons or semicolons (12 Oct: "just the title before the colon"); Ctrl used in a
+// shortcut such as Ctrl+V does not count. Text he selects himself is taken as it is.
+// Caps Lock pressed twice turns the mode on and off (capsKeys.ts), like the button in the
+// channel bar; Esc turns it off.
 
 const HIGHLIGHT = "agentdisc-feedback";
 const CONTENT = '[id^="message-content-"]';
 const BLOCK = "li, h1, h2, h3, blockquote";
 
 let on = false;
-// Whole paragraphs (true) or single sentences (false); each new start is paragraphs.
-let whole = true;
+// What lights up: 0 the paragraph, 1 the sentence, 2 the piece of the sentence. Each new
+// start is paragraphs.
+type Size = 0 | 1 | 2;
+let size: Size = 0;
+const next = (s: Size) => ((s + 1) % 3) as Size;
+const previous = (s: Size) => ((s + 2) % 3) as Size;
 // Set while Ctrl is down after it switched the mode: any other key undoes the switch.
 let ctrlSwitched = false;
 let hovered: Range | null = null;
@@ -84,8 +90,8 @@ function pointIn(pieces: { node: Text; start: number; }[], at: number): [Text, n
     return [pieces[0].node, 0];
 }
 
-// The paragraph (or the sentence) around one point of a message.
-function pieceAt(x: number, y: number, whole: boolean): Range | null {
+// The paragraph, the sentence or the piece of the sentence around one point of a message.
+function pieceAt(x: number, y: number, size: Size): Range | null {
     const caret = caretAt(x, y);
     if (!caret || caret.node.nodeType !== Node.TEXT_NODE) return null;
     const parent = caret.node.parentElement;
@@ -106,13 +112,22 @@ function pieceAt(x: number, y: number, whole: boolean): Range | null {
     let end = text.indexOf("\n", at);
     if (end < 0) end = text.length;
 
-    if (!whole) {
+    if (size >= 1) {
         // The sentence: after the last ". ", "! " or "? " before the point, up to the next one.
         const before = text.slice(start, at);
         const stops = [...before.matchAll(/[.!?…]["')\]]*\s+/g)];
         if (stops.length) start += stops[stops.length - 1].index! + stops[stops.length - 1][0].length;
         const after = /[.!?…]["')\]]*(?=\s|$)/.exec(text.slice(at, end));
         if (after) end = at + after.index + after[0].length;
+    }
+    if (size === 2) {
+        // The piece: between ", ", ": " or "; " in the sentence, without the mark itself. Only
+        // a mark followed by a space counts, so links, times and 1,000 stay whole.
+        const before = text.slice(start, at);
+        const stops = [...before.matchAll(/[,:;]\s+/g)];
+        if (stops.length) start += stops[stops.length - 1].index! + stops[stops.length - 1][0].length;
+        const after = /[,:;](?=\s)/.exec(text.slice(at, end));
+        if (after) end = at + after.index;
     }
     while (start < end && /\s/.test(text[start])) start++;
     while (end > start && /\s/.test(text[end - 1])) end--;
@@ -130,20 +145,20 @@ function onMove(e: MouseEvent) {
     frame = requestAnimationFrame(() => {
         frame = 0;
         const m = lastMove!;
-        hovered = pieceAt(m.clientX, m.clientY, whole);
+        hovered = pieceAt(m.clientX, m.clientY, size);
         paint(hovered);
     });
 }
 
 function repaint() {
     if (!lastMove) return;
-    hovered = pieceAt(lastMove.clientX, lastMove.clientY, whole);
+    hovered = pieceAt(lastMove.clientX, lastMove.clientY, size);
     paint(hovered);
 }
 
 function messageBoxHasText() {
     const box = document.querySelector<HTMLElement>('[class*="channelTextArea_"] [role="textbox"]');
-    return !!(box?.textContent ?? "").replace(/[\s​﻿]/g, "");
+    return !!(box?.textContent ?? "").replace(/[\s\u200b\ufeff]/g, "");
 }
 
 function quote(text: string) {
@@ -159,7 +174,7 @@ function onClick(e: MouseEvent) {
     if (!target?.closest?.(CONTENT)) return;
     // Text he selected himself goes in as it is.
     const selected = window.getSelection()?.toString() ?? "";
-    const range = selected.trim() ? null : pieceAt(e.clientX, e.clientY, whole);
+    const range = selected.trim() ? null : pieceAt(e.clientX, e.clientY, size);
     const text = selected.trim() || range?.toString() || "";
     if (!text.trim()) return;
     e.preventDefault();
@@ -172,12 +187,12 @@ function onKey(e: KeyboardEvent) {
     if (e.key === "Escape" && on) setFeedback(false);
     if (e.key === "Control") {
         if (e.repeat || e.altKey || e.shiftKey || e.metaKey) return;
-        whole = !whole;
+        size = next(size);
         ctrlSwitched = true;
         repaint();
     } else if (ctrlSwitched && e.ctrlKey) {
         // Ctrl was the start of a shortcut, not a switch.
-        whole = !whole;
+        size = previous(size);
         ctrlSwitched = false;
         repaint();
     }
@@ -187,27 +202,10 @@ function onKeyUp(e: KeyboardEvent) {
     if (e.key === "Control") ctrlSwitched = false;
 }
 
-// Ctrl+L (Stephane, 2 Oct). Chrome lets the page take it before its own address bar.
-function onShortcut(e: KeyboardEvent) {
-    if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey || e.repeat) return;
-    if (e.key.toLowerCase() !== "l") return;
-    e.preventDefault();
-    e.stopPropagation();
-    setFeedback(!on);
-}
-
-export function startFeedbackShortcut() {
-    document.addEventListener("keydown", onShortcut, true);
-}
-
-export function stopFeedbackShortcut() {
-    document.removeEventListener("keydown", onShortcut, true);
-}
-
-export function setFeedback(next: boolean) {
-    if (next === on) return;
-    on = next;
-    whole = true;
+export function setFeedback(want: boolean) {
+    if (want === on) return;
+    on = want;
+    size = 0;
     ctrlSwitched = false;
     document.documentElement.classList.toggle("agentdisc-feedback-on", on);
     if (on) {

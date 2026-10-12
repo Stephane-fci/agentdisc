@@ -68,24 +68,45 @@ function nameElement(header: Element, name: string): HTMLElement | null {
     return found;
 }
 
-// A click on the channel name above the messages opens the rename box; a click on the # (or
-// thread sign) just before it, or on a channel's # in the channel list, copies the link of
-// the channel or thread (Stephane, 7 Oct).
+// The # (or thread sign) just before the channel name above the messages, or a channel's #
+// in the channel list: a click copies the link of that channel or thread (Stephane, 7 Oct).
+// Returns the icon and the link it copies, or null.
+function copyIcon(target: HTMLElement | null): { icon: SVGElement; link: string; label: string; } | null {
+    const icon = target?.closest?.("svg");
+    if (!icon) return null;
+
+    const row = icon.closest<HTMLElement>('[data-list-item-id^="channels___"]');
+    if (row) {
+        if (row.querySelector("svg") !== icon) return null;
+        const listed = ChannelStore.getChannel(row.getAttribute("data-list-item-id")!.slice("channels___".length));
+        if (!listed?.guild_id || listed.isThread?.()) return null;
+        return { icon, link: `https://discord.com/channels/${listed.guild_id}/${listed.id}`, label: "Channel link copied" };
+    }
+
+    const header = channelHeaderSelector();
+    const inHeader = header ? icon.closest(header) : null;
+    if (!inHeader) return null;
+    const channel = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
+    const name = channel?.guild_id ? plain(channel.name) : "";
+    if (!name) return null;
+    const label = nameElement(inHeader, name);
+    const a = icon.getBoundingClientRect();
+    const b = label?.getBoundingClientRect();
+    if (!b || a.right > b.left + 4 || b.left - a.right >= 48 || Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) >= 16) return null;
+    return { icon, link: `https://discord.com/channels/${channel!.guild_id}/${channel!.id}`, label: channel!.isThread?.() ? "Thread link copied" : "Channel link copied" };
+}
+
+// A click on the channel name above the messages opens the rename box; a click on the #
+// copies the link.
 function onClick(e: MouseEvent) {
     if (e.button !== 0 || e.ctrlKey || e.shiftKey || e.altKey) return;
     const target = e.target as HTMLElement | null;
 
-    // In the channel list, the # at the start of a channel copies its link instead of
-    // opening it (Stephane, 7 Oct).
-    const row = target?.closest<HTMLElement>('[data-list-item-id^="channels___"]');
-    const rowIcon = target?.closest("svg");
-    if (row && rowIcon && row.querySelector("svg") === rowIcon) {
-        const listed = ChannelStore.getChannel(row.getAttribute("data-list-item-id")!.slice("channels___".length));
-        if (listed?.guild_id && !listed.isThread?.()) {
-            stop(e);
-            copyWithToast(`https://discord.com/channels/${listed.guild_id}/${listed.id}`, "Channel link copied");
-            return;
-        }
+    const copy = copyIcon(target);
+    if (copy) {
+        stop(e);
+        copyWithToast(copy.link, copy.label);
+        return;
     }
 
     const header = channelHeaderSelector();
@@ -96,18 +117,6 @@ function onClick(e: MouseEvent) {
     const name = plain(channel.name);
     if (!name) return;
 
-    const icon = target?.closest("svg");
-    if (icon) {
-        const label = nameElement(inHeader, name);
-        const a = icon.getBoundingClientRect();
-        const b = label?.getBoundingClientRect();
-        if (b && a.right <= b.left + 4 && b.left - a.right < 48 && Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 16) {
-            stop(e);
-            copyWithToast(`https://discord.com/channels/${channel.guild_id}/${channel.id}`, channel.isThread?.() ? "Thread link copied" : "Channel link copied");
-            return;
-        }
-    }
-
     for (let el: HTMLElement | null = target; el && el !== inHeader; el = el.parentElement) {
         if (plain(el.textContent ?? "") === name) {
             stop(e);
@@ -117,12 +126,29 @@ function onClick(e: MouseEvent) {
     }
 }
 
+// Under the mouse, that # turns into a link icon of the same size (Stephane, 12 Oct: no
+// change of shape, only the sign), so it shows a click copies the link.
+const LINK_SIGN = "agentdisc-copy-sign";
+let signed: SVGElement | null = null;
+
+function onOver(e: MouseEvent) {
+    const icon = copyIcon(e.target as HTMLElement | null)?.icon ?? null;
+    if (icon === signed) return;
+    signed?.classList.remove(LINK_SIGN);
+    signed = icon;
+    signed?.classList.add(LINK_SIGN);
+}
+
 export function startChannelShortcuts() {
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("click", onClick, true);
+    document.addEventListener("mouseover", onOver, true);
 }
 
 export function stopChannelShortcuts() {
     document.removeEventListener("keydown", onKey, true);
     document.removeEventListener("click", onClick, true);
+    document.removeEventListener("mouseover", onOver, true);
+    signed?.classList.remove(LINK_SIGN);
+    signed = null;
 }

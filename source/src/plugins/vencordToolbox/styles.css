@@ -781,3 +781,15 @@
     from { background-position: 0 0, 9px 2px; }
     to { background-position: 36px 0, -27px 2px; }
 }
+
+/* The # of a channel under the mouse turns into a link icon, same place and size: a click
+   copies the channel's link (12 Oct). */
+svg.agentdisc-copy-sign > * {
+    opacity: 0;
+}
+
+svg.agentdisc-copy-sign {
+    cursor: pointer;
+    background-color: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}

@@ -11,6 +11,7 @@ import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings, Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { allPlaces, find, ICONS, type Place } from "@plugins/vencordToolbox/channelSearch";
+import { useInvite } from "@plugins/vencordToolbox/topBar";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
@@ -475,13 +476,33 @@ function ChannelFilter({ guildId, onClose }: { guildId: string; onClose(): void;
     );
 }
 
-// The buttons above the channel list (Stephane, 29 Sept, then 1 and 6 Oct): show or hide
-// every thread, clear every bookmark, close or open every category, filter the channels and
-// create a channel. They stay in place while the list scrolls.
+// The buttons above the channel list (Stephane, 29 Sept, then 1 and 6 Oct; one line of
+// squares since 12 Oct): show or hide every thread, clear every bookmark, close or open every
+// category, filter the channels, create a channel, add people. Every square keeps its place,
+// greyed out when there is nothing to do, so the hand learns where each one is.
+function ToolSquare({ label, on, disabled, warn, badge, onClick, children }: { label: string; on?: boolean; disabled?: boolean; warn?: boolean; badge?: number; onClick(): void; children: React.ReactNode; }) {
+    return (
+        <button
+            type="button"
+            className={"vc-list-icon" + (on ? " vc-list-icon-on" : "") + (warn ? " vc-list-icon-warn" : "")}
+            title={label}
+            aria-label={label}
+            disabled={disabled}
+            onClick={onClick}
+        >
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">{children}</svg>
+            {!!badge && <span className="vc-list-badge">{badge}</span>}
+        </button>
+    );
+}
+
+const line = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
 function ListTools({ guildId }: { guildId: string; }) {
     useListedChanges();
     const { folded, priority } = settings.use(["folded", "priority"]);
     const [filterOpen, setFilterOpen] = useState(false);
+    const invite = useInvite(guildId);
 
     const withThreads: string[] = [];
     for (const [id, threads] of listed) {
@@ -495,37 +516,28 @@ function ListTools({ guildId }: { guildId: string; }) {
     const marks = Object.keys(priority ?? {}).length;
     return (
         <div className="vc-list-tools">
-            <div className="vc-threads-all-row">
-                {withThreads.length > 0 && (
-                    <button type="button" className={"vc-threads-all" + (someFolded ? " vc-threads-all-closed" : "")} onClick={() => setAllFolded(withThreads, !someFolded)}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CHEVRON} /></svg>
-                        {someFolded ? "Show threads" : "Hide threads"}
-                    </button>
-                )}
-                {marks > 0 && (
-                    <button type="button" className="vc-priority-clear" title="Remove every bookmark" onClick={clearPriorities}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d={FLAG} fill="#f23f43" stroke="#f23f43" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
-                        Clear {marks}
-                    </button>
-                )}
-                {categories.length > 0 && (
-                    <button
-                        type="button"
-                        className={"vc-threads-all" + (anyOpen ? "" : " vc-threads-all-closed")}
-                        title={anyOpen ? "Close every category" : "Open every category"}
-                        onClick={() => FluxDispatcher.dispatch({ type: anyOpen ? "CATEGORY_COLLAPSE_ALL" : "CATEGORY_EXPAND_ALL", guildId })}
-                    >
-                        <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CHEVRON} /></svg>
-                        {anyOpen ? "Close categories" : "Open categories"}
-                    </button>
-                )}
-                <span className="vc-list-tools-gap" />
-                <button type="button" className={"vc-list-icon" + (filterOpen ? " vc-list-icon-on" : "")} title="Filter channels" aria-label="Filter channels" onClick={() => setFilterOpen(v => !v)}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fillRule="evenodd" d={SEARCH} /></svg>
-                </button>
-                <button type="button" className="vc-list-icon" title="New channel (Ctrl+P)" aria-label="New channel" onClick={openNewChannel}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={PLUS} /></svg>
-                </button>
+            <div className="vc-list-tools-row">
+                <ToolSquare label={someFolded ? "Show threads" : "Hide threads"} on={withThreads.length > 0 && !someFolded} disabled={!withThreads.length} onClick={() => setAllFolded(withThreads, !someFolded)}>
+                    <path d="M6 3v12a4 4 0 0 0 4 4h4M6 7.5a4 4 0 0 0 4 4h4" {...line} />
+                    <circle cx="17" cy="11.5" r="2.3" {...line} />
+                    <circle cx="17" cy="19" r="2.3" {...line} />
+                </ToolSquare>
+                <ToolSquare label={marks ? `Remove every bookmark (${marks})` : "No bookmark to remove"} warn={marks > 0} badge={marks} disabled={!marks} onClick={clearPriorities}>
+                    <path d={FLAG} {...line} fill={marks ? "currentColor" : "none"} />
+                </ToolSquare>
+                <ToolSquare label={anyOpen ? "Close every category" : "Open every category"} on={categories.length > 0 && anyOpen} disabled={!categories.length} onClick={() => FluxDispatcher.dispatch({ type: anyOpen ? "CATEGORY_COLLAPSE_ALL" : "CATEGORY_EXPAND_ALL", guildId })}>
+                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" {...line} />
+                </ToolSquare>
+                <ToolSquare label="Filter channels" on={filterOpen} onClick={() => setFilterOpen(v => !v)}>
+                    <path fill="currentColor" fillRule="evenodd" d={SEARCH} />
+                </ToolSquare>
+                <ToolSquare label="New channel (Ctrl+P)" onClick={openNewChannel}>
+                    <path fill="currentColor" d={PLUS} />
+                </ToolSquare>
+                <ToolSquare label={invite ? "Add people" : "You cannot add people here"} disabled={!invite} onClick={() => invite?.()}>
+                    <circle cx="9" cy="8" r="3.5" {...line} />
+                    <path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" {...line} />
+                </ToolSquare>
             </div>
             {filterOpen && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setFilterOpen(false)} />}
         </div>

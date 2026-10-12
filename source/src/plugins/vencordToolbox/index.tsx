@@ -22,7 +22,7 @@ import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { togglePriority, usePriority } from "@plugins/channelGroups";
-import { ChannelSectionStore, isHidden, settings as panelSettings, startSearch, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
+import { ChannelSectionStore, isHidden, settings as panelSettings, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
 import { Devs } from "@utils/constants";
 import { copyWithToast } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
@@ -30,6 +30,7 @@ import { findComponentByCodeLazy } from "@webpack";
 import { ChannelStore, Popout, SelectedChannelStore, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
 import type { PropsWithChildren } from "react";
 
+import { startBusyBar, stopBusyBar } from "./busyBar";
 import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
 import { isFeedbackOn, onFeedbackChange, setFeedback, startFeedbackShortcut, stopFeedbackShortcut } from "./feedback";
 import { LinksPanel } from "./links";
@@ -38,6 +39,7 @@ import { renderPopout } from "./menu";
 import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
 import { renderSidePanel, startRightPanelWidth, stopRightPanelWidth } from "./sidePanel";
+import { keepArrows, keepInvite, renderArrows, renderServerIcon, setTrailing, useTrailing } from "./topBar";
 
 const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_BOTTOM,", 'position:"bottom"');
 
@@ -102,8 +104,9 @@ function Icon({ isShown }: { isShown: boolean; }) {
     );
 }
 
-// Three buttons before the inbox (Stephane, 30 Sept): search, the server list, and
-// Discord's own member list switch, drawn like the top bar's other icons.
+// AgentDisc's buttons, drawn like Discord's own icons. They sat in the top bar until it was
+// removed (12 Oct) and now sit in the channel's bar; the search button went, Discord's
+// search box being right there.
 function TopIcon({ children }: PropsWithChildren) {
     return (
         <svg viewBox="0 0 24 24" width={20} height={20} className="vc-toolbox-icon" aria-hidden="true">{children}</svg>
@@ -192,13 +195,6 @@ function FeedbackButton() {
     );
 }
 
-const SearchIcon = () => (
-    <TopIcon>
-        <circle cx="10.5" cy="10.5" r="6.3" fill="none" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M15.3 15.3 20.6 20.6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-    </TopIcon>
-);
-
 const ServersIcon = () => (
     <TopIcon>
         <rect x="2.5" y="3.5" width="19" height="17" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -236,7 +232,6 @@ function PanelButtons() {
             {inServer && channelId && isPluginEnabled("ChannelGroups") && <PriorityButton channelId={channelId} />}
             <FeedbackButton />
             <FindButton />
-            <HeaderBarIcon className="vc-toolbox-btn" onClick={startSearch} tooltip="Search" icon={SearchIcon} selected={false} />
             {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
             {channelType != null && !NO_MEMBER_LIST.has(channelType) && (
@@ -335,17 +330,52 @@ export default definePlugin({
                 replace: "upsellLongMessages:void 0"
             }
         },
+        // The top bar (removed, 12 Oct): its right-hand icons go to the channel's bar and its
+        // back and forward arrows are kept for the server name bar.
         {
             find: '?"BACK_FORWARD_NAVIGATION":',
+            replacement: [
+                {
+                    match: /(trailing:.{0,50}?)\i\.Fragment,(?=\{children:\[)/,
+                    replace: "$1$self.TrailingWrapper,"
+                },
+                {
+                    match: /(?<=leading:\(0,\i\.jsxs\)\(\i\.Fragment,\{children:\[)(?=\i&&\(0,\i\.jsx\)\((\i),\{firstElementFocusJumpSectionProps:)/,
+                    replace: "$self.keepArrows($1),"
+                }
+            ]
+        },
+        // The channel's bar: AgentDisc's buttons before Discord's, the moved ones after.
+        {
+            find: "toolbar:this.renderHeaderToolbar()",
             replacement: {
-                match: /(trailing:.{0,50}?)\i\.Fragment,(?=\{children:\[)/,
-                replace: "$1$self.TrailingWrapper,"
+                match: /toolbar:this\.renderHeaderToolbar\(\)/,
+                replace: "toolbar:$self.withToolbarSlot(this.renderHeaderToolbar())"
             }
+        },
+        // The server name bar (12 Oct): the server's icon before its name, the back and forward
+        // arrows after it, and the add people button moved down to the tools above the channels.
+        {
+            find: ".GUILD_HEADER_INVITE_BUTTON})",
+            replacement: [
+                {
+                    match: /(?<=className:\i\.\i,children:\[)(?=\(0,\i\.jsx\)\(\i\.\i,\{guild:(\i),isBannerVisible:\i\}\))/,
+                    replace: "$self.renderServerIcon($1),"
+                },
+                {
+                    match: /(!\(0,\i\.\i\)\((\i)\.id\)&&\i\.id!==\i\.\i&&)\(0,\i\.jsx\)\(\i\.\i,\{text:\i\.intl\.string\(\i\.t\.\i\),position:"bottom",asContainer:!0,ariaHidden:!0,children:\(0,\i\.jsx\)\(\i\.\i,\{"aria-label":[^}]{0,60},className:\i\.\i,onClick:\(\)=>\{(\i)\(\)\},children:\(0,\i\.jsx\)\(\i\.\i,\{size:"refresh_sm",color:"currentColor"\}\)\}\)\}\)/,
+                    replace: "$self.renderArrows(),$1$self.keepInvite($2.id,$3)"
+                }
+            ]
         }
     ],
 
     attachLongMessage,
     renderSidePanel,
+    keepArrows,
+    renderArrows,
+    renderServerIcon,
+    keepInvite,
 
     // A link icon in the bar that shows over a message copies the message's link (7 Oct).
     messagePopoverButton: {
@@ -369,6 +399,7 @@ export default definePlugin({
         startChannelShortcuts();
         startSideData();
         startRightPanelWidth();
+        startBusyBar();
     },
 
     stop() {
@@ -377,10 +408,18 @@ export default definePlugin({
         stopChannelShortcuts();
         stopSideData();
         stopRightPanelWidth();
+        stopBusyBar();
         setFeedback(false);
     },
 
+    // The top bar is gone (12 Oct): what Discord puts at its right (inbox, help) is handed to
+    // the channel's bar, after AgentDisc's buttons.
     TrailingWrapper({ children }: PropsWithChildren) {
+        useEffect(() => setTrailing(children));
+        return null;
+    },
+
+    withToolbarSlot(toolbar: React.ReactNode) {
         return (
             <>
                 {isPluginEnabled("PanelSwitches") && (
@@ -388,7 +427,10 @@ export default definePlugin({
                         <PanelButtons />
                     </ErrorBoundary>
                 )}
-                {children}
+                {toolbar}
+                <ErrorBoundary key="agentdisc-moved-buttons" noop>
+                    <MovedButtons />
+                </ErrorBoundary>
                 <ErrorBoundary key="vc-toolbox" noop>
                     <VencordPopoutButton />
                 </ErrorBoundary>
@@ -396,3 +438,7 @@ export default definePlugin({
         );
     },
 });
+
+function MovedButtons() {
+    return <>{useTrailing()}</>;
+}

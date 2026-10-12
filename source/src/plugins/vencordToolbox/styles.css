@@ -601,3 +601,183 @@
 .agentdisc-side-options .agentdisc-side-key {
     margin-left: 0;
 }
+
+/* The server name bar (12 Oct): the server's picture before its name, the back and forward
+   arrows right after the name instead of at the far right. */
+.agentdisc-server-icon {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    object-fit: cover;
+}
+
+.agentdisc-server-initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-mod-strong, #3f4147);
+    color: var(--text-strong, #fff);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.agentdisc-server-arrows {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    margin-inline-end: auto;
+}
+
+/* The busy bar (12 Oct): across the top of the screen, where the top bar was. It fills with
+   the conversations where an agent is working, and its colour and words change in steps. */
+@property --busy {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: #4e5058;
+}
+
+.agentdisc-busy {
+    --busy: #4e5058;
+    transition: --busy 0.6s ease;
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 100;
+    height: 20px;
+    overflow: visible;
+    background: var(--background-base-lowest, #111214);
+    font-family: var(--font-primary);
+    pointer-events: auto;
+}
+
+.agentdisc-busy-green { --busy: #23a55a; }
+.agentdisc-busy-yellow { --busy: #f0b232; }
+.agentdisc-busy-orange { --busy: #f26f22; }
+.agentdisc-busy-red,
+.agentdisc-busy-fire { --busy: #f23f43; }
+.agentdisc-busy-purple { --busy: #9b5cf6; }
+
+.agentdisc-busy-fill {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    border-start-end-radius: 6px;
+    border-end-end-radius: 6px;
+    background: linear-gradient(90deg, color-mix(in oklab, var(--busy) 55%, black), var(--busy));
+    transition: width 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* A soft light runs along the bar, so it never looks frozen. */
+.agentdisc-busy-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 22%) 50%, transparent 100%);
+    background-size: 220px 100%;
+    background-repeat: no-repeat;
+    animation: agentdisc-busy-shine 3.2s linear infinite;
+}
+
+@keyframes agentdisc-busy-shine {
+    from { background-position: -220px 0; }
+    to { background-position: calc(100% + 220px) 0; }
+}
+
+/* A new conversation: the bar flashes once. */
+.agentdisc-busy-flash {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    animation: agentdisc-busy-flash 0.7s ease-out forwards;
+}
+
+@keyframes agentdisc-busy-flash {
+    from { opacity: 0.7; }
+    to { opacity: 0; }
+}
+
+.agentdisc-busy-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-inline-start: 10px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 20px;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 70%);
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.agentdisc-busy-quiet .agentdisc-busy-label {
+    color: var(--text-muted, #949ba4);
+    text-shadow: none;
+}
+
+.agentdisc-busy-count {
+    min-width: 16px;
+    padding: 0 5px;
+    border-radius: 8px;
+    background: rgb(0 0 0 / 35%);
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+}
+
+/* "+1" pops out of the end of the bar and drops away. */
+.agentdisc-busy-pop {
+    position: absolute;
+    top: 2px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 800;
+    text-shadow: 0 0 6px var(--busy), 0 1px 2px rgb(0 0 0 / 80%);
+    pointer-events: none;
+    transform: translateX(-50%);
+    animation: agentdisc-busy-pop 1.4s ease-out forwards;
+}
+
+@keyframes agentdisc-busy-pop {
+    0% { opacity: 0; transform: translateX(-50%) scale(0.5); }
+    20% { opacity: 1; transform: translateX(-50%) scale(1.35); }
+    60% { opacity: 1; transform: translateX(-50%) translateY(10px) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(22px) scale(0.9); }
+}
+
+/* At 20 the bar burns: flames flicker along it and it glows. Beyond 20 it turns purple. */
+.agentdisc-busy-fire,
+.agentdisc-busy-purple {
+    animation: agentdisc-busy-glow 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes agentdisc-busy-glow {
+    from { box-shadow: 0 0 6px 1px color-mix(in oklab, var(--busy) 60%, transparent); }
+    to { box-shadow: 0 0 16px 4px color-mix(in oklab, var(--busy) 85%, transparent); }
+}
+
+.agentdisc-busy-flames {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 8px 17px at 50% 105%, #ffe066 0 30%, #ff8a1f 58%, transparent 72%) 0 0 / 18px 100% repeat-x,
+        radial-gradient(ellipse 6px 12px at 50% 105%, #fff3b0 0 28%, #ffb02e 52%, transparent 70%) 9px 2px / 18px 100% repeat-x;
+    mix-blend-mode: screen;
+    animation: agentdisc-busy-flicker 0.45s steps(3) infinite alternate, agentdisc-busy-drift 2.4s linear infinite;
+}
+
+.agentdisc-busy-purple .agentdisc-busy-flames {
+    filter: hue-rotate(230deg) saturate(1.4);
+}
+
+@keyframes agentdisc-busy-flicker {
+    from { opacity: 0.55; transform: scaleY(0.85); transform-origin: bottom; }
+    to { opacity: 1; transform: scaleY(1.1); transform-origin: bottom; }
+}
+
+@keyframes agentdisc-busy-drift {
+    from { background-position: 0 0, 9px 2px; }
+    to { background-position: 36px 0, -27px 2px; }
+}

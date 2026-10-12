@@ -6,6 +6,7 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { redrawChannelList } from "@plugins/channelGroups";
+import { BUSY_BAR_HEIGHT } from "@plugins/vencordToolbox/busyBar";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
@@ -73,16 +74,10 @@ export const settings = definePluginSettings({
         default: false,
         onChange: () => apply()
     },
-    hideTopBar: {
-        type: OptionType.BOOLEAN,
-        description: "Hide the top bar (it slides back when the mouse touches the top edge)",
-        default: false,
-        onChange: () => apply()
-    },
     hideChannelHeader: {
         type: OptionType.BOOLEAN,
         description: "Hide the channel header (channel name, threads, pins, search)",
-        default: true,
+        default: false,
         onChange: () => apply()
     },
     hideNotices: {
@@ -94,7 +89,7 @@ export const settings = definePluginSettings({
     hideServerHeader: {
         type: OptionType.BOOLEAN,
         description: "Hide the server name bar at the top of the channel list",
-        default: true,
+        default: false,
         onChange: () => apply()
     },
     hideServerLines: {
@@ -129,14 +124,13 @@ export const settings = definePluginSettings({
     }
 });
 
-type Panel = "serverList" | "channelList" | "topBar" | "channelHeader" | "notices";
+type Panel = "serverList" | "channelList" | "channelHeader" | "notices";
 
 export function isHidden(panel: Panel) {
     const s = settings.store;
     const own = {
         serverList: s.hideServerList,
         channelList: s.hideChannelList,
-        topBar: s.hideTopBar,
         channelHeader: s.hideChannelHeader,
         notices: s.hideNotices
     }[panel];
@@ -189,11 +183,12 @@ function buildCss() {
         }
     }
 
-    if (L && T && isHidden("topBar")) {
+    // No top bar (Stephane, 12 Oct): its strip holds only the busy bar; its buttons moved
+    // next to the server name and into the channel's bar (vencordToolbox/topBar.tsx).
+    if (L && T) {
         rules.push(
-            `${sel(L.base)}{grid-template-rows:[top] 0 [titleBarEnd] min-content [noticeEnd] 1fr [end]!important}`,
-            `${sel(T.bar)}{position:absolute!important;inset-inline:0;top:0;z-index:1001;background:var(--background-base-lowest);box-shadow:0 2px 8px rgba(0,0,0,.35);transform:translateY(calc(6px - 100%));transition:transform .12s ease .3s}`,
-            `${sel(T.bar)}:hover,${sel(T.bar)}:focus-within{transform:none;transition-delay:0s}`
+            `${sel(L.base)},${sel(L.base)}[data-fullscreen=true]{grid-template-rows:[top] ${BUSY_BAR_HEIGHT}px [titleBarEnd] min-content [noticeEnd] 1fr [end]!important;padding-top:0!important}`,
+            `${sel(T.bar)}{display:none!important}`
         );
     }
 
@@ -367,7 +362,7 @@ export default definePlugin({
     },
 
     toolboxActions() {
-        const s = settings.use(["chatOnly", "hideServerList", "hideChannelList", "hideTopBar", "hideChannelHeader", "hideNotices", "hideServerHeader", "hideServerLines", "hideAccountPanel", "hideAddDiscover", "hideMessageButtons"]);
+        const s = settings.use(["chatOnly", "hideServerList", "hideChannelList", "hideChannelHeader", "hideNotices", "hideServerHeader", "hideServerLines", "hideAccountPanel", "hideAddDiscover", "hideMessageButtons"]);
         const membersHidden = useStateFromStores([ChannelSectionStore as any], () => !ChannelSectionStore.getState().isMembersOpen);
         const flip = (key: keyof typeof s) => () => { settings.store[key] = !settings.store[key]; };
 
@@ -376,7 +371,6 @@ export default definePlugin({
             <Menu.MenuCheckboxItem key="servers" id="agentdisc-hide-servers" label="Hide server list" checked={s.hideServerList} action={flip("hideServerList")} />,
             <Menu.MenuCheckboxItem key="channels" id="agentdisc-hide-channels" label="Hide channel list" checked={s.hideChannelList} action={flip("hideChannelList")} />,
             <Menu.MenuCheckboxItem key="members" id="agentdisc-hide-members" label="Hide member list (Ctrl+U)" checked={membersHidden} action={toggleMembers} />,
-            <Menu.MenuCheckboxItem key="top-bar" id="agentdisc-hide-top-bar" label="Hide top bar" checked={s.hideTopBar} action={flip("hideTopBar")} />,
             <Menu.MenuCheckboxItem key="header" id="agentdisc-hide-header" label="Hide channel header" checked={s.hideChannelHeader} action={flip("hideChannelHeader")} />,
             <Menu.MenuCheckboxItem key="notices" id="agentdisc-hide-notices" label="Hide notice banners" checked={s.hideNotices} action={flip("hideNotices")} />,
             <Menu.MenuCheckboxItem key="server-name" id="agentdisc-hide-server-name" label="Hide server name bar" checked={s.hideServerHeader} action={flip("hideServerHeader")} />,

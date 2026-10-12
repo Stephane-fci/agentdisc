@@ -4,23 +4,23 @@ AgentDisc makes Discord in the browser calmer and easier when you work with AI a
 
 ## Feedback mode
 
-A speech-bubble button in the top bar, or Ctrl+L, turns feedback mode on (the button turns orange). Move the mouse over any message and the paragraph under it lights up orange (a bullet point counts as a paragraph). Tap Ctrl to switch to the single sentence under the mouse, and tap it again to go back to the whole paragraph. A click puts it in your message box as "the text" >> , ready for your answer; each new click adds the next one on its own line. Text you select yourself goes in as it is. Click the button again, press Ctrl+L again or press Esc to stop.
+A speech-bubble button in the channel bar (the bar above the messages), or Ctrl+L, turns feedback mode on (the button turns orange). Move the mouse over any message and the paragraph under it lights up orange (a bullet point counts as a paragraph). Tap Ctrl to switch to the single sentence under the mouse, and tap it again to go back to the whole paragraph. A click puts it in your message box as "the text" >> , ready for your answer; each new click adds the next one on its own line. Text you select yourself goes in as it is. Click the button again, press Ctrl+L again or press Esc to stop.
 
 ## Find a channel
 
-A button in the top bar, or Ctrl+O, opens a search box. As soon as you type, the matching channels and threads of the server you are in show, best first, each with its category and the day of its last message (the time if it was today). In direct messages it searches all your servers and shows the server too. A click or Enter takes you there; the arrows move through the list and Esc closes it. Emoji, dashes and capitals do not matter: "lifely po" finds "🦕-lifely-po-allocation".
+A button in the channel bar, or Ctrl+O, opens a search box. As soon as you type, the matching channels and threads of the server you are in show, best first, each with its category and the day of its last message (the time if it was today). In direct messages it searches all your servers and shows the server too. A click or Enter takes you there; the arrows move through the list and Esc closes it. Emoji, dashes and capitals do not matter: "lifely po" finds "🦕-lifely-po-allocation".
 
 ## Links in a channel
 
-A link button in the top bar opens a panel with every link posted in the channel you are in and in all its threads (or only in the thread, when you are in a thread), newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard. A link from a thread carries a small tag with the thread's name. A gear at the top of the panel offers four tick boxes, all on at first: hide links to Discord channels and messages, hide Slack links, group the same link posted several times into one line (grouped lines have no Jump button, since they point to several messages), and also group links that only differ by tracking codes (a Figma file counts once, whatever frame it points to). Untick grouping to see every post of a link with its own Jump button.
+A link button in the channel bar opens a panel with every link posted in the channel you are in and in all its threads (or only in the thread, when you are in a thread), newest first, each with its date, who posted it and a Jump button to the message. Type in the filter to find one quickly, for example figma or dashboard. A link from a thread carries a small tag with the thread's name. A gear at the top of the panel offers four tick boxes, all on at first: hide links to Discord channels and messages, hide Slack links, group the same link posted several times into one line (grouped lines have no Jump button, since they point to several messages), and also group links that only differ by tracking codes (a Figma file counts once, whatever frame it points to). Untick grouping to see every post of a link with its own Jump button.
 
 ## Bookmarks
 
-A flag button in the top bar, or Ctrl+B, bookmarks the channel or thread you are in; do it again to remove the bookmark. You can also right-click any channel or thread and choose "Bookmark". A bookmark stays until you remove it and only colours the line, which keeps its place in the list, in the colour of what is happening in it: green while an agent is working there, red when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A bookmarked channel stays visible in a closed category, and a bookmarked thread stays visible when its channel's threads are folded away. A "Clear" button above the channel list removes every bookmark at once.
+A flag button in the channel bar, or Ctrl+B, bookmarks the channel or thread you are in; do it again to remove the bookmark. You can also right-click any channel or thread and choose "Bookmark". A bookmark stays until you remove it and only colours the line, which keeps its place in the list, in the colour of what is happening in it: green while an agent is working there, red when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A bookmarked channel stays visible in a closed category, and a bookmarked thread stays visible when its channel's threads are folded away. The flag square above the channel list removes every bookmark at once; a small red number on it shows how many there are.
 
 ## Above the channel list
 
-A row of buttons stays at the top of the channel list. "Hide threads" or "Show threads" folds or opens every channel's threads. "Close categories" or "Open categories" closes or opens every category of the server. A closed category still shows a channel that is bookmarked or where someone is typing (in it or in one of its threads), like it shows unread ones; unread messages in a channel's threads alone do not keep it in view. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Ctrl+P does the same): type its name and press Enter, and it opens. It goes outside any category unless you pick one in the box; archive categories are not offered.
+One line of square buttons stays at the top of the channel list, always in the same order, so your hand learns where each one is; a square greys out when it has nothing to do. From the left: hide or show every channel's threads; remove every bookmark; close or open every category of the server; filter the channels; create a channel; add people to the server. A closed category still shows a channel that is bookmarked or where someone is typing (in it or in one of its threads), like it shows unread ones; unread messages in a channel's threads alone do not keep it in view. The magnifier opens a filter: as you type, only the matching channels and threads of the server stay in the panel, the arrows move, Enter opens one, and Esc clears it. The plus creates a channel (Ctrl+P does the same): type its name and press Enter, and it opens. It goes outside any category unless you pick one in the box; archive categories are not offered. The last square opens Discord's own window to invite people.
 
 ## Tidy a channel into its category
 
@@ -30,7 +30,7 @@ Ctrl+K on a channel outside any category moves it into the first category whose 
 
 When the right panel is open, two things sit above the member list. First a map: the channel you are in is the white dot in the middle, and around it are the channels (purple) and threads (orange) linked with it, both ways: a channel or thread mentioned, a link to a channel, thread or message, or a forwarded message, posted here or posted elsewhere about this channel. The map moves like Obsidian's graph: the dots float and pull on each other, dragging a dot moves it and the dots tied to it follow, the mouse wheel zooms, dragging the background moves the view, and the corner button fits the whole map again. Lines also join dots that link to each other. Tick boxes under the map show or hide channels, threads and names. A click on a dot opens it. In a thread, the panel shows the thread's channel. Then a calendar of the month: a dot under a day means you wrote in this channel or its threads that day, and a click on it opens the channel at that day's first message. The first visit to a long channel takes a few seconds to read; the other channels of the server are then read slowly in the background to find the links made to this one.
 
-The mirrored panel icon in the top bar folds the whole right panel away or opens it again, and dragging its left edge makes it wider or narrower; the width is kept.
+The mirrored panel icon in the channel bar folds the whole right panel away or opens it again, and dragging its left edge makes it wider or narrower; the width is kept.
 
 ## Copy a link
 
@@ -40,19 +40,21 @@ A click on the # just before the channel name at the top, or on the # of a chann
 
 Ctrl+R, or a click on the channel name above the messages, opens a small box with the name of the channel or thread you are in. Change it and press Enter to save, or Esc to leave it as it was.
 
-## Buttons in the top bar
+## No top bar, a busy bar instead
 
-Three buttons sit in the top bar, just before the inbox. Search opens Discord's search; when the channel header is hidden, it comes back while you search and goes away after (Ctrl+F does the same). The server list button shows or hides the servers. The member list button is Discord's own member list switch, lit while the list is open; it shows in server channels, threads and group chats.
+Discord's bar across the top of the window is gone, and its pieces moved closer to where you work. The server's picture sits before its name at the top of the channel list, with the back and forward arrows right after the name. Every icon that sat at the top right now sits in the channel bar, the bar above the messages: first AgentDisc's own (bookmark, feedback mode, find a channel, links, the server list and the right panel), then Discord's own channel icons, then Discord's inbox and help and the AgentDisc robot. The server list button shows or hides the servers; the right panel button opens or folds the member list column.
+
+Where the top bar was, a thin busy bar runs across the screen. It counts the conversations, channels and threads of the server you are in, where an agent (Claude Code, Codex or any bot) is working right now, and fills a little more with each one. Its colour and words change in steps: green with a few ("Easy mode", "I'm cheating"), yellow from 4 ("Okay, now we're getting into it"), orange from 8 ("Okay, this is serious work"), red from 13 ("Things are heating up"), and at 20 it is full and burns, with flames along it ("The system is burning"). Beyond 20 it turns purple ("Beyond burning"). Each step has a few phrases and picks one at random, so the words change. When a new conversation starts, the bar jumps, flashes and a "+1" pops out of its end; when one ends, it eases down. A conversation counts while its agent shows "typing", and for a few seconds after, so a short pause does not drop it.
 
 ## The AgentDisc button
 
-A small purple robot at the top of Discord opens one simple menu with three groups: Theme, Panels and Channel signs. While a message is being read, it also offers "Stop reading". Every choice is saved and stays after a restart.
+A small purple robot at the end of the channel bar opens one simple menu with three groups: Theme, Panels and Channel signs. While a message is being read, it also offers "Stop reading". Every choice is saved and stays after a restart.
 
 ## Read any message aloud
 
 Next to the name on every message there is a small purple play button. Click it and a natural AI voice reads that message, plus the messages sent right after it under the same name, so an agent's answer split in several parts is read as one. You can also right-click a message and choose "Read aloud".
 
-While it reads, a player sits inside the channel's top bar, between the channel name and its buttons (or just above the message box when the top bar is hidden): play and pause, back 10 seconds, forward 10 seconds, a timeline you can drag, speed from 1× to 2×, and close. Space pauses or plays, and the left and right arrows go back or forward 10 seconds (in the message box only while it is empty, so typing is never disturbed). The word being read lights up in the message, and a click on any word of that message jumps the reading there. The play button turns while the voice is being prepared, shows pause while it plays, and the player closes by itself at the end unless you moved around in it. Reading goes on when you change channel. While the voice plays, any YouTube tab turns down to a fifth of its volume, without pausing, and goes back to where it was when the voice stops (a switch in the AgentDiscVoice settings turns this off).
+While it reads, a player sits inside the channel bar, between the channel name and its buttons (or just above the message box when that bar is hidden or too narrow): play and pause, back 10 seconds, forward 10 seconds, a timeline you can drag, speed from 1× to 2×, and close. Space pauses or plays, and the left and right arrows go back or forward 10 seconds (in the message box only while it is empty, so typing is never disturbed). The word being read lights up in the message, and a click on any word of that message jumps the reading there. The play button turns while the voice is being prepared, shows pause while it plays, and the player closes by itself at the end unless you moved around in it. Reading goes on when you change channel. While the voice plays, any YouTube tab turns down to a fifth of its volume, without pausing, and goes back to where it was when the voice stops (a switch in the AgentDiscVoice settings turns this off).
 
 Links are read as "a link to" plus the site, and code blocks are skipped. Playing the same message again is free for 30 days. If the voice is not set up or not answering, Chrome's own voice reads instead.
 
@@ -66,9 +68,9 @@ A channel whose threads are open sits on one rounded soft blue card together wit
 
 ## Panels you can hide
 
-From the Panels group of the menu, each part of Discord can be hidden on its own: the server list, the channel list, the top bar, the channel header, notice banners, the server name bar, the Events and Server Boosts lines, the account bar at the bottom (with the call buttons), the add server and Discover buttons, the gift, GIF, sticker, emoji and apps buttons of the message box, and the member list. A hidden channel list slides back while the mouse sits at the left edge of the window; a hidden top bar slides back at the top edge.
+From the Panels group of the menu, each part of Discord can be hidden on its own: the server list, the channel list, the channel header (with it go the buttons it holds), notice banners, the server name bar, the Events and Server Boosts lines, the account bar at the bottom (with the call buttons), the add server and Discover buttons, the gift, GIF, sticker, emoji and apps buttons of the message box, and the member list. A hidden channel list slides back while the mouse sits at the left edge of the window.
 
-The server list and member list also have their own buttons in the top bar (see above).
+The server list and member list also have their own buttons in the channel bar (see above).
 
 Ctrl+Alt+F switches "chat only" on and off: it hides the server list, channel list and member list at once (or everything except the chat, a choice in the settings, on the PanelSwitches cog).
 
@@ -94,7 +96,7 @@ The invite and settings buttons that pop up when the mouse passes over a channel
 
 ## Stephane's starting setup
 
-The Midnight theme is on. Hidden: the server list, the channel header, notice banners, the server name bar, the Events and Boosts lines, the account bar, the add server and Discover buttons, and the message box buttons. Shown: the channel list, the top bar and everything else. Typing signs show the dots with the small photos, the busy threads sign is on, and signs also show on the channel you are in. The voice is a calm, clear American man.
+The Midnight theme is on. Hidden: the server list, notice banners, the Events and Boosts lines, the account bar, the add server and Discover buttons, and the message box buttons. Shown: the channel list, the channel header and the server name bar (they hold the buttons), the busy bar and everything else. Typing signs show the dots with the small photos, the busy threads sign is on, and signs also show on the channel you are in. The voice is a calm, clear American man.
 
 ## Settings
 

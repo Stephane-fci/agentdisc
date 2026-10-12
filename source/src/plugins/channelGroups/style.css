@@ -33,101 +33,29 @@
     color: var(--interactive-text-active);
 }
 
-/* One button above the channel list: open or fold every channel's threads. */
-.vc-threads-all-row {
-    flex: 0 0 auto;
-    padding: 8px 8px 4px;
-}
-
-.vc-threads-all {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    height: 28px;
-    padding: 0 10px;
-    border: none;
-    border-radius: var(--radius-sm, 8px);
-    background: color-mix(in oklab, #5865f2 14%, transparent);
-    color: var(--channels-default);
-    font-family: var(--font-primary);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.vc-threads-all:hover {
-    background: color-mix(in oklab, #5865f2 28%, transparent);
-    color: var(--interactive-text-active);
-}
-
-.vc-threads-all-closed svg {
-    transform: rotate(-90deg);
-}
-
-/* Beside it, while any line is marked: one click removes every priority mark. */
-.vc-threads-all-row {
-    display: flex;
-    gap: 6px;
-}
-
-.vc-priority-clear {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 10px;
-    border: none;
-    border-radius: var(--radius-sm, 8px);
-    background: color-mix(in oklab, #f23f43 16%, transparent);
-    color: var(--channels-default);
-    font-family: var(--font-primary);
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.vc-priority-clear:hover {
-    background: color-mix(in oklab, #f23f43 30%, transparent);
-    color: var(--interactive-text-active);
-}
-
-.vc-threads-all-row .vc-threads-all {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-/* The tools above the channel list (6 Oct): close or open every category, filter the
-   channels, create a channel. The row wraps when the panel is narrow. */
+/* The tools above the channel list (12 Oct): one line of squares, each always in its place. */
 .vc-list-tools {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
 }
 
-.vc-threads-all-row {
-    flex-wrap: wrap;
+.vc-list-tools-row {
+    display: flex;
+    flex: 0 0 auto;
     align-items: center;
-}
-
-.vc-threads-all-row .vc-threads-all {
-    width: auto;
-    white-space: nowrap;
-}
-
-.vc-list-tools-gap {
-    flex: 1 1 0;
+    gap: 6px;
+    padding: 8px 8px 4px;
 }
 
 .vc-list-icon {
+    position: relative;
     display: flex;
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     border: none;
     border-radius: var(--radius-sm, 8px);
@@ -136,10 +64,43 @@
     cursor: pointer;
 }
 
-.vc-list-icon:hover,
+.vc-list-icon:hover:not(:disabled),
 .vc-list-icon-on {
     background: color-mix(in oklab, #5865f2 28%, transparent);
     color: var(--interactive-text-active);
+}
+
+.vc-list-icon-warn {
+    background: color-mix(in oklab, #f23f43 16%, transparent);
+    color: #f23f43;
+}
+
+.vc-list-icon-warn:hover:not(:disabled) {
+    background: color-mix(in oklab, #f23f43 30%, transparent);
+    color: #f23f43;
+}
+
+.vc-list-icon:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.vc-list-badge {
+    position: absolute;
+    inset-inline-end: -3px;
+    bottom: -3px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    box-sizing: border-box;
+    border-radius: 7px;
+    background: #f23f43;
+    color: #fff;
+    font-family: var(--font-primary);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
 }
 
 /* The filter: while it holds text, only the matching channels show in the panel. */

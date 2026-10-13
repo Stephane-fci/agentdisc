@@ -11,7 +11,7 @@ import { closeBox, openBoxKind, showBox } from "@plugins/channelGroups/boxes";
 
 const SHORTCUTS: [string, string][] = [
     ["Ctrl+O", "Find a channel or thread in this server, with its category and last message day; when none has the name typed, the last line creates it"],
-    ["Ctrl+P", "Create a channel: small letters and hyphens as you type, the category's emoji added when you pick one (also from Ctrl+O when no channel has that name)"],
+    ["Ctrl+P", "Create a channel at the bottom of the channels with no category: small letters and hyphens as you type, a category's emoji added when you pick one (also from Ctrl+O when no channel has that name)"],
     ["Ctrl+R", "Rename this channel or thread (or click its name at the top)"],
     ["Ctrl+B", "Bookmark this channel or thread, or remove the bookmark"],
     ["Ctrl+K", "Put this channel in the category with the same emoji (never an archive), or take it out, under the other channels above the categories"],

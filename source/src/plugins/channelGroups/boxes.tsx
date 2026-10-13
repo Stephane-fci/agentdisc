@@ -122,10 +122,11 @@ function leadingSign(name: string): string | null {
     return first && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(first) ? first : null;
 }
 
-// A new channel goes outside any category unless he picks one in the box (Stephane, 6 Oct:
-// "no category as default"). Archive categories are not offered. Picking a category puts its
-// emoji at the start of the name, like his other channels; "No category" takes it off again
-// (13 Oct).
+// A new channel never goes into a category: it lands at the bottom of the channels above the
+// categories (Stephane, 13 Oct: "avoid going into the category and instead appear at the
+// bottom"); Ctrl+K moves it in later. Picking a category in the box only puts that category's
+// emoji at the start of the name, like his other channels; "No category" takes it off again.
+// Archive categories are not offered.
 function NewChannelBox({ guildId, categories, initial }: { guildId: string; categories: any[]; initial: string; }) {
     const [name, setName] = useState(toChannelName(initial));
     const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -152,7 +153,7 @@ function NewChannelBox({ guildId, categories, initial }: { guildId: string; cate
         try {
             const { body } = await RestAPI.post({
                 url: `/guilds/${guildId}/channels`,
-                body: { type: TEXT, name: clean, ...(categoryId ? { parent_id: categoryId } : {}) }
+                body: { type: TEXT, name: clean, position: lastLoosePosition(guildId) + 1 }
             });
             closeBox();
             if (body?.id) NavigationRouter.transitionTo(`/channels/${guildId}/${body.id}`);
@@ -182,7 +183,7 @@ function NewChannelBox({ guildId, categories, initial }: { guildId: string; cate
                     onKeyDown={keys}
                 />
                 <label className="agentdisc-namebox-field">
-                    <span>Category</span>
+                    <span>Category emoji</span>
                     <select
                         className="agentdisc-namebox-select"
                         value={categoryId ?? ""}
@@ -195,11 +196,19 @@ function NewChannelBox({ guildId, categories, initial }: { guildId: string; cate
                     </select>
                 </label>
                 <div className={"agentdisc-find-note" + (error ? " agentdisc-namebox-error" : "")}>
-                    {error || (busy ? "Saving…" : "Enter creates it, Esc closes.")}
+                    {error || (busy ? "Saving…" : "Enter creates it at the bottom of the channels with no category. Esc closes.")}
                 </div>
             </div>
         </div>
     );
+}
+
+// The highest place among the text channels above the categories, so a new one goes after them.
+function lastLoosePosition(guildId: string) {
+    const loose = ((GuildChannelStore.getChannels(guildId) as any)?.SELECTABLE ?? [])
+        .map((e: any) => e.channel)
+        .filter((c: any) => c && !c.parent_id);
+    return loose.reduce((top: number, c: any) => Math.max(top, c.position ?? 0), 0);
 }
 
 export function openNewChannel(initial = "") {

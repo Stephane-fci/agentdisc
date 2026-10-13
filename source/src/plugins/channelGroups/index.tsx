@@ -530,7 +530,7 @@ function ListTools({ guildId }: { guildId: string; }) {
                 <ToolSquare label="Filter channels" on={filterOpen} onClick={() => setFilterOpen(v => !v)}>
                     <path fill="currentColor" fillRule="evenodd" d={SEARCH} />
                 </ToolSquare>
-                <ToolSquare label="New channel (Ctrl+P)" onClick={openNewChannel}>
+                <ToolSquare label="New channel (Ctrl+P)" onClick={() => openNewChannel()}>
                     <path fill="currentColor" d={PLUS} />
                 </ToolSquare>
                 <ToolSquare label={invite ? "Add people" : "You cannot add people here"} disabled={!invite} onClick={() => invite?.()}>

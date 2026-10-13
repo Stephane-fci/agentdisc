@@ -259,7 +259,10 @@ function lastLoosePosition(guildId: string) {
     return loose.reduce((top: number, c: any) => Math.max(top, c.position ?? 0), 0);
 }
 
-export function openNewChannel(initial = "") {
+// The name typed in Ctrl+O, if any. Used as a click handler it receives the click, which is
+// not a name (13 Oct: the plus square broke that way).
+export function openNewChannel(initial: unknown = "") {
+    const typed = typeof initial === "string" ? initial : "";
     const current = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
     const guildId = current?.guild_id ?? SelectedGuildStore.getGuildId();
     if (!guildId) {
@@ -267,7 +270,7 @@ export function openNewChannel(initial = "") {
         return;
     }
     // Only families with an emoji: picking one puts its emoji in the name, which is all it does.
-    show(<NewChannelBox guildId={guildId} families={categoryFamilies(guildId).filter(f => f.emoji)} initial={initial} />);
+    show(<NewChannelBox guildId={guildId} families={categoryFamilies(guildId).filter(f => f.emoji)} initial={typed} />);
 }
 
 // Renames the channel or thread open now. False when there is nothing to rename (a DM).

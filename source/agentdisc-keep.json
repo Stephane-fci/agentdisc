@@ -14,7 +14,8 @@
         "WebKeybinds",
         "WebScreenShareFixes",
         "CrashHandler",
-        "AgentDiscVoice"
+        "AgentDiscVoice",
+        "AlwaysTrust"
     ],
     "offHelpers_about": "Engine helpers that stay switched off in his Discord because no kept plugin uses them. The update check reports a failure in one of them but still lets the update through. Remove a name here when a kept plugin starts using it.",
     "offHelpers": [

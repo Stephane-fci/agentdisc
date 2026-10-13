@@ -111,11 +111,36 @@ function categoryForName(name: string, categories: any[]) {
     return emoji ? categories.find(c => leadingEmoji(c.name) === emoji) ?? null : null;
 }
 
+// A channel name as Discord writes it: small letters, a hyphen for each space (13 Oct).
+export function toChannelName(text: string) {
+    return text.toLowerCase().replace(/\s+/g, "-");
+}
+
+// The emoji a name starts with, exactly as written (with its variation sign), or null.
+function leadingSign(name: string): string | null {
+    const first = new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(name)[Symbol.iterator]().next().value?.segment;
+    return first && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(first) ? first : null;
+}
+
 // A new channel goes outside any category unless he picks one in the box (Stephane, 6 Oct:
-// "no category as default"). Archive categories are not offered.
-function NewChannelBox({ guildId, categories }: { guildId: string; categories: any[]; }) {
-    const [name, setName] = useState("");
+// "no category as default"). Archive categories are not offered. Picking a category puts its
+// emoji at the start of the name, like his other channels; "No category" takes it off again
+// (13 Oct).
+function NewChannelBox({ guildId, categories, initial }: { guildId: string; categories: any[]; initial: string; }) {
+    const [name, setName] = useState(toChannelName(initial));
     const [categoryId, setCategoryId] = useState<string | null>(null);
+    const [added, setAdded] = useState<string | null>(null);
+
+    function pickCategory(id: string | null) {
+        const sign = id ? leadingSign(categories.find(c => c.id === id)?.name ?? "") : null;
+        let rest = name;
+        const own = leadingSign(rest);
+        // The emoji this box put there goes; so does his own one when a category brings another.
+        if (own && (own === added || sign)) rest = rest.slice(own.length).replace(/^-/, "");
+        setName(sign ? `${sign}-${rest}` : rest);
+        setAdded(sign);
+        setCategoryId(id);
+    }
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
@@ -149,11 +174,11 @@ function NewChannelBox({ guildId, categories }: { guildId: string; categories: a
                 <div className="agentdisc-namebox-title">New channel</div>
                 <input
                     className="agentdisc-find-input"
-                    placeholder="Channel name"
+                    placeholder="channel-name"
                     value={name}
                     autoFocus
                     disabled={busy}
-                    onChange={e => setName(e.currentTarget.value)}
+                    onChange={e => setName(toChannelName(e.currentTarget.value))}
                     onKeyDown={keys}
                 />
                 <label className="agentdisc-namebox-field">
@@ -162,7 +187,7 @@ function NewChannelBox({ guildId, categories }: { guildId: string; categories: a
                         className="agentdisc-namebox-select"
                         value={categoryId ?? ""}
                         disabled={busy}
-                        onChange={e => setCategoryId(e.currentTarget.value || null)}
+                        onChange={e => pickCategory(e.currentTarget.value || null)}
                         onKeyDown={keys}
                     >
                         <option value="">No category</option>
@@ -177,14 +202,14 @@ function NewChannelBox({ guildId, categories }: { guildId: string; categories: a
     );
 }
 
-export function openNewChannel() {
+export function openNewChannel(initial = "") {
     const current = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
     const guildId = current?.guild_id ?? SelectedGuildStore.getGuildId();
     if (!guildId) {
         showToast("Open a server first, then create the channel.", Toasts.Type.FAILURE);
         return;
     }
-    show(<NewChannelBox guildId={guildId} categories={guildCategories(guildId)} />);
+    show(<NewChannelBox guildId={guildId} categories={guildCategories(guildId)} initial={initial} />);
 }
 
 // Renames the channel or thread open now. False when there is nothing to rename (a DM).

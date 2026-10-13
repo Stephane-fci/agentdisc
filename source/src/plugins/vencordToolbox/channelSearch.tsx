@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { openNewChannel, toChannelName } from "@plugins/channelGroups/boxes";
 import { ActiveJoinedThreadsStore, ChannelStore, GuildChannelStore, GuildStore, NavigationRouter, ReactDOM, SelectedGuildStore, useEffect, useMemo, useRef, useState } from "@webpack/common";
 
 // Channel search (Stephane, 2 Oct): a button in the top bar and Ctrl+O (Ctrl+M until 6 Oct)
 // open one search box; as soon as he types, the matching channels and threads show, the
 // best first, and a click or Enter takes him there. In a server it searches that server
 // only, and each line shows its category and the day of its last message (6 Oct); outside
-// a server (direct messages) it searches every server.
+// a server (direct messages) it searches every server. When no channel has exactly the name
+// typed, a last line creates it (13 Oct): it opens the new channel box with that name.
 
 export interface Place {
     id: string;
@@ -126,12 +128,17 @@ export const ICONS: Record<Place["kind"], string> = {
     voice: "M12 3a1 1 0 0 0-1.7-.7L6.6 6H4a2 2 0 0 0-2 2v8c0 1.1.9 2 2 2h2.6l3.7 3.7A1 1 0 0 0 12 21V3Zm3.1 5.3a1 1 0 0 1 1.4 0 5 5 0 0 1 0 7.4 1 1 0 1 1-1.4-1.4 3 3 0 0 0 0-4.6 1 1 0 0 1 0-1.4Z"
 };
 
+const PLUS = "M13 5a1 1 0 1 0-2 0v6H5a1 1 0 1 0 0 2h6v6a1 1 0 1 0 2 0v-6h6a1 1 0 1 0 0-2h-6V5Z";
+
 function SearchBox({ onClose }: { onClose(): void; }) {
     const places = useMemo(() => allPlaces(SelectedGuildStore.getGuildId()), []);
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     const results = useMemo(() => find(places, query), [places, query]);
     const listRef = useRef<HTMLDivElement>(null);
+    const typed = plain(query);
+    const canCreate = !!SelectedGuildStore.getGuildId() && !!typed && !results.some(p => p.plain === typed);
+    const last = results.length - (canCreate ? 0 : 1);
 
     useEffect(() => setActive(0), [query]);
     useEffect(() => {
@@ -142,6 +149,11 @@ function SearchBox({ onClose }: { onClose(): void; }) {
         if (!p) return;
         NavigationRouter.transitionTo(`/channels/${p.guildId}/${p.id}`);
         onClose();
+    }
+
+    function create() {
+        onClose();
+        openNewChannel(query);
     }
 
     return (
@@ -155,9 +167,9 @@ function SearchBox({ onClose }: { onClose(): void; }) {
                     onChange={e => setQuery(e.currentTarget.value)}
                     onKeyDown={e => {
                         if (e.key === "Escape") { e.preventDefault(); onClose(); }
-                        else if (e.key === "ArrowDown") { e.preventDefault(); setActive(i => Math.min(i + 1, results.length - 1)); }
+                        else if (e.key === "ArrowDown") { e.preventDefault(); setActive(i => Math.max(0, Math.min(i + 1, last))); }
                         else if (e.key === "ArrowUp") { e.preventDefault(); setActive(i => Math.max(i - 1, 0)); }
-                        else if (e.key === "Enter") { e.preventDefault(); go(results[active]); }
+                        else if (e.key === "Enter") { e.preventDefault(); if (canCreate && active === results.length) create(); else go(results[active]); }
                         e.stopPropagation();
                     }}
                 />
@@ -175,7 +187,17 @@ function SearchBox({ onClose }: { onClose(): void; }) {
                             <span className="agentdisc-find-date">{p.lastDate}</span>
                         </div>
                     ))}
-                    {query.trim() && !results.length && <div className="agentdisc-find-note">No channel or thread matches.</div>}
+                    {canCreate && (
+                        <div
+                            className={"agentdisc-find-item agentdisc-find-create" + (active === results.length ? " agentdisc-find-on" : "")}
+                            onMouseEnter={() => setActive(results.length)}
+                            onClick={create}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={PLUS} /></svg>
+                            <span className="agentdisc-find-name">Create the channel {toChannelName(query)}</span>
+                        </div>
+                    )}
+                    {query.trim() && !results.length && !canCreate && <div className="agentdisc-find-note">No channel or thread matches.</div>}
                     {!query.trim() && <div className="agentdisc-find-note">Start typing a channel or thread name. Enter opens the first one, the arrows move, Esc closes.</div>}
                 </div>
             </div>

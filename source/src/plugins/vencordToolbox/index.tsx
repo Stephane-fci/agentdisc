@@ -325,6 +325,23 @@ export default definePlugin({
                 }
             ]
         },
+        // No notifications from threads (Stephane, 13 Oct: "only when they come from channels
+        // not threads"): a thread counts no mentions, so the red numbers on the server icon, the
+        // tab title and the thread lines leave threads out, and a thread message never pings.
+        {
+            find: "getNotifCenterReadState(e){",
+            replacement: {
+                match: /getMentionCount\((\i)\)\{(?=let \i=arguments\.length>1&&void 0!==arguments\[1\]\?arguments\[1\]:\i\.\i\.CHANNEL,\i=\i\.getValue)/,
+                replace: "getMentionCount($1){if($self.isThreadId($1))return 0;"
+            }
+        },
+        {
+            find: 'static displayName="NotificationStore"',
+            replacement: {
+                match: /(MESSAGE_CREATE:function\(\i\)\{var \i;let\{channelId:\i,message:\i,optimistic:\i\}=\i;if\(\i\)return!1;let (\i)=\i\.\i\.getChannel\(\i\),\i=\i\.default\.getUser\(\i\.author\?\.id\),\i=\i\.default\.getCurrentUser\(\);if\()/,
+                replace: "$1$self.isThread($2)||"
+            }
+        },
         // A message over the length limit is attached as a text file on Enter, with no window.
         {
             find: '"MESSAGE_LENGTH_UPSELL",this.handleMessageLengthUpsell',
@@ -383,6 +400,8 @@ export default definePlugin({
 
     attachLongMessage,
     renderSidePanel,
+    isThread: (channel: any) => !!channel?.isThread?.(),
+    isThreadId: (id: string) => !!ChannelStore.getChannel(id)?.isThread?.(),
     keepArrows,
     renderArrows,
     renderServerIcon,

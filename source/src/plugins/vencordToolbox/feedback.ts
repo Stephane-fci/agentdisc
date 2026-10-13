@@ -161,10 +161,11 @@ function messageBoxHasText() {
     return !!(box?.textContent ?? "").replace(/[\s\u200b\ufeff]/g, "");
 }
 
+// Each quote in italics, with an empty line before the next one (Stephane, 13 Oct).
 function quote(text: string) {
-    const clean = text.replace(/\s+/g, " ").trim();
+    const clean = text.replace(/\s+/g, " ").trim().replace(/\*/g, "\\*");
     if (!clean) return;
-    insertTextIntoChatInputBox((messageBoxHasText() ? "\n" : "") + `"${clean}" >> `);
+    insertTextIntoChatInputBox((messageBoxHasText() ? "\n\n" : "") + `*"${clean}"* >> `);
     ComponentDispatch?.dispatchToLastSubscribed?.("TEXTAREA_FOCUS");
 }
 

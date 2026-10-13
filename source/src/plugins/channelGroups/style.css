@@ -85,24 +85,6 @@
     cursor: default;
 }
 
-.vc-list-badge {
-    position: absolute;
-    inset-inline-end: -3px;
-    bottom: -3px;
-    min-width: 14px;
-    height: 14px;
-    padding: 0 3px;
-    box-sizing: border-box;
-    border-radius: 7px;
-    background: #f23f43;
-    color: #fff;
-    font-family: var(--font-primary);
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 14px;
-    text-align: center;
-}
-
 /* The filter: while it holds text, only the matching channels show in the panel. */
 html.agentdisc-channel-filter .vc-list-tools {
     flex: 1 1 auto;

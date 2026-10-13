@@ -40,6 +40,9 @@ export default definePlugin({
     description: "Removes the annoying untrusted domain and suspicious file popup",
     tags: ["Utility"],
     authors: [Devs.zt, Devs.Trwy],
+    // AgentDisc (Stephane, 13 Oct): a link opens in a new tab at once, with no "leaving
+    // Discord" window. Always on, whatever an older saved setting says.
+    required: true,
     patches: [
         {
             find: '="MaskedLinkStore",',

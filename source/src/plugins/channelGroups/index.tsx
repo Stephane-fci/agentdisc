@@ -480,7 +480,7 @@ function ChannelFilter({ guildId, onClose }: { guildId: string; onClose(): void;
 // squares since 12 Oct): show or hide every thread, clear every bookmark, close or open every
 // category, filter the channels, create a channel, add people. Every square keeps its place,
 // greyed out when there is nothing to do, so the hand learns where each one is.
-function ToolSquare({ label, on, disabled, warn, badge, onClick, children }: { label: string; on?: boolean; disabled?: boolean; warn?: boolean; badge?: number; onClick(): void; children: React.ReactNode; }) {
+function ToolSquare({ label, on, disabled, warn, onClick, children }: { label: string; on?: boolean; disabled?: boolean; warn?: boolean; onClick(): void; children: React.ReactNode; }) {
     return (
         <button
             type="button"
@@ -491,7 +491,6 @@ function ToolSquare({ label, on, disabled, warn, badge, onClick, children }: { l
             onClick={onClick}
         >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">{children}</svg>
-            {!!badge && <span className="vc-list-badge">{badge}</span>}
         </button>
     );
 }
@@ -522,7 +521,7 @@ function ListTools({ guildId }: { guildId: string; }) {
                     <circle cx="17" cy="11.5" r="2.3" {...line} />
                     <circle cx="17" cy="19" r="2.3" {...line} />
                 </ToolSquare>
-                <ToolSquare label={marks ? `Remove every bookmark (${marks})` : "No bookmark to remove"} warn={marks > 0} badge={marks} disabled={!marks} onClick={clearPriorities}>
+                <ToolSquare label={marks ? "Remove every bookmark" : "No bookmark to remove"} warn={marks > 0} disabled={!marks} onClick={clearPriorities}>
                     <path d={FLAG} {...line} fill={marks ? "currentColor" : "none"} />
                 </ToolSquare>
                 <ToolSquare label={anyOpen ? "Close every category" : "Open every category"} on={categories.length > 0 && anyOpen} disabled={!categories.length} onClick={() => FluxDispatcher.dispatch({ type: anyOpen ? "CATEGORY_COLLAPSE_ALL" : "CATEGORY_EXPAND_ALL", guildId })}>

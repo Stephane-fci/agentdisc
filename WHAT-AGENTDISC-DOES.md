@@ -24,7 +24,7 @@ One line of square buttons stays at the top of the channel list, always in the s
 
 ## Tidy a channel into its category
 
-Ctrl+K on a channel outside any category moves it into the first category whose name starts with the same emoji (never an archive category), at the top of that category: "🥑-discord-app" goes into "🥑 Tools & Skills". Ctrl+K on a channel inside a category takes it out, under the other channels above the categories. In a thread, its channel moves.
+AgentDisc reads the categories of the server you are in, so it works with any server and follows the categories as you add or remove them. Categories that differ only by an archive mark are one family: "🦕 Lifely", "🦕 Lifely Archive 1" and "🦕 Lifely Archive 2" are all Lifely. A family is its emoji and its name together, so two families that share a name or an emoji are never mixed up. Ctrl+K on a channel outside any category moves it into its family's main category, at the top: the family with the same emoji ("🥑-discord-app" goes into "🥑 Tools & Skills"), or, when the channel name has no emoji, the family whose name it holds ("chris-weekly-report" goes into "Chris"). It never moves a channel into an archive. Ctrl+K on a channel inside a category takes it out, under the other channels above the categories. In a thread, Ctrl+K moves its channel. The new channel box lists one line per family, and only families with an emoji, since picking one only adds its emoji to the name.
 
 ## Map and calendar above the members
 

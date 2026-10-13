@@ -14,7 +14,7 @@ const SHORTCUTS: [string, string][] = [
     ["Ctrl+P", "Create a channel at the bottom of the channels with no category: small letters and hyphens as you type, a category's emoji added when you pick one (also from Ctrl+O when no channel has that name)"],
     ["Ctrl+R", "Rename this channel or thread (or click its name at the top)"],
     ["Ctrl+B", "Bookmark this channel or thread, or remove the bookmark"],
-    ["Ctrl+K", "Put this channel in the category with the same emoji (never an archive), or take it out, under the other channels above the categories"],
+    ["Ctrl+K", "Put this channel in its category: the one with the same emoji (or, with no emoji, the one whose name it holds), never an archive; or take it out, under the other channels above the categories"],
     ["Shift twice", "Feedback mode on or off; each tap on Ctrl: the paragraph, the sentence, a piece of it (up to a comma or colon)"],
     ["Shift + ← / →", "Hide or show the left panel (servers and channels) / the right panel; while typing, Shift with the arrows still selects text"],
     ["Ctrl+H", "This window"],

@@ -96,19 +96,67 @@ function NameBox({ title, initial, placeholder, save }: { title: string; initial
     );
 }
 
-// The real categories of a server, in their order in the list (Discord's list of them
-// starts with a made-up "Uncategorized" one). Archive categories never count (Stephane, 6 Oct).
-function guildCategories(guildId: string): any[] {
-    return ((GuildChannelStore.getChannels(guildId) as any)?.[CATEGORY] ?? [])
-        .map((e: any) => e.channel)
-        .filter((c: any) => c && ChannelStore.getChannel(c.id)?.type === CATEGORY && !/archive/i.test(c.name))
-        .sort((a: any, b: any) => a.position - b.position);
+// Categories are read from the server itself, never from a fixed list, and grouped into
+// families (Stephane, 13 Oct): "🦕 Lifely", "🦕 Lifely Archive 1" and "🦕 Lifely Archive 2" are
+// one family, Lifely. A family is its emoji and its name together, so two categories with the
+// same name and different emojis, or the same emoji and different names, stay apart. The
+// family's main category is its first one that is not an archive.
+export interface CategoryFamily {
+    key: string;
+    emoji: string | null;
+    name: string;
+    label: string;
+    main: any | null;
+    position: number;
 }
 
-// The first category whose name starts with the same emoji as this name.
-function categoryForName(name: string, categories: any[]) {
+const ARCHIVE = /\barchiv(?:e|es|ed)\b.*$/iu;
+const sameSign = (sign: string | null) => sign?.replace(/[\uFE0E\uFE0F]/g, "") ?? "";
+const words = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+function familyName(name: string) {
+    const trimmed = name.trim();
+    const sign = leadingSign(trimmed);
+    const rest = sign ? trimmed.slice(sign.length) : trimmed;
+    return rest.replace(ARCHIVE, "").replace(/^[\s\-–—_|·:]+|[\s\-–—_|·:]+$/g, "");
+}
+
+export function categoryFamilies(guildId: string): CategoryFamily[] {
+    // Discord's list of categories starts with a made-up "Uncategorized" one; only real ones count.
+    const categories = ((GuildChannelStore.getChannels(guildId) as any)?.[CATEGORY] ?? [])
+        .map((e: any) => e.channel)
+        .filter((c: any) => c && ChannelStore.getChannel(c.id)?.type === CATEGORY)
+        .sort((a: any, b: any) => a.position - b.position);
+    const families = new Map<string, CategoryFamily>();
+    for (const c of categories) {
+        const emoji = leadingSign(c.name.trim());
+        const name = familyName(c.name);
+        const key = `${sameSign(emoji)}|${words(name)}`;
+        let family = families.get(key);
+        if (!family) families.set(key, family = { key, emoji, name, label: "", main: null, position: c.position });
+        if (!family.main && !ARCHIVE.test(c.name)) {
+            family.main = c;
+            family.position = c.position;
+        }
+    }
+    return [...families.values()]
+        .map(f => ({ ...f, label: f.main?.name ?? [f.emoji, f.name].filter(Boolean).join(" ") }))
+        .sort((a, b) => a.position - b.position);
+}
+
+// The family a channel belongs in: the one with the channel's emoji (the best name match
+// when several share it), or, for a name without an emoji, the family whose name it holds.
+function familyForName(name: string, families: CategoryFamily[]) {
     const emoji = leadingEmoji(name);
-    return emoji ? categories.find(c => leadingEmoji(c.name) === emoji) ?? null : null;
+    const channelWords = ` ${words(name)} `;
+    const score = (f: CategoryFamily) => words(f.name).split(" ").filter(w => w && channelWords.includes(` ${w} `)).length;
+    if (emoji) {
+        const same = families.filter(f => sameSign(f.emoji) === emoji);
+        return same.reduce<CategoryFamily | null>((best, f) => !best || score(f) > score(best) ? f : best, null);
+    }
+    return families
+        .filter(f => words(f.name) && channelWords.includes(` ${words(f.name)} `))
+        .sort((a, b) => words(b.name).length - words(a.name).length)[0] ?? null;
 }
 
 // A channel name as Discord writes it: small letters, a hyphen for each space (13 Oct).
@@ -127,13 +175,13 @@ function leadingSign(name: string): string | null {
 // bottom"); Ctrl+K moves it in later. Picking a category in the box only puts that category's
 // emoji at the start of the name, like his other channels; "No category" takes it off again.
 // Archive categories are not offered.
-function NewChannelBox({ guildId, categories, initial }: { guildId: string; categories: any[]; initial: string; }) {
+function NewChannelBox({ guildId, families, initial }: { guildId: string; families: CategoryFamily[]; initial: string; }) {
     const [name, setName] = useState(toChannelName(initial));
     const [categoryId, setCategoryId] = useState<string | null>(null);
     const [added, setAdded] = useState<string | null>(null);
 
     function pickCategory(id: string | null) {
-        const sign = id ? leadingSign(categories.find(c => c.id === id)?.name ?? "") : null;
+        const sign = id ? families.find(f => f.key === id)?.emoji ?? null : null;
         let rest = name;
         const own = leadingSign(rest);
         // The emoji this box put there goes; so does his own one when a category brings another.
@@ -182,7 +230,7 @@ function NewChannelBox({ guildId, categories, initial }: { guildId: string; cate
                     onChange={e => setName(toChannelName(e.currentTarget.value))}
                     onKeyDown={keys}
                 />
-                <label className="agentdisc-namebox-field">
+                {families.length > 0 && <label className="agentdisc-namebox-field">
                     <span>Category emoji</span>
                     <select
                         className="agentdisc-namebox-select"
@@ -192,9 +240,9 @@ function NewChannelBox({ guildId, categories, initial }: { guildId: string; cate
                         onKeyDown={keys}
                     >
                         <option value="">No category</option>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {families.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
                     </select>
-                </label>
+                </label>}
                 <div className={"agentdisc-find-note" + (error ? " agentdisc-namebox-error" : "")}>
                     {error || (busy ? "Saving…" : "Enter creates it at the bottom of the channels with no category. Esc closes.")}
                 </div>
@@ -218,7 +266,8 @@ export function openNewChannel(initial = "") {
         showToast("Open a server first, then create the channel.", Toasts.Type.FAILURE);
         return;
     }
-    show(<NewChannelBox guildId={guildId} categories={guildCategories(guildId)} initial={initial} />);
+    // Only families with an emoji: picking one puts its emoji in the name, which is all it does.
+    show(<NewChannelBox guildId={guildId} families={categoryFamilies(guildId).filter(f => f.emoji)} initial={initial} />);
 }
 
 // Renames the channel or thread open now. False when there is nothing to rename (a DM).
@@ -240,9 +289,10 @@ export function openRename(): boolean {
     return true;
 }
 
-// Ctrl+K (Stephane, 6 Oct): a channel outside any category goes into the first category
-// whose name starts with the same emoji, first in it; a channel in a category comes out of
-// it, last of the channels above the categories (7 Oct). In a thread, its channel moves.
+// Ctrl+K (Stephane, 6 Oct): a channel outside any category goes into the main category of its
+// family (same emoji, or its name for a server without emojis, 13 Oct), first in it; a channel
+// in a category comes out of it, last of the channels above the categories (7 Oct). In a
+// thread, its channel moves.
 function leadingEmoji(name: string): string | null {
     const first = new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(name.trim())[Symbol.iterator]().next().value?.segment;
     if (!first || !/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(first)) return null;
@@ -262,14 +312,11 @@ export async function tidyChannel(): Promise<boolean> {
 
     let category: any = null;
     if (!channel.parent_id) {
-        const emoji = leadingEmoji(channel.name);
-        if (!emoji) {
-            showToast("This channel's name does not start with an emoji.", Toasts.Type.FAILURE);
-            return true;
-        }
-        category = categoryForName(channel.name, guildCategories(guildId));
+        const family = familyForName(channel.name, categoryFamilies(guildId));
+        category = family?.main ?? null;
         if (!category) {
-            showToast(`No category starts with ${emoji}.`, Toasts.Type.FAILURE);
+            const emoji = leadingEmoji(channel.name);
+            showToast(family ? `Only archive categories for ${family.label}.` : emoji ? `No category starts with ${emoji}.` : "No category matches this channel's name.", Toasts.Type.FAILURE);
             return true;
         }
     }

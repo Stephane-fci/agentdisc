@@ -112,13 +112,16 @@ export function showBoard(channelId: string, threadId: string | null) {
     f.contentWindow.postMessage({ type: "mission-control:show", channel: channelId, thread: threadId }, origin);
 }
 
-// A click on a card's thread in the board opens that thread here.
+// A click on a card's thread or icon in the board opens that thread or message here.
 function onMessage(e: MessageEvent) {
     if (!origin || e.origin !== origin || !frame || e.source !== frame.contentWindow) return;
     const { data } = e;
     if (data?.type !== "mission-control:open" || typeof data.channel !== "string" || !/^\d+$/.test(data.channel)) return;
     const guild = typeof data.guild === "string" && /^\d+$/.test(data.guild) ? data.guild : ChannelStore.getChannel(data.channel)?.guild_id ?? "@me";
-    NavigationRouter.transitionTo(`/channels/${guild}/${data.channel}`);
+    // A card's icon names the exact message to look at (14 Oct): Discord jumps to it and
+    // lights it up, in a thread too.
+    const message = typeof data.message === "string" && /^\d+$/.test(data.message) ? `/${data.message}` : "";
+    NavigationRouter.transitionTo(`/channels/${guild}/${data.channel}${message}`);
 }
 
 export function startBoard() {

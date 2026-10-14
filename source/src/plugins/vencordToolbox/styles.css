@@ -793,3 +793,38 @@ svg.agentdisc-copy-sign {
     background-color: currentColor;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
+
+/* The mission board in the right panel (14 Oct): its place fills the whole column, and
+   whatever else the column holds (Discord's member list) steps aside. The frame is laid
+   over this place from outside, so it never reloads on a channel switch. */
+:has(> .agentdisc-board-slot) {
+    display: flex !important;
+    flex-direction: column;
+}
+
+:has(> .agentdisc-board-slot) > :not(.agentdisc-board-slot) {
+    display: none !important;
+}
+
+.agentdisc-side.agentdisc-board-slot {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 200px;
+    height: 100%;
+    padding: 0;
+    border-bottom: none;
+}
+
+.agentdisc-board-frame {
+    position: fixed;
+    z-index: 10;
+    display: none;
+    border: 0;
+    background: transparent;
+    color-scheme: dark;
+}
+
+/* While the panel's edge is dragged, the frame lets the mouse through. */
+.agentdisc-resizing .agentdisc-board-frame {
+    pointer-events: none;
+}

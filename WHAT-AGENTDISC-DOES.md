@@ -32,6 +32,10 @@ When the right panel is open, two things sit above the member list. First a map:
 
 The mirrored panel icon in the channel bar folds the whole right panel away or opens it again, and dragging its left edge makes it wider or narrower; the width is kept.
 
+## A mission board in the right panel
+
+Where a mission board (one simple Kanban board per channel) is set up on your computer, the right panel shows the board of the channel you are in instead of the map, the calendar and the member list. It follows you as you change channel, without reloading, and marks the card of the thread you are in; a click on a card's thread opens that thread. The board opens without a login, through a key kept in your browser. "Mission board in the right panel" in the Panels group of the AgentDisc menu switches back to the map, the calendar and the members. Without a board set up, the right panel stays as described above.
+
 ## Copy a link
 
 A click on the # just before the channel name at the top, or on the # of a channel in the channel list, copies the link of that channel (or thread); under the mouse, the # turns into a link icon of the same size to show it. In the small bar that shows over a message, a link icon copies the link of that message.

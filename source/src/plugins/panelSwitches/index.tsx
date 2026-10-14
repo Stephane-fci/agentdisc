@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings } from "@api/Settings";
+import { definePluginSettings, Settings, useSettings } from "@api/Settings";
 import { redrawChannelList } from "@plugins/channelGroups";
 import { BUSY_BAR_HEIGHT } from "@plugins/vencordToolbox/busyBar";
+import { hasBoard } from "@plugins/vencordToolbox/missionBoard";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
@@ -378,6 +379,7 @@ export default definePlugin({
     toolboxActions() {
         const s = settings.use(["chatOnly", "hideServerList", "hideChannelList", "hideChannelHeader", "hideNotices", "hideServerHeader", "hideServerLines", "hideAccountPanel", "hideAddDiscover", "hideMessageButtons"]);
         const membersHidden = useStateFromStores([ChannelSectionStore as any], () => !ChannelSectionStore.getState().isMembersOpen);
+        const boardOn = useSettings(["plugins.VencordToolbox.rightPanelBoard"]).plugins.VencordToolbox?.rightPanelBoard !== false;
         const flip = (key: keyof typeof s) => () => { settings.store[key] = !settings.store[key]; };
 
         return [
@@ -385,6 +387,9 @@ export default definePlugin({
             <Menu.MenuCheckboxItem key="servers" id="agentdisc-hide-servers" label="Hide server list" checked={s.hideServerList} action={flip("hideServerList")} />,
             <Menu.MenuCheckboxItem key="channels" id="agentdisc-hide-channels" label="Hide channel list" checked={s.hideChannelList} action={flip("hideChannelList")} />,
             <Menu.MenuCheckboxItem key="members" id="agentdisc-hide-members" label="Hide member list (Ctrl+U)" checked={membersHidden} action={toggleMembers} />,
+            // The mission board (14 Oct), offered only where it is set up; unticked, the right
+            // panel shows the map, the calendar and the member list again.
+            ...(hasBoard() ? [<Menu.MenuCheckboxItem key="board" id="agentdisc-right-board" label="Mission board in the right panel" checked={boardOn} action={() => { Settings.plugins.VencordToolbox.rightPanelBoard = !boardOn; }} />] : []),
             <Menu.MenuCheckboxItem key="header" id="agentdisc-hide-header" label="Hide channel header" checked={s.hideChannelHeader} action={flip("hideChannelHeader")} />,
             <Menu.MenuCheckboxItem key="notices" id="agentdisc-hide-notices" label="Hide notice banners" checked={s.hideNotices} action={flip("hideNotices")} />,
             <Menu.MenuCheckboxItem key="server-name" id="agentdisc-hide-server-name" label="Hide server name bar" checked={s.hideServerHeader} action={flip("hideServerHeader")} />,

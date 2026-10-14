@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Settings } from "@api/Settings";
+import { Settings, useSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { ChannelStore, NavigationRouter, useEffect, useRef, useState } from "@webpack/common";
+import { ChannelStore, NavigationRouter, useEffect, useReducer, useRef, useState } from "@webpack/common";
 
+import { attachSlot, detachSlot, hasBoard, onBoardFound, showBoard } from "./missionBoard";
 import { type DayInfo, dayKey, linksOf, pairsAmong, type PlaceName, placeName, useSideData } from "./sideData";
 
 // The right panel (Stephane, 7 Oct), above the member list like Obsidian's side panel:
@@ -389,13 +390,48 @@ export function stopRightPanelWidth() {
     widthStyle = null;
 }
 
-// In a thread, the panel shows its channel (Stephane, 7 Oct: the panel vanished in threads).
+// The mission board (14 Oct): the whole column is its place; the frame itself lives in
+// missionBoard.ts and is laid over this place, so it survives every channel switch.
+function BoardSlot({ channelId, threadId }: { channelId: string; threadId: string | null; }) {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const element = ref.current!;
+        attachSlot(element);
+        return () => detachSlot(element);
+    }, []);
+    useEffect(() => showBoard(channelId, threadId), [channelId, threadId]);
+    return (
+        <div className="agentdisc-side agentdisc-board-slot" ref={ref}>
+            <ResizeHandle />
+        </div>
+    );
+}
+
+// The board when it is set up on this computer and switched on in the AgentDisc menu;
+// otherwise the map and the calendar above the member list, as before.
+function useBoardOn() {
+    const [, redraw] = useReducer((n: number) => n + 1, 0);
+    useEffect(() => onBoardFound(redraw), []);
+    const { plugins } = useSettings(["plugins.VencordToolbox.rightPanelBoard"]);
+    return hasBoard() && plugins.VencordToolbox?.rightPanelBoard !== false;
+}
+
+function RightPanel({ channel, threadId }: { channel: any; threadId: string | null; }) {
+    return useBoardOn() ? <BoardSlot channelId={channel.id} threadId={threadId} /> : <SidePanel channel={channel} />;
+}
+
+// In a thread, the panel shows its channel (Stephane, 7 Oct: the panel vanished in threads),
+// and the board marks the thread's card.
 export function renderSidePanel(channel: any) {
-    if (channel?.isThread?.()) channel = ChannelStore.getChannel(channel.parent_id);
+    let threadId: string | null = null;
+    if (channel?.isThread?.()) {
+        threadId = channel.id;
+        channel = ChannelStore.getChannel(channel.parent_id);
+    }
     if (!channel?.id || !channel.guild_id) return null;
     return (
         <ErrorBoundary noop key="agentdisc-side">
-            <SidePanel channel={channel} />
+            <RightPanel channel={channel} threadId={threadId} />
         </ErrorBoundary>
     );
 }

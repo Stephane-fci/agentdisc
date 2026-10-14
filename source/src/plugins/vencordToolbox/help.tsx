@@ -40,6 +40,7 @@ const BUTTONS: [string, string][] = [
     ["Link icon on a message", "In the bar that shows on hover: copy the link of that message"],
     ["Squares above the channels", "From left: hide or show every thread, remove every bookmark, close or open every category, filter the channels, create a channel, add people"],
     ["Arrow left of a channel", "Fold or open that channel's threads"],
+    ["Mission board", "Right panel, where the board is set up: the board of the channel you are in, its open thread's card marked; a click on a card's thread opens it. The AgentDisc menu brings back the map, calendar and members"],
     ["Map above the members", "Channels (purple) and threads (orange) linked with this channel, both ways; drag dots, zoom with the wheel, click a dot to open it; tick boxes for channels, threads and names"],
     ["Right panel edge", "Drag it to make the right panel wider or narrower"],
     ["Calendar above the members", "The days you wrote here; click a marked day to open its first message"],

@@ -36,6 +36,7 @@ import { isFeedbackOn, onFeedbackChange, setFeedback } from "./feedback";
 import { LinksPanel } from "./links";
 import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
+import { startBoard, stopBoard } from "./missionBoard";
 import { startShiftKeys, stopShiftKeys } from "./shiftKeys";
 import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
@@ -77,6 +78,12 @@ export const settings = definePluginSettings({
     mapChannels: { type: OptionType.BOOLEAN, default: true, description: "Map: show channels", hidden: true },
     mapThreads: { type: OptionType.BOOLEAN, default: true, description: "Map: show threads", hidden: true },
     mapTitles: { type: OptionType.BOOLEAN, default: true, description: "Map: show names", hidden: true },
+    rightPanelBoard: {
+        type: OptionType.BOOLEAN,
+        default: true,
+        description: "Right panel: the mission board instead of the map, the calendar and the member list (when the board is set up on this computer)",
+        hidden: true
+    },
     rightPanelWidth: {
         type: OptionType.NUMBER,
         default: 0,
@@ -430,6 +437,7 @@ export default definePlugin({
         startSideData();
         startRightPanelWidth();
         startBusyBar();
+        startBoard();
     },
 
     stop() {
@@ -439,6 +447,7 @@ export default definePlugin({
         stopSideData();
         stopRightPanelWidth();
         stopBusyBar();
+        stopBoard();
         setFeedback(false);
     },
 

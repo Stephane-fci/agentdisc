@@ -46,3 +46,41 @@ function duckPage(on) {
   }
 }
 
+
+// AgentDisc mission board (Stephane, 14 Oct): the board shown in the right panel sits behind
+// a Cloudflare login. Where the board is set up, a file beside the app holds its key
+// (mission-panel-key.json, which web pages cannot read); this browser then adds the key to
+// the board's own requests, so the panel opens without a login. Without the file nothing is
+// added, and the rule from an earlier setup is removed.
+const BOARD_RULE = 1001;
+
+async function setBoardKey() {
+  let rule = null;
+  try {
+    const res = await fetch(chrome.runtime.getURL("mission-panel-key.json"), { cache: "no-store" });
+    if (res.ok) {
+      const key = await res.json();
+      const host = new URL(key.board).hostname;
+      if (host && key.client_id && key.client_secret) {
+        rule = {
+          id: BOARD_RULE,
+          priority: 1,
+          action: {
+            type: "modifyHeaders",
+            requestHeaders: [
+              { header: "CF-Access-Client-Id", operation: "set", value: String(key.client_id) },
+              { header: "CF-Access-Client-Secret", operation: "set", value: String(key.client_secret) }
+            ]
+          },
+          condition: {
+            requestDomains: [host],
+            resourceTypes: ["sub_frame", "xmlhttprequest", "script", "stylesheet", "image", "font", "media", "ping", "other"]
+          }
+        };
+      }
+    }
+  } catch {}
+  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [BOARD_RULE], addRules: rule ? [rule] : [] }).catch(() => {});
+}
+
+setBoardKey();

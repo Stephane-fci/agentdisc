@@ -164,7 +164,7 @@ function priorityState(id: string): PriorityState {
         }
     }
     if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return "green";
-    return lines.some(l => ReadStateStore.hasUnread(l)) ? "red" : "yellow";
+    return lines.some(l => ReadStateStore.hasUnread(l)) ? "orange" : "yellow";
 }
 
 let priorityStyle: HTMLStyleElement | null = null;

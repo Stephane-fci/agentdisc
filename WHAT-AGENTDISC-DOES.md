@@ -16,7 +16,7 @@ A link button in the channel bar opens a panel with every link posted in the cha
 
 ## Bookmarks
 
-A flag button in the channel bar, or Ctrl+B, bookmarks the channel or thread you are in; do it again to remove the bookmark. You can also right-click any channel or thread and choose "Bookmark". A bookmark stays until you remove it and only colours the line, which keeps its place in the list, in the colour of what is happening in it: green while an agent is working there, red when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A bookmarked channel stays visible in a closed category, and a bookmarked thread stays visible when its channel's threads are folded away. The flag square above the channel list removes every bookmark at once; it is red while there are bookmarks.
+A flag button in the channel bar, or Ctrl+B, bookmarks the channel or thread you are in; do it again to remove the bookmark. You can also right-click any channel or thread and choose "Bookmark". A bookmark stays until you remove it and only colours the line, which keeps its place in the list, in the colour of what is happening in it: green while an agent is working there, orange when no agent is working and something is unread (go there first), yellow when no agent is working and everything is read. A bookmarked channel stays visible in a closed category, and a bookmarked thread stays visible when its channel's threads are folded away. The flag square above the channel list removes every bookmark at once; it is red while there are bookmarks.
 
 ## Above the channel list
 

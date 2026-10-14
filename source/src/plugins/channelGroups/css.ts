@@ -30,11 +30,12 @@ const CARD_RADIUS = 8;
 
 // Priority lines (Stephane, 1 Oct): a channel or thread he marks stands out until he
 // removes the mark, in the colour of what is happening in it: green while an agent is
-// working there, red when no agent works and something is unread (go there first),
-// yellow when no agent works and nothing is unread. A tint, a bar on the left and white
-// text; when it is also the open one, it keeps the purple with the coloured bar.
-export type PriorityState = "green" | "red" | "yellow";
-export const PRIORITY_COLOURS: Record<PriorityState, string> = { green: "#23a55a", red: "#f23f43", yellow: "#f0b232" };
+// working there, orange when no agent works and something is unread (go there first; red
+// until 14 Oct, now the mission board's orange for "needs you to check"), yellow when no
+// agent works and nothing is unread. A tint, a bar on the left and white text; when it is
+// also the open one, it keeps the purple with the coloured bar.
+export type PriorityState = "green" | "orange" | "yellow";
+export const PRIORITY_COLOURS: Record<PriorityState, string> = { green: "#23a55a", orange: "#f57c2a", yellow: "#f0b232" };
 
 export function buildPriorityCss(items: { id: string; state: PriorityState; }[], line?: GroupClasses["line"]) {
     if (!items.length || !line) return "";

@@ -5,7 +5,7 @@
  */
 
 import { EXTENSION_BASE_URL, metaReady } from "@utils/web-metadata";
-import { ChannelStore, NavigationRouter } from "@webpack/common";
+import { ChannelStore, MessageActions, NavigationRouter, SelectedChannelStore } from "@webpack/common";
 
 // The mission board in the right panel (Stephane, 14 Oct): one Kanban board per channel,
 // shown instead of the map, the calendar and the member list. It follows the channel he
@@ -119,9 +119,14 @@ function onMessage(e: MessageEvent) {
     if (data?.type !== "mission-control:open" || typeof data.channel !== "string" || !/^\d+$/.test(data.channel)) return;
     const guild = typeof data.guild === "string" && /^\d+$/.test(data.guild) ? data.guild : ChannelStore.getChannel(data.channel)?.guild_id ?? "@me";
     // A card's icon names the exact message to look at (14 Oct): Discord jumps to it and
-    // lights it up, in a thread too.
-    const message = typeof data.message === "string" && /^\d+$/.test(data.message) ? `/${data.message}` : "";
-    NavigationRouter.transitionTo(`/channels/${guild}/${data.channel}${message}`);
+    // lights it up, in a thread too. In the channel already open, going to the same address
+    // does nothing, so Discord's own jump is used there.
+    const message = typeof data.message === "string" && /^\d+$/.test(data.message) ? data.message : null;
+    if (message && SelectedChannelStore.getChannelId() === data.channel) {
+        MessageActions.jumpToMessage({ channelId: data.channel, messageId: message, flash: true, jumpType: "INSTANT" });
+        return;
+    }
+    NavigationRouter.transitionTo(`/channels/${guild}/${data.channel}${message ? `/${message}` : ""}`);
 }
 
 export function startBoard() {

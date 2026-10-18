@@ -18,7 +18,8 @@ import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack"
 import { ActiveJoinedThreadsStore, ChannelStore, FluxDispatcher, GuildChannelStore, Menu, NavigationRouter, ReadStateStore, SelectedChannelStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
 
 import { openNewChannel } from "./boxes";
-import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, PriorityState, THREAD_TRIM } from "./css";
+import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
+import { askSoon, dueText, plannedChecks, startWaits, stopWaits } from "./waits";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
 // under it, and a small arrow where Discord's white unread mark was folds them away or
@@ -42,6 +43,12 @@ const settings = definePluginSettings({
     priority: {
         type: OptionType.CUSTOM,
         default: {} as Record<string, true>
+    },
+    // Bookmarks he monitors (18 Oct): "added" when monitoring made the bookmark, "kept" when
+    // the line was already bookmarked, so stopping monitoring puts it back as it was.
+    monitored: {
+        type: OptionType.CUSTOM,
+        default: {} as Record<string, "added" | "kept">
     }
 });
 
@@ -53,25 +60,65 @@ export function isBookmarked(id: string | null | undefined) {
     return isPriority(id);
 }
 
-export function togglePriority(id: string) {
-    const priority = { ...settings.store.priority };
-    if (priority[id]) delete priority[id];
-    else priority[id] = true;
-    settings.store.priority = priority;
+function bookmarksChanged(ids: string[]) {
     priorityKey = "";
     updatePriority();
-    refreshLists([id]);
+    refreshLists(ids);
     redrawList();
+    askSoon();
+}
+
+function setMonitored(id: string, value: "added" | "kept" | null) {
+    const monitored = { ...settings.store.monitored };
+    if (value) monitored[id] = value;
+    else delete monitored[id];
+    settings.store.monitored = monitored;
+}
+
+// Taking a bookmark off also stops monitoring it.
+export function togglePriority(id: string) {
+    const priority = { ...settings.store.priority };
+    if (priority[id]) {
+        delete priority[id];
+        if (isMonitored(id)) setMonitored(id, null);
+    } else priority[id] = true;
+    settings.store.priority = priority;
+    bookmarksChanged([id]);
+}
+
+export function isMonitored(id: string | null | undefined) {
+    return !!id && isPriority(id) && !!settings.store.monitored?.[id];
+}
+
+export function useMonitored(id: string | null | undefined) {
+    const { priority, monitored } = settings.use(["priority", "monitored"]);
+    return !!id && priority?.[id] === true && !!monitored?.[id];
+}
+
+// Monitoring (Stephane, 18 Oct: "the channel for which I want to follow closely but I
+// don't have anything to do"), Ctrl+M or the right-click menu: a bookmark of its own
+// colour. Started on a line with no bookmark, it bookmarks it; stopped, the line goes back
+// to how it was, a plain bookmark or no bookmark. Returns whether it is now monitored.
+export function toggleMonitoring(id: string) {
+    const priority = { ...settings.store.priority };
+    if (isMonitored(id)) {
+        if (settings.store.monitored?.[id] === "added") delete priority[id];
+        setMonitored(id, null);
+    } else {
+        setMonitored(id, priority[id] ? "kept" : "added");
+        priority[id] = true;
+    }
+    settings.store.priority = priority;
+    bookmarksChanged([id]);
+    return isMonitored(id);
 }
 
 // One click puts every marked channel and thread back to normal (Stephane, 1 Oct).
 export function clearPriorities() {
     const before = Object.keys(settings.store.priority ?? {});
     settings.store.priority = {};
-    priorityKey = "";
-    updatePriority();
-    refreshLists(before);
-    redrawList();
+    settings.store.monitored = {};
+    bookmarksChanged(before);
 }
 
 // A bookmark only colours its line; the channel keeps its place in the list (Stephane,
@@ -151,9 +198,10 @@ function refreshLists(ids: string[]) {
     }
 }
 
-// What is happening in a marked line: an agent typing there (or, for a folded channel, in
-// one of its hidden threads, whose dots show on the channel line), else unread or not.
-function priorityState(id: string): PriorityState {
+// What is happening in a marked line, the strongest first (css.ts): an agent typing there
+// (or, for a folded channel, in one of its hidden threads, whose dots show on the channel
+// line), something unread, a check an agent has planned there, monitored, else quiet.
+function priorityState(id: string): PriorityItem {
     const me = UserStore.getCurrentUser()?.id;
     const channel = ChannelStore.getChannel(id);
     const lines = [id];
@@ -163,8 +211,12 @@ function priorityState(id: string): PriorityState {
             if (t !== selected) lines.push(t);
         }
     }
-    if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return "green";
-    return lines.some(l => ReadStateStore.hasUnread(l)) ? "orange" : "yellow";
+    const item = (state: PriorityState, due?: string): PriorityItem => ({ id, state, due });
+    if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return item("green");
+    if (lines.some(l => ReadStateStore.hasUnread(l))) return item("orange");
+    const planned = lines.flatMap(l => plannedChecks(l) ?? []);
+    if (planned.length) return item("blue", dueText(planned.sort((a, b) => Date.parse(a) - Date.parse(b))));
+    return item(isMonitored(id) ? "purple" : "yellow");
 }
 
 let priorityStyle: HTMLStyleElement | null = null;
@@ -173,13 +225,13 @@ let priorityQueued = false;
 
 function updatePriority() {
     if (!priorityStyle) return;
-    let items: { id: string; state: PriorityState; }[] = [];
+    let items: PriorityItem[] = [];
     try {
-        items = Object.keys(settings.store.priority ?? {}).map(id => ({ id, state: priorityState(id) }));
+        items = Object.keys(settings.store.priority ?? {}).map(priorityState);
     } catch (e) {
         logger.warn("Could not read the priority lines", e);
     }
-    const key = items.map(i => i.id + i.state).join() + "|" + (classes.line ? "1" : "0");
+    const key = items.map(i => i.id + i.state + (i.due ?? "")).join() + "|" + (classes.line ? "1" : "0");
     if (key === priorityKey) return;
     priorityKey = key;
     priorityStyle.textContent = buildPriorityCss(items, classes.line);
@@ -193,6 +245,20 @@ function queuePriority() {
         priorityQueued = false;
         updatePriority();
     });
+}
+
+// The lines whose planned checks are asked for: every bookmark, and the open threads of a
+// folded bookmarked channel, whose state shows on the channel line.
+function bookmarkedLines() {
+    const out = new Set<string>();
+    for (const id of Object.keys(settings.store.priority ?? {})) {
+        out.add(id);
+        const channel = ChannelStore.getChannel(id);
+        if (channel?.guild_id && isFolded(id)) {
+            for (const t of Object.keys(ActiveJoinedThreadsStore.getActiveJoinedThreadsForParent(channel.guild_id, id) ?? {})) out.add(t);
+        }
+    }
+    return [...out];
 }
 
 const PRIORITY_STORES = () => [TypingStore, ReadStateStore, SelectedChannelStore, ActiveJoinedThreadsStore] as any[];
@@ -210,6 +276,11 @@ const priorityMenu: NavContextMenuPatchCallback = (children, { channel }: { chan
                 id="agentdisc-priority"
                 label={isPriority(channel.id) ? "Remove bookmark" : "Bookmark"}
                 action={() => togglePriority(channel.id)}
+            />
+            <Menu.MenuItem
+                id="agentdisc-monitor"
+                label={isMonitored(channel.id) ? "Stop monitoring" : "Monitor"}
+                action={() => toggleMonitoring(channel.id)}
             />
         </Menu.MenuGroup>
     );
@@ -769,9 +840,11 @@ export default definePlugin({
         FluxDispatcher.subscribe("TYPING_START", onTypingStart);
         for (const part of Object.keys(LOOKUPS) as (keyof typeof LOOKUPS)[]) lookUp(part);
         apply();
+        startWaits(bookmarkedLines, queuePriority);
     },
 
     stop() {
+        stopWaits();
         for (const store of PRIORITY_STORES()) store?.removeChangeListener?.(queuePriority);
         TypingStore.removeChangeListener(queueTypingCheck);
         FluxDispatcher.unsubscribe("TYPING_START", onTypingStart);

@@ -11,6 +11,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "agentdiscDuck") {
     duckYouTube(!!message.on);
   }
+  if (message.action === "agentdiscWaits" && sender.id === chrome.runtime.id) {
+    agentWaits(message.ids).then(sendResponse, () => sendResponse({}));
+    return true;
+  }
 });
 
 // AgentDisc read aloud: while the voice plays, YouTube tabs go down to a fifth of their
@@ -84,3 +88,49 @@ async function setBoardKey() {
 }
 
 setBoardKey();
+
+// AgentDisc waiting bookmarks (Stephane, 18 Oct): a bookmarked line turns blue while an
+// agent has planned its next check there. The mission board knows the agents' planned
+// checks; its board of a channel lists them for the channel and for each card's thread.
+// Only the due times go back to the page; the key never leaves this background part.
+const ID = /^\d{15,21}$/;
+
+async function boardKey() {
+  try {
+    const res = await fetch(chrome.runtime.getURL("mission-panel-key.json"), { cache: "no-store" });
+    if (!res.ok) return null;
+    const key = await res.json();
+    const board = new URL(key.board);
+    if (board.protocol !== "https:" || !key.client_id || !key.client_secret) return null;
+    return { origin: board.origin, headers: { "CF-Access-Client-Id": String(key.client_id), "CF-Access-Client-Secret": String(key.client_secret) } };
+  } catch {
+    return null;
+  }
+}
+
+async function agentWaits(ids) {
+  const key = await boardKey();
+  if (!key || !Array.isArray(ids)) return {};
+  const asked = [...new Set(ids.map(String).filter(id => ID.test(id)))].slice(0, 60);
+  const out = {};
+  const add = (id, wakes) => {
+    if (!ID.test(String(id)) || !Array.isArray(wakes)) return;
+    for (const w of wakes) if (w && typeof w.at === "string") (out[id] ??= []).push(w.at);
+  };
+  // A few at a time: the board is a small server.
+  const queue = [...asked];
+  async function worker() {
+    for (let id; (id = queue.shift());) {
+      try {
+        const res = await fetch(`${key.origin}/api/board/${id}`, { headers: key.headers, cache: "no-store", credentials: "omit", redirect: "manual" });
+        if (!res.ok) continue;
+        const board = await res.json();
+        add(board.channel, board.live && board.live.wakes);
+        for (const card of board.cards || []) if (card && card.thread) add(card.thread, card.live && card.live.wakes);
+      } catch {}
+    }
+  }
+  await Promise.all([worker(), worker(), worker()]);
+  for (const id of Object.keys(out)) out[id] = [...new Set(out[id])];
+  return out;
+}

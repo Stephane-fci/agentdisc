@@ -14,6 +14,7 @@ const SHORTCUTS: [string, string][] = [
     ["Ctrl+P", "Create a channel at the bottom of the channels with no category: small letters and hyphens as you type, a category's emoji added when you pick one (also from Ctrl+O when no channel has that name)"],
     ["Ctrl+R", "Rename this channel or thread (or click its name at the top)"],
     ["Ctrl+B", "Bookmark this channel or thread, or remove the bookmark"],
+    ["Ctrl+M", "Monitor this channel or thread (purple bookmark), or stop monitoring it"],
     ["Ctrl+K", "Put this channel in its category: the one with the same emoji (or, with no emoji, the one whose name it holds), never an archive; or take it out, under the other channels above the categories"],
     ["Shift twice", "Feedback mode on or off; each tap on Ctrl: the paragraph, the sentence, a piece of it (up to a comma or colon)"],
     ["Shift + ← / →", "Hide or show the left panel (servers and channels) / the right panel; while typing, Shift with the arrows still selects text"],
@@ -30,7 +31,7 @@ const SHORTCUTS: [string, string][] = [
 const BUTTONS: [string, string][] = [
     ["Busy bar", "Top of the screen: how many conversations have an agent working in this server; green, yellow, orange, red, burning at 20, purple beyond"],
     ["Picture and arrows", "Server name: the server's picture before its name, back and forward right after it"],
-    ["Flag", "Channel bar: bookmark the channel or thread you are in"],
+    ["Flag", "Channel bar: bookmark the channel or thread you are in; purple while you monitor it. A bookmarked line is green while an agent works, orange when something is unread, blue while an agent's next check is planned (hover for when), purple when monitored, yellow when quiet"],
     ["Speech bubble", "Channel bar: feedback mode, click text to quote it in your reply"],
     ["Magnifier with lines", "Channel bar: find a channel"],
     ["Chain link", "Channel bar: every link posted in this channel and its threads"],

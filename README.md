@@ -4,7 +4,7 @@ AgentDisc is a Chrome extension that makes Discord in the browser calmer and eas
 
 - **Typing signs:** dots and small photos show which channel or thread an agent is working in, even inside threads.
 - **Clear channel list:** a channel with open threads sits on one soft blue card with them; the open channel is solid purple, and one click folds a channel's threads.
-- **Bookmarks:** one click on the flag or Ctrl+B bookmarks a channel or thread; its line shows green while an agent works there, red when something waits for you, yellow when all is read; one button clears every bookmark.
+- **Bookmarks:** one click on the flag or Ctrl+B bookmarks a channel or thread; its line shows green while an agent works there, orange when something waits for you, blue while an agent's next check is planned, purple when you monitor it (Ctrl+M), yellow when all is quiet; one button clears every bookmark.
 - **Channel tools:** one line of squares above the channel list to show or hide threads, clear bookmarks, close or open every category, filter the list as you type, create a channel (Ctrl+P) and add people; rename a channel (Ctrl+R or a click on its name), and put a channel in the category with its emoji (Ctrl+K). Ctrl+H lists every shortcut.
 - **Busy bar:** Discord's top bar is gone; a thin bar across the top counts the conversations where an agent is working in your server, from green to burning red at 20 and purple beyond. Its buttons moved into the channel bar, and the back and forward arrows sit next to the server name.
 - **Feedback mode:** press Shift twice, then click paragraphs, sentences or pieces of a sentence in a long answer to quote them into your reply, in italics and spaced apart, ready for your comments.

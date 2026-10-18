@@ -29,15 +29,31 @@ export const CARD = "color-mix(in oklab,#5865f2 12%,transparent)";
 const CARD_RADIUS = 8;
 
 // Priority lines (Stephane, 1 Oct): a channel or thread he marks stands out until he
-// removes the mark, in the colour of what is happening in it: green while an agent is
-// working there, orange when no agent works and something is unread (go there first; red
-// until 14 Oct, now the mission board's orange for "needs you to check"), yellow when no
-// agent works and nothing is unread. A tint, a bar on the left and white text; when it is
-// also the open one, it keeps the purple with the coloured bar.
-export type PriorityState = "green" | "orange" | "yellow";
-export const PRIORITY_COLOURS: Record<PriorityState, string> = { green: "#23a55a", orange: "#f57c2a", yellow: "#f0b232" };
+// removes the mark, in the colour of what is happening in it, the strongest first:
+//   green   an agent is working there
+//   orange  no agent works and something is unread: go there first (red until 14 Oct, now
+//           the mission board's orange for "needs you to check")
+//   blue    an agent has planned its next check there and nothing needs him (18 Oct, the
+//           mission board's Waiting blue); a hover on the line says when it is due
+//   purple  he monitors it: he follows it closely with nothing to do (18 Oct, Ctrl+M)
+//   yellow  quiet: no agent, nothing unread
+// A tint, a bar on the left and white text; when it is also the open one, it keeps the
+// purple with the coloured bar.
+export type PriorityState = "green" | "orange" | "blue" | "purple" | "yellow";
+export const PRIORITY_COLOURS: Record<PriorityState, string> = {
+    green: "#23a55a",
+    orange: "#f57c2a",
+    blue: "#4ba3f5",
+    purple: "#a970ff",
+    yellow: "#f0b232"
+};
 
-export function buildPriorityCss(items: { id: string; state: PriorityState; }[], line?: GroupClasses["line"]) {
+export interface PriorityItem { id: string; state: PriorityState; due?: string; }
+
+// The words of a hover label go inside a CSS string.
+const cssText = (text: string) => '"' + text.replace(/[\\"\n]/g, " ") + '"';
+
+export function buildPriorityCss(items: PriorityItem[], line?: GroupClasses["line"]) {
     if (!items.length || !line) return "";
     const rules: string[] = [];
     const rowOf = (id: string) => `${sel(line.wrapper)}:has([data-list-item-id="channels___${id}"])`;
@@ -51,6 +67,13 @@ export function buildPriorityCss(items: { id: string; state: PriorityState; }[],
         );
     }
     rules.push(`${items.map(i => `${rowOf(i.id)} ${sel(line.name)}`).join(",")}{color:#fff!important}`);
+    // A waiting line says on hover when its next check is due, in a small label above it.
+    const due = items.filter(i => i.state === "blue" && i.due);
+    if (due.length) {
+        rules.push(`${due.map(i => `${rowOf(i.id)} ${sel(line.link)}`).join(",")}{position:relative}`);
+        rules.push(`${due.map(i => `${rowOf(i.id)}:hover ${sel(line.link)}:after`).join(",")}{position:absolute;left:8px;bottom:calc(100% + 4px);z-index:100;padding:4px 8px;border-radius:4px;background:#111214;color:#fff;font-size:12px;font-weight:500;line-height:16px;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgb(0 0 0 / 50%)}`);
+        for (const i of due) rules.push(`${rowOf(i.id)}:hover ${sel(line.link)}:after{content:${cssText(i.due!)}}`);
+    }
     return rules.join("\n");
 }
 

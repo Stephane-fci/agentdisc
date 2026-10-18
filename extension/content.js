@@ -29,6 +29,15 @@ document.addEventListener(
             if (event.data.type === 'AGENTDISC_DUCK') {
                 chrome.runtime.sendMessage({ action: "agentdiscDuck", on: !!event.data.on });
             }
+
+            // AgentDisc waiting bookmarks: the checks agents planned in these conversations,
+            // asked from the mission board by the background part, which holds its key.
+            if (event.data.type === 'AGENTDISC_WAITS' && Array.isArray(event.data.ids)) {
+                const seq = event.data.seq;
+                chrome.runtime.sendMessage({ action: "agentdiscWaits", ids: event.data.ids.slice(0, 60) })
+                    .then(waits => window.postMessage({ type: "AGENTDISC_WAITS_ANSWER", seq, waits: waits || {} }, location.origin))
+                    .catch(() => {});
+            }
         }, false);
     },
     { once: true }

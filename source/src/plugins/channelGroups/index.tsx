@@ -200,7 +200,8 @@ function refreshLists(ids: string[]) {
 
 // What is happening in a marked line, the strongest first (css.ts): an agent typing there
 // (or, for a folded channel, in one of its hidden threads, whose dots show on the channel
-// line), something unread, a check an agent has planned there, monitored, else quiet.
+// line), something unread (for a waiting or monitored line, in the line itself only), a
+// check an agent has planned there or in a hidden thread, monitored, else quiet.
 function priorityState(id: string): PriorityItem {
     const me = UserStore.getCurrentUser()?.id;
     const channel = ChannelStore.getChannel(id);
@@ -213,8 +214,12 @@ function priorityState(id: string): PriorityItem {
     }
     const item = (state: PriorityState, due?: string): PriorityItem => ({ id, state, due });
     if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return item("green");
-    if (lines.some(l => ReadStateStore.hasUnread(l))) return item("orange");
     const planned = lines.flatMap(l => plannedChecks(l) ?? []);
+    // A waiting or monitored line turns orange only for new messages in itself: the folded
+    // threads of a busy channel are nearly always partly unread and held it orange for good
+    // (Stephane, 18 Oct: "I see no blue, no purple, and Business to Build is still orange").
+    const calm = planned.length > 0 || isMonitored(id);
+    if ((calm ? [id] : lines).some(l => ReadStateStore.hasUnread(l))) return item("orange");
     if (planned.length) return item("blue", dueText(planned.sort((a, b) => Date.parse(a) - Date.parse(b))));
     return item(isMonitored(id) ? "purple" : "yellow");
 }

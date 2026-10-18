@@ -32,7 +32,8 @@ const CARD_RADIUS = 8;
 // removes the mark, in the colour of what is happening in it, the strongest first:
 //   green   an agent is working there
 //   orange  no agent works and something is unread: go there first (red until 14 Oct, now
-//           the mission board's orange for "needs you to check")
+//           the mission board's orange for "needs you to check"). For a blue or purple
+//           line only its own new messages count, not its folded threads (18 Oct).
 //   blue    an agent has planned its next check there and nothing needs him (18 Oct, the
 //           mission board's Waiting blue); a hover on the line says when it is due
 //   purple  he monitors it: he follows it closely with nothing to do (18 Oct, Ctrl+M)

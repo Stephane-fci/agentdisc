@@ -31,21 +31,20 @@ const CARD_RADIUS = 8;
 // Priority lines (Stephane, 1 Oct): a channel or thread he marks stands out until he
 // removes the mark, in the colour of what is happening in it, the strongest first:
 //   green   an agent is working there
-//   orange  no agent works and something is unread: go there first (red until 14 Oct, now
-//           the mission board's orange for "needs you to check"). For a blue or purple
-//           line only its own new messages count, not its folded threads (18 Oct).
+//   red     no agent works and something is unread: go there first (orange from 14 to
+//           19 Oct, then red again, his word: "much more visual and simple"). For a blue
+//           line only its own new messages count, not its folded threads (18 Oct)
 //   blue    an agent has planned its next check there and nothing needs him (18 Oct, the
-//           mission board's Waiting blue; no hover label since 19 Oct, his ask)
-//   purple  he monitors it: he follows it closely with nothing to do (18 Oct, Ctrl+M)
+//           mission board's Waiting blue); a clock on the line says when (19 Oct)
 //   yellow  quiet: no agent, nothing unread
+// A purple "monitoring" state (18 Oct) was taken out on 19 Oct: "it's confusing".
 // A tint, a bar on the left and white text; when it is also the open one, it keeps the
 // purple with the coloured bar.
-export type PriorityState = "green" | "orange" | "blue" | "purple" | "yellow";
+export type PriorityState = "green" | "red" | "blue" | "yellow";
 export const PRIORITY_COLOURS: Record<PriorityState, string> = {
     green: "#23a55a",
-    orange: "#f57c2a",
+    red: "#f23f43",
     blue: "#4ba3f5",
-    purple: "#a970ff",
     yellow: "#f0b232"
 };
 

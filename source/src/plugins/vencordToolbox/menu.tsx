@@ -228,6 +228,7 @@ const AGENTDISC_GROUPS: [label: string, plugin: string][] = [
     ["Theme", "AgentDiscTheme"],
     ["Panels", "PanelSwitches"],
     ["Channel signs", "TypingIndicator"],
+    ["Bookmarks", "ChannelGroups"],
     ["Read aloud", "AgentDiscVoice"]
 ];
 

@@ -91,7 +91,8 @@ setBoardKey();
 
 // AgentDisc waiting bookmarks (Stephane, 18 Oct): a bookmarked line turns blue while an
 // agent has planned its next check there. The mission board knows the agents' planned
-// checks; its board of a channel lists them for the channel and for each card's thread.
+// checks; its board of a channel lists them for the channel and for each card's thread
+// (one-off checks as wakes; repeating jobs as jobs, asked of the board on 19 Oct).
 // Only the due times go back to the page; the key never leaves this background part.
 const ID = /^\d{15,21}$/;
 
@@ -125,8 +126,11 @@ async function agentWaits(ids) {
         const res = await fetch(`${key.origin}/api/board/${id}`, { headers: key.headers, cache: "no-store", credentials: "omit", redirect: "manual" });
         if (!res.ok) continue;
         const board = await res.json();
-        add(board.channel, board.live && board.live.wakes);
-        for (const card of board.cards || []) if (card && card.thread) add(card.thread, card.live && card.live.wakes);
+        // One-off planned checks (wakes) and, once the board lists them, the next runs of
+        // repeating jobs (jobs, same shape: { at }), for the channel and each card's thread.
+        const timers = live => [...((live && live.wakes) || []), ...((live && live.jobs) || [])];
+        add(board.channel, timers(board.live));
+        for (const card of board.cards || []) if (card && card.thread) add(card.thread, timers(card.live));
       } catch {}
     }
   }

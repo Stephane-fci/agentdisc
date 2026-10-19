@@ -15,9 +15,9 @@ import { useInvite } from "@plugins/vencordToolbox/topBar";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
-import { ActiveJoinedThreadsStore, ChannelStore, FluxDispatcher, GuildChannelStore, Menu, NavigationRouter, ReadStateStore, SelectedChannelStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
+import { ActiveJoinedThreadsStore, ChannelStore, FluxDispatcher, GuildChannelStore, GuildStore, Menu, NavigationRouter, ReadStateStore, SelectedChannelStore, SelectedGuildStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
 
-import { openNewChannel } from "./boxes";
+import { moveAfterBookmarks, openNewChannel } from "./boxes";
 import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
 import { askSoon, plannedChecks, startWaits, stopWaits } from "./waits";
 
@@ -44,11 +44,10 @@ const settings = definePluginSettings({
         type: OptionType.CUSTOM,
         default: {} as Record<string, true>
     },
-    // Bookmarks he monitors (18 Oct): "added" when monitoring made the bookmark, "kept" when
-    // the line was already bookmarked, so stopping monitoring puts it back as it was.
-    monitored: {
+    // Servers where a new bookmark keeps its place (the AgentDisc menu, 19 Oct).
+    keepPlace: {
         type: OptionType.CUSTOM,
-        default: {} as Record<string, "added" | "kept">
+        default: {} as Record<string, true>
     }
 });
 
@@ -68,56 +67,22 @@ function bookmarksChanged(ids: string[]) {
     askSoon();
 }
 
-function setMonitored(id: string, value: "added" | "kept" | null) {
-    const monitored = { ...settings.store.monitored };
-    if (value) monitored[id] = value;
-    else delete monitored[id];
-    settings.store.monitored = monitored;
-}
-
-// Taking a bookmark off also stops monitoring it.
+// A channel he bookmarks moves to the end of the bookmarked channels of its list (19 Oct).
 export function togglePriority(id: string) {
     const priority = { ...settings.store.priority };
-    if (priority[id]) {
-        delete priority[id];
-        if (isMonitored(id)) setMonitored(id, null);
-    } else priority[id] = true;
+    const adding = !priority[id];
+    if (adding) priority[id] = true;
+    else delete priority[id];
     settings.store.priority = priority;
     bookmarksChanged([id]);
-}
-
-export function isMonitored(id: string | null | undefined) {
-    return !!id && isPriority(id) && !!settings.store.monitored?.[id];
-}
-
-export function useMonitored(id: string | null | undefined) {
-    const { priority, monitored } = settings.use(["priority", "monitored"]);
-    return !!id && priority?.[id] === true && !!monitored?.[id];
-}
-
-// Monitoring (Stephane, 18 Oct: "the channel for which I want to follow closely but I
-// don't have anything to do"), Ctrl+M or the right-click menu: a bookmark of its own
-// colour. Started on a line with no bookmark, it bookmarks it; stopped, the line goes back
-// to how it was, a plain bookmark or no bookmark. Returns whether it is now monitored.
-export function toggleMonitoring(id: string) {
-    const priority = { ...settings.store.priority };
-    if (isMonitored(id)) {
-        if (settings.store.monitored?.[id] === "added") delete priority[id];
-        setMonitored(id, null);
-    } else {
-        setMonitored(id, priority[id] ? "kept" : "added");
-        priority[id] = true;
-    }
-    settings.store.priority = priority;
-    bookmarksChanged([id]);
-    return isMonitored(id);
+    const guildId = ChannelStore.getChannel(id)?.guild_id;
+    if (adding && guildId && !settings.store.keepPlace?.[guildId]) moveAfterBookmarks(id, isPriority);
 }
 
 // One click puts every marked channel and thread back to normal (Stephane, 1 Oct).
 export function clearPriorities() {
     const before = Object.keys(settings.store.priority ?? {});
     settings.store.priority = {};
-    settings.store.monitored = {};
     bookmarksChanged(before);
 }
 
@@ -200,8 +165,8 @@ function refreshLists(ids: string[]) {
 
 // What is happening in a marked line, the strongest first (css.ts): an agent typing there
 // (or, for a folded channel, in one of its hidden threads, whose dots show on the channel
-// line), something unread (for a waiting or monitored line, in the line itself only), a
-// check an agent has planned there or in a hidden thread, monitored, else quiet.
+// line), something unread (for a waiting line, in the line itself only), a check an agent
+// has planned there or in a hidden thread, else quiet.
 function priorityState(id: string): PriorityItem {
     const me = UserStore.getCurrentUser()?.id;
     const channel = ChannelStore.getChannel(id);
@@ -215,13 +180,12 @@ function priorityState(id: string): PriorityItem {
     const item = (state: PriorityState, next?: string): PriorityItem => ({ id, state, next });
     if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return item("green");
     const planned = lines.flatMap(l => plannedChecks(l) ?? []);
-    // A waiting or monitored line turns orange only for new messages in itself: the folded
-    // threads of a busy channel are nearly always partly unread and held it orange for good
-    // (Stephane, 18 Oct: "I see no blue, no purple, and Business to Build is still orange").
-    const calm = planned.length > 0 || isMonitored(id);
-    if ((calm ? [id] : lines).some(l => ReadStateStore.hasUnread(l))) return item("orange");
+    // A waiting line turns red only for new messages in itself: the folded threads of a busy
+    // channel are nearly always partly unread and held it red for good (Stephane, 18 Oct:
+    // "I see no blue ... and Business to Build is still orange").
+    if ((planned.length ? [id] : lines).some(l => ReadStateStore.hasUnread(l))) return item("red");
     if (planned.length) return item("blue", planned.reduce((a, b) => Date.parse(a) <= Date.parse(b) ? a : b));
-    return item(isMonitored(id) ? "purple" : "yellow");
+    return item("yellow");
 }
 
 let priorityStyle: HTMLStyleElement | null = null;
@@ -303,11 +267,6 @@ const priorityMenu: NavContextMenuPatchCallback = (children, { channel }: { chan
                 id="agentdisc-priority"
                 label={isPriority(channel.id) ? "Remove bookmark" : "Bookmark"}
                 action={() => togglePriority(channel.id)}
-            />
-            <Menu.MenuItem
-                id="agentdisc-monitor"
-                label={isMonitored(channel.id) ? "Stop monitoring" : "Monitor"}
-                action={() => toggleMonitoring(channel.id)}
             />
         </Menu.MenuGroup>
     );
@@ -733,6 +692,26 @@ export default definePlugin({
     authors: [{ name: "Steph", id: 0n }],
     enabledByDefault: true,
     settings,
+
+    // The "Bookmarks" group of the AgentDisc menu: in a server he owns, whether a channel he
+    // bookmarks moves under the other bookmarked ones. In a client's server (he owns Lifely's
+    // too) that changes the order everyone there sees, so it can be switched off per server.
+    toolboxActions() {
+        const { keepPlace } = settings.use(["keepPlace"]);
+        const guildId = useStateFromStores([SelectedGuildStore], () => SelectedGuildStore.getGuildId());
+        const owned = useStateFromStores([GuildStore], () => !!guildId && GuildStore.getGuild(guildId)?.ownerId === UserStore.getCurrentUser()?.id, [guildId]);
+        if (!guildId || !owned) return [];
+        const moves = !keepPlace?.[guildId];
+        return [
+            <Menu.MenuCheckboxItem key="move" id="agentdisc-bookmark-move" label="Move a new bookmark under the others in this server" checked={moves}
+                action={() => {
+                    const next = { ...settings.store.keepPlace };
+                    if (moves) next[guildId] = true;
+                    else delete next[guildId];
+                    settings.store.keepPlace = next;
+                }} />
+        ];
+    },
 
     contextMenus: {
         "channel-context": priorityMenu,

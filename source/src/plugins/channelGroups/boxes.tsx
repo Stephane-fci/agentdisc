@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { ChannelStore, createRoot, GuildChannelStore, NavigationRouter, RestAPI, SelectedChannelStore, SelectedGuildStore, showToast, Toasts, useState } from "@webpack/common";
+import { ChannelStore, createRoot, GuildChannelStore, GuildStore, NavigationRouter, RestAPI, SelectedChannelStore, SelectedGuildStore, showToast, Toasts, UserStore, useState } from "@webpack/common";
 import type { Root } from "react-dom/client";
 
 // New channel and rename (Stephane, 6 Oct): one small box in the middle of the screen,
@@ -300,6 +300,39 @@ function leadingEmoji(name: string): string | null {
     const first = new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(name.trim())[Symbol.iterator]().next().value?.segment;
     if (!first || !/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(first)) return null;
     return first.replace(/[\uFE0E\uFE0F]/g, "");
+}
+
+// Discord's own order of a list: by position, then the older channel first.
+const byPlace = (a: any, b: any) => (a.position ?? 0) - (b.position ?? 0) || a.id.length - b.id.length || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+// A channel he has just bookmarked moves to the end of the bookmarked channels of its own
+// list (Stephane, 19 Oct: "I want it to be moved automatically at the end of the bookmarked
+// channels"): right under the last bookmarked one, or to the top of its list when none is.
+// It stays in its category, or out of any. Only in servers he owns: in a client's server,
+// moving a channel would change everybody's list there.
+export async function moveAfterBookmarks(channelId: string, isBookmarked: (id: string) => boolean) {
+    const channel = ChannelStore.getChannel(channelId);
+    if (!channel?.guild_id || channel.isThread?.() || channel.type === CATEGORY) return;
+    const guild = GuildStore.getGuild(channel.guild_id);
+    if (!guild || guild.ownerId !== UserStore.getCurrentUser()?.id) return;
+    const lists = GuildChannelStore.getChannels(guild.id) as any;
+    const records = (entries: any[] | undefined) => (entries ?? []).map(e => e.channel).filter(Boolean);
+    const selectable = records(lists?.SELECTABLE);
+    // Text channels and voice channels are ordered apart; the channel moves among its own kind.
+    const group = selectable.some(c => c.id === channel.id) ? selectable : records(lists?.VOCAL);
+    const parentId = channel.parent_id ?? null;
+    const row = group.filter(c => (c.parent_id ?? null) === parentId).sort(byPlace);
+    const others = row.filter(c => c.id !== channel.id);
+    let at = 0;
+    others.forEach((c, i) => { if (isBookmarked(c.id)) at = i + 1; });
+    const order = [...others.slice(0, at), channel, ...others.slice(at)];
+    if (order.every((c, i) => c.id === row[i]?.id)) return;
+    const changes = order.map((c, i) => ({ c, i })).filter(({ c, i }) => c.position !== i).map(({ c, i }) => ({ id: c.id, position: i }));
+    try {
+        await RestAPI.patch({ url: `/guilds/${guild.id}/channels`, body: changes });
+    } catch (e) {
+        showToast(`Bookmarked, but it could not move up: ${errorText(e)}`, Toasts.Type.FAILURE);
+    }
 }
 
 export async function tidyChannel(): Promise<boolean> {

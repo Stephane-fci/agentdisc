@@ -21,7 +21,7 @@ import "./styles.css";
 import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { togglePriority, useMonitored, usePriority } from "@plugins/channelGroups";
+import { togglePriority, usePriority } from "@plugins/channelGroups";
 import { ChannelSectionStore, isHidden, isLeftPanelHidden, settings as panelSettings, toggleLeftPanel, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
 import { Devs } from "@utils/constants";
 import { copyWithToast } from "@utils/discord";
@@ -121,20 +121,17 @@ function TopIcon({ children }: PropsWithChildren) {
     );
 }
 
-// The priority flag: red while the channel or thread being read is marked, purple while
-// it is monitored.
-const FlagIcon = ({ colour }: { colour: string | null; }) => (
+// The priority flag: red while the channel or thread being read is marked.
+const FlagIcon = ({ on }: { on: boolean; }) => (
     <TopIcon>
-        <path d="M5 21V4m0 0h11.5l-2 4 2 4H5" fill={colour ?? "none"} stroke={colour ?? "currentColor"} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        <path d="M5 21V4m0 0h11.5l-2 4 2 4H5" fill={on ? "#f23f43" : "none"} stroke={on ? "#f23f43" : "currentColor"} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
     </TopIcon>
 );
 
 function PriorityButton({ channelId }: { channelId: string; }) {
     const on = usePriority(channelId);
-    const monitored = useMonitored(channelId);
-    const tooltip = monitored ? "Monitoring: remove bookmark (Ctrl+B), stop monitoring (Ctrl+M)" : on ? "Remove bookmark (Ctrl+B)" : "Bookmark (Ctrl+B)";
     return (
-        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => togglePriority(channelId)} tooltip={tooltip} icon={() => <FlagIcon colour={monitored ? "#a970ff" : on ? "#f23f43" : null} />} selected={on} />
+        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => togglePriority(channelId)} tooltip={on ? "Remove bookmark (Ctrl+B)" : "Bookmark (Ctrl+B)"} icon={() => <FlagIcon on={on} />} selected={on} />
     );
 }
 

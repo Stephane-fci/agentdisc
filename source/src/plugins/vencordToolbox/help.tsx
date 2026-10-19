@@ -13,8 +13,7 @@ const SHORTCUTS: [string, string][] = [
     ["Ctrl+O", "Find a channel or thread in this server, with its category and last message day; when none has the name typed, the last line creates it"],
     ["Ctrl+P", "Create a channel at the bottom of the channels with no category: small letters and hyphens as you type, a category's emoji added when you pick one (also from Ctrl+O when no channel has that name)"],
     ["Ctrl+R", "Rename this channel or thread (or click its name at the top)"],
-    ["Ctrl+B", "Bookmark this channel or thread, or remove the bookmark"],
-    ["Ctrl+M", "Monitor this channel or thread (purple bookmark), or stop monitoring it"],
+    ["Ctrl+B", "Bookmark this channel or thread (a channel moves under the other bookmarked ones), or remove the bookmark"],
     ["Ctrl+K", "Put this channel in its category: the one with the same emoji (or, with no emoji, the one whose name it holds), never an archive; or take it out, under the other channels above the categories"],
     ["Shift twice", "Feedback mode on or off; each tap on Ctrl: the paragraph, the sentence, a piece of it (up to a comma or colon)"],
     ["Shift + ← / →", "Hide or show the left panel (servers and channels) / the right panel; while typing, Shift with the arrows still selects text"],
@@ -31,7 +30,7 @@ const SHORTCUTS: [string, string][] = [
 const BUTTONS: [string, string][] = [
     ["Busy bar", "Top of the screen: how many conversations have an agent working in this server; green, yellow, orange, red, burning at 20, purple beyond"],
     ["Picture and arrows", "Server name: the server's picture before its name, back and forward right after it"],
-    ["Flag", "Channel bar: bookmark the channel or thread you are in; purple while you monitor it. A bookmarked line is green while an agent works, orange when something is unread (for a blue or purple line, only in the channel itself, not its folded threads), blue while an agent's next check is planned (a small clock on the line shows when), purple when monitored, yellow when quiet"],
+    ["Flag", "Channel bar: bookmark the channel or thread you are in; a newly bookmarked channel moves under the other bookmarked ones (in servers you own). A bookmarked line is green while an agent works, red when something is unread (for a blue line, only in the channel itself, not its folded threads), blue while an agent's next check is planned (a small clock on the line shows when), yellow when quiet"],
     ["Speech bubble", "Channel bar: feedback mode, click text to quote it in your reply"],
     ["Magnifier with lines", "Channel bar: find a channel"],
     ["Chain link", "Channel bar: every link posted in this channel and its threads"],

@@ -35,7 +35,7 @@ const CARD_RADIUS = 8;
 //           the mission board's orange for "needs you to check"). For a blue or purple
 //           line only its own new messages count, not its folded threads (18 Oct).
 //   blue    an agent has planned its next check there and nothing needs him (18 Oct, the
-//           mission board's Waiting blue); a hover on the line says when it is due
+//           mission board's Waiting blue; no hover label since 19 Oct, his ask)
 //   purple  he monitors it: he follows it closely with nothing to do (18 Oct, Ctrl+M)
 //   yellow  quiet: no agent, nothing unread
 // A tint, a bar on the left and white text; when it is also the open one, it keeps the
@@ -49,10 +49,7 @@ export const PRIORITY_COLOURS: Record<PriorityState, string> = {
     yellow: "#f0b232"
 };
 
-export interface PriorityItem { id: string; state: PriorityState; due?: string; }
-
-// The words of a hover label go inside a CSS string.
-const cssText = (text: string) => '"' + text.replace(/[\\"\n]/g, " ") + '"';
+export interface PriorityItem { id: string; state: PriorityState; }
 
 export function buildPriorityCss(items: PriorityItem[], line?: GroupClasses["line"]) {
     if (!items.length || !line) return "";
@@ -68,13 +65,6 @@ export function buildPriorityCss(items: PriorityItem[], line?: GroupClasses["lin
         );
     }
     rules.push(`${items.map(i => `${rowOf(i.id)} ${sel(line.name)}`).join(",")}{color:#fff!important}`);
-    // A waiting line says on hover when its next check is due, in a small label above it.
-    const due = items.filter(i => i.state === "blue" && i.due);
-    if (due.length) {
-        rules.push(`${due.map(i => `${rowOf(i.id)} ${sel(line.link)}`).join(",")}{position:relative}`);
-        rules.push(`${due.map(i => `${rowOf(i.id)}:hover ${sel(line.link)}:after`).join(",")}{position:absolute;left:8px;bottom:calc(100% + 4px);z-index:100;padding:4px 8px;border-radius:4px;background:#111214;color:#fff;font-size:12px;font-weight:500;line-height:16px;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgb(0 0 0 / 50%)}`);
-        for (const i of due) rules.push(`${rowOf(i.id)}:hover ${sel(line.link)}:after{content:${cssText(i.due!)}}`);
-    }
     return rules.join("\n");
 }
 

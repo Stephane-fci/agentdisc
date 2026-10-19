@@ -31,7 +31,7 @@ const SHORTCUTS: [string, string][] = [
 const BUTTONS: [string, string][] = [
     ["Busy bar", "Top of the screen: how many conversations have an agent working in this server; green, yellow, orange, red, burning at 20, purple beyond"],
     ["Picture and arrows", "Server name: the server's picture before its name, back and forward right after it"],
-    ["Flag", "Channel bar: bookmark the channel or thread you are in; purple while you monitor it. A bookmarked line is green while an agent works, orange when something is unread (for a blue or purple line, only in the channel itself, not its folded threads), blue while an agent's next check is planned (hover for when), purple when monitored, yellow when quiet"],
+    ["Flag", "Channel bar: bookmark the channel or thread you are in; purple while you monitor it. A bookmarked line is green while an agent works, orange when something is unread (for a blue or purple line, only in the channel itself, not its folded threads), blue while an agent's next check is planned, purple when monitored, yellow when quiet"],
     ["Speech bubble", "Channel bar: feedback mode, click text to quote it in your reply"],
     ["Magnifier with lines", "Channel bar: find a channel"],
     ["Chain link", "Channel bar: every link posted in this channel and its threads"],

@@ -98,18 +98,3 @@ export function stopWaits() {
     soon = null;
     waits = new Map();
 }
-
-// When the next check is due, in his own time: "today at 13:11", "Tuesday at 12:37", or
-// "any moment" once the time has passed and the agent has not started yet.
-export function dueText(times: string[]) {
-    const at = new Date(times[0]);
-    const now = new Date();
-    if (at.getTime() <= now.getTime() + 30_000) return "Next check: any moment";
-    const time = at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-    const days = Math.round((new Date(at).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86_400_000);
-    const day = days === 0 ? "today" : days === 1 ? "tomorrow" : days < 7
-        ? at.toLocaleDateString(undefined, { weekday: "long" })
-        : at.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
-    const more = times.length > 1 ? ` (${times.length} checks planned)` : "";
-    return `Next check: ${day} at ${time}${more}`;
-}

@@ -19,7 +19,7 @@ import { ActiveJoinedThreadsStore, ChannelStore, FluxDispatcher, GuildChannelSto
 
 import { openNewChannel } from "./boxes";
 import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
-import { askSoon, dueText, plannedChecks, startWaits, stopWaits } from "./waits";
+import { askSoon, plannedChecks, startWaits, stopWaits } from "./waits";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
 // under it, and a small arrow where Discord's white unread mark was folds them away or
@@ -212,7 +212,7 @@ function priorityState(id: string): PriorityItem {
             if (t !== selected) lines.push(t);
         }
     }
-    const item = (state: PriorityState, due?: string): PriorityItem => ({ id, state, due });
+    const item = (state: PriorityState): PriorityItem => ({ id, state });
     if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return item("green");
     const planned = lines.flatMap(l => plannedChecks(l) ?? []);
     // A waiting or monitored line turns orange only for new messages in itself: the folded
@@ -220,7 +220,7 @@ function priorityState(id: string): PriorityItem {
     // (Stephane, 18 Oct: "I see no blue, no purple, and Business to Build is still orange").
     const calm = planned.length > 0 || isMonitored(id);
     if ((calm ? [id] : lines).some(l => ReadStateStore.hasUnread(l))) return item("orange");
-    if (planned.length) return item("blue", dueText(planned.sort((a, b) => Date.parse(a) - Date.parse(b))));
+    if (planned.length) return item("blue");
     return item(isMonitored(id) ? "purple" : "yellow");
 }
 
@@ -236,7 +236,7 @@ function updatePriority() {
     } catch (e) {
         logger.warn("Could not read the priority lines", e);
     }
-    const key = items.map(i => i.id + i.state + (i.due ?? "")).join() + "|" + (classes.line ? "1" : "0");
+    const key = items.map(i => i.id + i.state).join() + "|" + (classes.line ? "1" : "0");
     if (key === priorityKey) return;
     priorityKey = key;
     priorityStyle.textContent = buildPriorityCss(items, classes.line);
@@ -789,6 +789,16 @@ export default definePlugin({
             replacement: {
                 match: /(\i)\|\|(\i)\|\|(!\i\(\)\.isEmpty\(\i\))\|\|(\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
                 replace: "$1||$2||(!this.category.isCollapsed&&$3)||$4||$self.keepVisible(this.id)"
+            }
+        },
+        {
+            // No "More Active Threads" box when the mouse is on a channel line (Stephane, 19 Oct:
+            // "remove ... the one that shows the threads"): Discord opened it beside every
+            // channel whose threads are folded away. The box for a channel's activities stays.
+            find: "shouldShowThreadsPopout:",
+            replacement: {
+                match: /(\{isMenuItemPopoverVisible:(\i),shouldShowThreadsPopout:\i,shouldShowActivities:\i\}=this\.state,\i=)!\2&&\i,/,
+                replace: "$1!1,"
             }
         },
         {

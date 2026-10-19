@@ -21,13 +21,13 @@ import "./style.css";
 import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { useHiddenThreads } from "@plugins/channelGroups";
+import { useHiddenThreads, useNextCheck } from "@plugins/channelGroups";
 import TypingTweaksPlugin, { buildSeveralUsers } from "@plugins/typingTweaks";
 import { Devs } from "@utils/constants";
 import { getIntlMessage } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
 import { findComponentByCodeLazy } from "@webpack";
-import { ActiveJoinedThreadsStore, GuildMemberStore, Menu, RelationshipStore, SelectedChannelStore, Tooltip, TypingStore, UserGuildSettingsStore, UserStore, UserSummaryItem, useStateFromStores } from "@webpack/common";
+import { ActiveJoinedThreadsStore, GuildMemberStore, Menu, RelationshipStore, SelectedChannelStore, Tooltip, TypingStore, useEffect, UserGuildSettingsStore, UserStore, UserSummaryItem, useState, useStateFromStores } from "@webpack/common";
 
 const ThreeDots = findComponentByCodeLazy("Math.min(1,Math.max(", "dotRadius:");
 
@@ -39,6 +39,40 @@ const enum IndicatorMode {
 function getDisplayName(guildId: string, userId: string) {
     const user = UserStore.getUser(userId);
     return GuildMemberStore.getNick(guildId, userId) ?? (user as any).globalName ?? user.username;
+}
+
+// When the next check is due, as short as fits on the line: "09:23" today, "Tue 09:23"
+// later this week, "26 Oct 09:23" further away, "now" once the time has come.
+function clockText(at: string) {
+    const due = new Date(at);
+    const now = new Date();
+    if (due.getTime() <= now.getTime() + 30_000) return "now";
+    const time = due.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    const days = Math.round((new Date(due).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86_400_000);
+    if (days === 0) return time;
+    const day = days < 6
+        ? due.toLocaleDateString(undefined, { weekday: "short" })
+        : due.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    return `${day} ${time}`;
+}
+
+// A waiting bookmark's clock (channelGroups, 19 Oct): the time of the agent's next check,
+// in the place of the photo and dots. It looks at the clock again every half minute.
+function NextCheck({ at }: { at: string; }) {
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        const timer = setInterval(() => setTick(t => t + 1), 30_000);
+        return () => clearInterval(timer);
+    }, []);
+    return (
+        <div className="vc-next-check" aria-label={`Next check ${clockText(at)}`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.4" />
+                <path d="M12 7v5l3.5 2" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>{clockText(at)}</span>
+        </div>
+    );
 }
 
 function TypingIndicator({ channelId, guildId }: { channelId: string; guildId: string; }) {
@@ -61,6 +95,9 @@ function TypingIndicator({ channelId, guildId }: { channelId: string; guildId: s
         }
     );
     const currentChannelId = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
+    // A waiting bookmark has no agent at work: its clock takes the place of the dots.
+    const nextCheck = useNextCheck(channelId);
+    if (nextCheck) return <NextCheck at={nextCheck} />;
 
     if (!settings.store.includeMutedChannels) {
         const isChannelMuted = UserGuildSettingsStore.isChannelMuted(guildId, channelId);

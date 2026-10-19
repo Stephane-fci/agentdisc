@@ -36,3 +36,19 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.55; }
 }
+
+.vc-next-check {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: #fff;
+    background: rgb(75 163 245 / 32%);
+}

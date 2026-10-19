@@ -212,7 +212,7 @@ function priorityState(id: string): PriorityItem {
             if (t !== selected) lines.push(t);
         }
     }
-    const item = (state: PriorityState): PriorityItem => ({ id, state });
+    const item = (state: PriorityState, next?: string): PriorityItem => ({ id, state, next });
     if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return item("green");
     const planned = lines.flatMap(l => plannedChecks(l) ?? []);
     // A waiting or monitored line turns orange only for new messages in itself: the folded
@@ -220,7 +220,7 @@ function priorityState(id: string): PriorityItem {
     // (Stephane, 18 Oct: "I see no blue, no purple, and Business to Build is still orange").
     const calm = planned.length > 0 || isMonitored(id);
     if ((calm ? [id] : lines).some(l => ReadStateStore.hasUnread(l))) return item("orange");
-    if (planned.length) return item("blue");
+    if (planned.length) return item("blue", planned.reduce((a, b) => Date.parse(a) <= Date.parse(b) ? a : b));
     return item(isMonitored(id) ? "purple" : "yellow");
 }
 
@@ -236,10 +236,32 @@ function updatePriority() {
     } catch (e) {
         logger.warn("Could not read the priority lines", e);
     }
-    const key = items.map(i => i.id + i.state).join() + "|" + (classes.line ? "1" : "0");
+    const key = items.map(i => i.id + i.state + (i.next ?? "")).join() + "|" + (classes.line ? "1" : "0");
     if (key === priorityKey) return;
     priorityKey = key;
     priorityStyle.textContent = buildPriorityCss(items, classes.line);
+    setNextChecks(new Map(items.filter(i => i.next).map(i => [i.id, i.next!])));
+}
+
+// A blue line shows a small clock with the time of its next check where the agent's photo
+// and dots go while one works (Stephane, 19 Oct: "a clock that shows the time of the next
+// check so I still know that something is going on here"). The channel list asks here.
+let nextChecks = new Map<string, string>();
+const nextListeners = new Set<() => void>();
+
+function setNextChecks(next: Map<string, string>) {
+    if (next.size === nextChecks.size && [...next].every(([id, at]) => nextChecks.get(id) === at)) return;
+    nextChecks = next;
+    nextListeners.forEach(l => l());
+}
+
+export function useNextCheck(id: string | null | undefined) {
+    const [, redraw] = useReducer((n: number) => n + 1, 0);
+    useEffect(() => {
+        nextListeners.add(redraw);
+        return () => void nextListeners.delete(redraw);
+    }, []);
+    return id ? nextChecks.get(id) ?? null : null;
 }
 
 // Typing and reading change often; the colours are worked out again at most once a frame.
@@ -872,6 +894,7 @@ export default definePlugin({
         priorityStyle?.remove();
         priorityStyle = null;
         priorityKey = "";
+        setNextChecks(new Map());
         refreshLists(Object.keys(settings.store.priority ?? {}));
         redrawList();
     }

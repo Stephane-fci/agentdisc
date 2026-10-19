@@ -49,7 +49,8 @@ export const PRIORITY_COLOURS: Record<PriorityState, string> = {
     yellow: "#f0b232"
 };
 
-export interface PriorityItem { id: string; state: PriorityState; }
+// next: for a blue line, when its soonest planned check is due (the clock on the line).
+export interface PriorityItem { id: string; state: PriorityState; next?: string; }
 
 export function buildPriorityCss(items: PriorityItem[], line?: GroupClasses["line"]) {
     if (!items.length || !line) return "";

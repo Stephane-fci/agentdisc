@@ -279,6 +279,18 @@ function lookUp(part: Part, attempt = 1) {
 
 // The channel header (name, topic, buttons above the messages), for the rename on a click
 // of the channel name.
+// The channel's name above the messages and the server's name above the channels, for a
+// theme's title font (Ivory, 20 Oct). Empty until Discord's class names are found.
+export function titleSelectors(): string[] {
+    const sel = (cls: string) => cls.split(" ").map(c => "." + c).join("");
+    const out: string[] = [];
+    const header = channelHeaderSelector();
+    if (header) out.push(header);
+    const H = classes.serverHeader;
+    if (H?.header) out.push(sel(H.header));
+    return out;
+}
+
 export function channelHeaderSelector() {
     const C = classes.chat;
     if (!C?.chat || !C.title) return null;

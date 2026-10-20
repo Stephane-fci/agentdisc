@@ -21,11 +21,17 @@ export interface GroupClasses {
 
 const sel = (cls: string) => cls.split(" ").map(c => "." + c).join("");
 
-export const SELECTED = "#5865f2";
+export const SELECTED = "var(--agentdisc-selected,#5865f2)";
+// A light theme sets these (Ivory, 20 Oct); without one they are the dark look's values.
+const SELECTED_TEXT = "var(--agentdisc-selected-text,#fff)";
+const SELECTED_GLOW = "var(--agentdisc-selected-glow,rgb(88 101 242 / 40%))";
+const SELECTED_RING = "var(--agentdisc-selected-ring,rgb(255 255 255 / 14%))";
+const LINE_TEXT = "var(--agentdisc-bookmark-text,#fff)";
+const TINT = "var(--agentdisc-tint,22%)";
 // The soft blue card: a channel whose threads are open sits on it together with its
 // threads (Stephane, 1 Oct: "If it has a thread and the dropdown is open, threads and the
 // main channel have the same blue color"). Other channels stay as Discord draws them.
-export const CARD = "color-mix(in oklab,#5865f2 12%,transparent)";
+export const CARD = "var(--agentdisc-card,color-mix(in oklab,#5865f2 12%,transparent))";
 const CARD_RADIUS = 8;
 
 // Priority lines (Stephane, 1 Oct): a channel or thread he marks stands out until he
@@ -42,10 +48,10 @@ const CARD_RADIUS = 8;
 // purple with the coloured bar.
 export type PriorityState = "green" | "red" | "blue" | "yellow";
 export const PRIORITY_COLOURS: Record<PriorityState, string> = {
-    green: "#23a55a",
-    red: "#f23f43",
-    blue: "#4ba3f5",
-    yellow: "#f0b232"
+    green: "var(--agentdisc-green,#23a55a)",
+    red: "var(--agentdisc-red,#f23f43)",
+    blue: "var(--agentdisc-blue,#4ba3f5)",
+    yellow: "var(--agentdisc-yellow,#f0b232)"
 };
 
 // next: for a blue line, when its soonest planned check is due (the clock on the line).
@@ -60,11 +66,12 @@ export function buildPriorityCss(items: PriorityItem[], line?: GroupClasses["lin
         if (!rows.length) continue;
         const colour = PRIORITY_COLOURS[state];
         rules.push(
-            `${rows.map(r => `${r} ${sel(line.link)}`).join(",")}{background:color-mix(in oklab,${colour} 22%,transparent)!important;box-shadow:inset 3px 0 0 ${colour}!important}`,
-            `${rows.map(r => `${r}${sel(line.modeSelected)} ${sel(line.link)}`).join(",")}{background:${SELECTED}!important;box-shadow:inset 4px 0 0 ${colour},0 2px 10px rgb(88 101 242 / 40%)!important}`
+            `${rows.map(r => `${r} ${sel(line.link)}`).join(",")}{background:color-mix(in oklab,${colour} ${TINT},transparent)!important;box-shadow:inset 3px 0 0 ${colour}!important}`,
+            `${rows.map(r => `${r}${sel(line.modeSelected)} ${sel(line.link)}`).join(",")}{background:${SELECTED}!important;box-shadow:inset 4px 0 0 ${colour},0 2px 10px ${SELECTED_GLOW}!important}`
         );
     }
-    rules.push(`${items.map(i => `${rowOf(i.id)} ${sel(line.name)}`).join(",")}{color:#fff!important}`);
+    rules.push(`${items.map(i => `${rowOf(i.id)} ${sel(line.name)}`).join(",")}{color:${LINE_TEXT}!important}`);
+    rules.push(`${items.map(i => `${rowOf(i.id)}${sel(line.modeSelected)} ${sel(line.name)}`).join(",")}{color:${SELECTED_TEXT}!important}`);
     return rules.join("\n");
 }
 
@@ -80,8 +87,8 @@ export function buildGroupCss({ line, group }: GroupClasses) {
             `${sel(line.typeThread)} ${sel(line.link)}{padding-block:${4 - THREAD_TRIM / 2}px!important}`,
             // The channel or thread being read stands out at a glance (Stephane, 1 Oct):
             // a solid purple line with white text instead of Discord's faint grey.
-            `${selected} ${sel(line.link)},${selected}:hover ${sel(line.link)}{background:${SELECTED}!important;box-shadow:inset 0 0 0 1px rgb(255 255 255 / 14%),0 2px 10px rgb(88 101 242 / 40%)}`,
-            `${selected} ${sel(line.name)},${selected}:hover ${sel(line.name)},${selected} ${sel(line.icon)},${selected}:hover ${sel(line.icon)}{color:#fff!important}`
+            `${selected} ${sel(line.link)},${selected}:hover ${sel(line.link)}{background:${SELECTED}!important;box-shadow:inset 0 0 0 1px ${SELECTED_RING},0 2px 10px ${SELECTED_GLOW}}`,
+            `${selected} ${sel(line.name)},${selected}:hover ${sel(line.name)},${selected} ${sel(line.icon)},${selected}:hover ${sel(line.icon)}{color:${SELECTED_TEXT}!important}`
         );
     }
 

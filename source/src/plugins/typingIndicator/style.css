@@ -49,6 +49,6 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    color: #fff;
-    background: rgb(75 163 245 / 32%);
+    color: var(--agentdisc-pill-text, #fff);
+    background: color-mix(in oklab, var(--agentdisc-blue, #4ba3f5) var(--agentdisc-pill-mix, 32%), transparent);
 }

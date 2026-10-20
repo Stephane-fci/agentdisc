@@ -13,7 +13,7 @@ AgentDisc is a Chrome extension that makes Discord in the browser calmer and eas
 - **Links panel:** every link posted in a channel, with its date and a jump to the message.
 - **Panels you can hide:** the server list, the channel header, the account bar and more, each with its own switch.
 - **Read aloud:** a play button on every message reads it in a natural Google voice, and the words light up as they are read.
-- **Midnight theme and left-hand shortcuts:** a calm dark theme, and Alt with Z Q S D (or W A S D) to move between channels.
+- **Midnight and Ivory themes, left-hand shortcuts:** a calm dark theme or a warm light one (ivory paper, clay orange, serif titles), and Alt with Z Q S D (or W A S D) to move between channels.
 
 The full tour is in `WHAT-AGENTDISC-DOES.md`.
 

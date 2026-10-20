@@ -53,6 +53,9 @@ let slot: HTMLElement | null = null;
 let raf = 0;
 let last = "";
 let full = false;
+// The look AgentDisc shows ("ivory" or "dark", from the theme switch), so the board can match
+// it (asked of the board on 20 Oct); a board that does not know the message ignores it.
+let look = "dark";
 let dim: HTMLElement | null = null;
 // The space left free all round the big board.
 const MARGIN = 24;
@@ -119,6 +122,12 @@ export function detachSlot(element: HTMLElement) {
     if (!raf) raf = requestAnimationFrame(place);
 }
 
+export function setBoardLook(next: string) {
+    if (next === look) return;
+    look = next;
+    if (origin && frame?.contentWindow && loaded) frame.contentWindow.postMessage({ type: "mission-control:look", look }, origin);
+}
+
 // The board's own button shows the real size only once it hears it from here.
 function tellSize() {
     if (origin && frame?.contentWindow) frame.contentWindow.postMessage({ type: "mission-control:size", full }, origin);
@@ -166,7 +175,7 @@ export function showBoard(channelId: string, threadId: string | null) {
     if (!loaded || !f.contentWindow) {
         loaded = false;
         // grow=1: the board offers its full-screen button, which this app answers.
-        f.src = `${origin}/c/${channelId}?panel=1&grow=1${threadId ? `&thread=${threadId}` : ""}`;
+        f.src = `${origin}/c/${channelId}?panel=1&grow=1&look=${look}${threadId ? `&thread=${threadId}` : ""}`;
         return;
     }
     f.contentWindow.postMessage({ type: "mission-control:show", channel: channelId, thread: threadId }, origin);

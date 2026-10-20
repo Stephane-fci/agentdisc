@@ -293,7 +293,7 @@
 /* Feedback mode: the sentence under the mouse lights up orange, a click quotes it. */
 ::highlight(agentdisc-feedback) {
     background-color: rgb(240 140 40 / 45%);
-    color: #fff;
+    color: var(--agentdisc-feedback-text, #fff);
 }
 
 .agentdisc-feedback-on [id^="message-content-"] {
@@ -359,7 +359,7 @@
 }
 
 .agentdisc-side-dot.agentdisc-side-on circle:not([fill]) {
-    fill: #fff;
+    fill: var(--agentdisc-map-on, #fff);
 }
 
 .agentdisc-side-dot.agentdisc-side-on text {

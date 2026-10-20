@@ -82,7 +82,7 @@ Ctrl+Alt+F switches "chat only" on and off: it hides the server list, channel li
 
 ## Theme
 
-Midnight: a near-black channel list, a slightly lighter chat so the two stand apart, and a dark message box. Or Discord's normal dark look. Both work over Discord's own Dark theme (Discord settings, Appearance). Messages keep the same background when the mouse passes over them, so the chat stays still.
+Midnight: a near-black channel list, a slightly lighter chat so the two stand apart, and a dark message box. Or Discord's normal dark look. Both work over Discord's own Dark theme (Discord settings, Appearance). Ivory is a light look instead: warm ivory paper from the server column to the chat, dark ink text, clay orange links and highlights, the Inter font and serif titles for the channel and server names, with AgentDisc's own colours (bookmarks, clocks, the open channel as a white card) made for light paper. Choosing Ivory switches Discord to its light look on this computer only; your Discord account's own setting, and so your phone and other computers, stay as they are, and choosing another theme brings the dark look back. The mission board in the right panel keeps its own look. Messages keep the same background when the mouse passes over them, so the chat stays still.
 
 ## Moving around with the keyboard
 

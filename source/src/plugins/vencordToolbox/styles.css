@@ -824,6 +824,21 @@ svg.agentdisc-copy-sign {
     color-scheme: dark;
 }
 
+/* The board big, over almost the whole window (20 Oct), above a dim layer that a click closes. */
+.agentdisc-board-frame.agentdisc-board-full {
+    z-index: 1001;
+    border-radius: 12px;
+    background: #0a0a0c;
+    box-shadow: 0 16px 56px rgb(0 0 0 / 65%), 0 0 0 1px rgb(255 255 255 / 8%);
+}
+
+.agentdisc-board-dim {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgb(0 0 0 / 55%);
+}
+
 /* While the panel's edge is dragged, the frame lets the mouse through. */
 .agentdisc-resizing .agentdisc-board-frame {
     pointer-events: none;

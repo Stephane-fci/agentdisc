@@ -36,7 +36,7 @@ The mirrored panel icon in the channel bar folds the whole right panel away or o
 
 ## A mission board in the right panel
 
-Where a mission board (one simple Kanban board per channel) is set up on your computer, the right panel shows the board of the channel you are in instead of the map, the calendar and the member list. It follows you as you change channel, without reloading, and marks the card of the thread you are in; a click on a card's thread opens that thread. The board opens without a login, through a key kept in your browser. "Mission board in the right panel" in the Panels group of the AgentDisc menu switches back to the map, the calendar and the members. Without a board set up, the right panel stays as described above.
+Where a mission board (one simple Kanban board per channel) is set up on your computer, the right panel shows the board of the channel you are in instead of the map, the calendar and the member list. It follows you as you change channel, without reloading, and marks the card of the thread you are in; a click on a card's thread opens that thread. The board opens without a login, through a key kept in your browser. The board's full-screen button grows it over almost the whole window, over a dimmed Discord, and it keeps following the channel you open; a click on the dimmed part, Esc, the same button, or opening a card's message puts it back in the panel. "Mission board in the right panel" in the Panels group of the AgentDisc menu switches back to the map, the calendar and the members. Without a board set up, the right panel stays as described above.
 
 ## Copy a link
 

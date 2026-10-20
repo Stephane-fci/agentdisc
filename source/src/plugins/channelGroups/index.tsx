@@ -795,11 +795,13 @@ export default definePlugin({
         {
             // No "More Active Threads" box when the mouse is on a channel line (Stephane, 19 Oct:
             // "remove ... the one that shows the threads"): Discord opened it beside every
-            // channel whose threads are folded away. The box for a channel's activities stays.
+            // channel whose threads are folded away. The one place that opens it, when the mouse
+            // rests on the line, does nothing now (the first hook, on the line's drawing, broke
+            // with Discord's 20 Oct update). The box for a channel's activities stays.
             find: "shouldShowThreadsPopout:",
             replacement: {
-                match: /(\{isMenuItemPopoverVisible:(\i),shouldShowThreadsPopout:\i,shouldShowActivities:\i\}=this\.state,\i=)!\2&&\i,/,
-                replace: "$1!1,"
+                match: /this\.setState\(\{shouldShowThreadsPopout:!0\}\)/,
+                replace: "void 0"
             }
         },
         {

@@ -292,6 +292,13 @@ export function serverHeaderSelector(): string {
     return H?.header ? H.header.split(" ").map(c => "." + c).join("") : "";
 }
 
+// The chat area (header, messages and right panel), for a theme's white sheet (Ivory, 21
+// Oct). Empty until found.
+export function chatSelector(): string {
+    const C = classes.chat;
+    return C?.chat ? C.chat.split(" ").map(c => "." + c).join("") : "";
+}
+
 export function channelHeaderSelector() {
     const C = classes.chat;
     if (!C?.chat || !C.title) return null;

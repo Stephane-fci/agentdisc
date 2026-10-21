@@ -57,13 +57,24 @@ let full = false;
 // it (asked of the board on 20 Oct); a board that does not know the message ignores it.
 let look = "dark";
 let dim: HTMLElement | null = null;
-// The space left free all round the big board.
-const MARGIN = 24;
+// The panel's resize handle sits on its left edge; the frame leaves it free (styles.css).
+//
+// Chrome itself keeps the frame on the panel's place (CSS anchor positioning, 21 Oct): the
+// place is the anchor and the frame follows it through every resize with no script running.
+// Before, a script measured the place on every screen refresh, all day long, which kept the
+// computer busy for nothing (his lag report, 21 Oct). A watcher on the place's size only
+// hides the frame when the place is gone or too small. A browser without anchors keeps the
+// old way.
+const ANCHORS = typeof CSS !== "undefined" && CSS.supports?.("anchor-name: --agentdisc-board") === true;
+const ANCHOR = "--agentdisc-board";
+const HANDLE = 4;
+let seen = false;
+let watcher: ResizeObserver | null = null;
 
 function boardFrame() {
     if (frame) return frame;
     frame = document.createElement("iframe");
-    frame.className = "agentdisc-board-frame";
+    frame.className = "agentdisc-board-frame" + (ANCHORS ? " agentdisc-board-anchored" : "");
     frame.title = "Mission board";
     // Chrome fires a load for the empty frame the moment it is added; only the board's own
     // page counts.
@@ -72,23 +83,20 @@ function boardFrame() {
     return frame;
 }
 
-// The panel's resize handle sits on its left edge; the frame leaves it free.
-const HANDLE = 4;
+function show(on: boolean) {
+    if (frame) frame.style.display = on ? "block" : "none";
+}
 
 function place() {
     raf = 0;
     if (!frame) return;
-    // Big, the frame keeps its place whatever the panel does; the window's size follows by itself.
-    if (full) {
-        if (last !== "full") {
-            last = "full";
-            Object.assign(frame.style, {
-                display: "block",
-                left: `${MARGIN}px`,
-                top: `${MARGIN}px`,
-                width: `calc(100vw - ${2 * MARGIN}px)`,
-                height: `calc(100vh - ${2 * MARGIN}px)`
-            });
+    // Big, the frame keeps its place whatever the panel does (styles.css, agentdisc-board-full).
+    if (full || ANCHORS) {
+        const next = full ? "full" : seen && slot ? "shown" : "hidden";
+        if (next !== last) {
+            last = next;
+            if (!ANCHORS) Object.assign(frame.style, { left: "", top: "", width: "", height: "" });
+            show(next !== "hidden");
         }
         return;
     }
@@ -97,7 +105,7 @@ function place() {
     const next = visible ? `${rect!.left + HANDLE}|${rect!.top}|${rect!.width - HANDLE}|${rect!.height}` : "hidden";
     if (next !== last) {
         last = next;
-        if (!visible) frame.style.display = "none";
+        if (!visible) show(false);
         else Object.assign(frame.style, {
             display: "block",
             left: `${rect!.left + HANDLE}px`,
@@ -109,17 +117,36 @@ function place() {
     if (slot) raf = requestAnimationFrame(place);
 }
 
+function schedule() {
+    if (!raf) raf = requestAnimationFrame(place);
+}
+
 // The panel's place is on screen: lay the frame over it and keep it there.
 export function attachSlot(element: HTMLElement) {
+    if (slot && slot !== element) slot.style.removeProperty("anchor-name");
     slot = element;
     boardFrame();
-    if (!raf) raf = requestAnimationFrame(place);
+    if (ANCHORS) {
+        element.style.setProperty("anchor-name", ANCHOR);
+        seen = false;
+        watcher ??= new ResizeObserver(entries => {
+            const box = entries[entries.length - 1]?.contentRect;
+            seen = !!box && box.width > 40 && box.height > 40;
+            schedule();
+        });
+        watcher.disconnect();
+        watcher.observe(element);
+    }
+    schedule();
 }
 
 export function detachSlot(element: HTMLElement) {
     if (slot !== element) return;
+    element.style.removeProperty("anchor-name");
+    watcher?.disconnect();
+    seen = false;
     slot = null;
-    if (!raf) raf = requestAnimationFrame(place);
+    schedule();
 }
 
 export function setBoardLook(next: string) {
@@ -160,7 +187,7 @@ function setFull(next: boolean) {
         document.removeEventListener("keydown", onEscape, true);
     }
     last = "";
-    if (!raf) raf = requestAnimationFrame(place);
+    schedule();
     tellSize();
 }
 
@@ -214,6 +241,10 @@ export function stopBoard() {
     setFull(false);
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
+    watcher?.disconnect();
+    watcher = null;
+    seen = false;
+    slot?.style.removeProperty("anchor-name");
     frame?.remove();
     frame = null;
     loaded = false;

@@ -94,7 +94,10 @@ export function buildGroupCss({ line, group }: GroupClasses) {
             `${selected} ${sel(line.name)},${selected}:hover ${sel(line.name)},${selected} ${sel(line.icon)},${selected}:hover ${sel(line.icon)}{color:${SELECTED_TEXT}!important}`,
             // Ivory (21 Oct, his "We still have those hashtags"): no # before channel names;
             // a bookmarked line shows a dot of its colour there instead (buildPriorityCss).
-            `html[data-agentdisc-look="ivory"] ${sel(line.icon)}{opacity:0!important}`
+            `html[data-agentdisc-look="ivory"] ${sel(line.icon)}{opacity:0!important}`,
+            // Ivory's open line is dark ink (21 Oct): Discord's small buttons on it (invite,
+            // settings) turn light too, instead of grey on dark.
+            `html[data-agentdisc-look="ivory"] ${selected}{--interactive-icon-default:#D1CFC5;--interactive-icon-hover:#FAF9F5;--interactive-icon-active:#FAF9F5;--interactive-text-default:#FAF9F5;--interactive-text-hover:#FAF9F5;--interactive-text-active:#FAF9F5;--channel-icon:#D1CFC5}`
         );
     }
 

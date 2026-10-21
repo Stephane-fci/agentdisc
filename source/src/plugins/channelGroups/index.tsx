@@ -238,18 +238,12 @@ function queuePriority() {
     });
 }
 
-// The lines whose planned checks are asked for: every bookmark, and the open threads of a
-// folded bookmarked channel, whose state shows on the channel line.
+// The lines whose planned checks are asked for: the bookmarks only. A folded channel's
+// threads need no question of their own: the board asked for a thread answers with its
+// channel's whole board, which the channel's own question already brings, cards' threads
+// included (21 Oct, fewer and smaller reads after his lag report).
 function bookmarkedLines() {
-    const out = new Set<string>();
-    for (const id of Object.keys(settings.store.priority ?? {})) {
-        out.add(id);
-        const channel = ChannelStore.getChannel(id);
-        if (channel?.guild_id && isFolded(id)) {
-            for (const t of Object.keys(ActiveJoinedThreadsStore.getActiveJoinedThreadsForParent(channel.guild_id, id) ?? {})) out.add(t);
-        }
-    }
-    return [...out];
+    return Object.keys(settings.store.priority ?? {});
 }
 
 const PRIORITY_STORES = () => [TypingStore, ReadStateStore, SelectedChannelStore, ActiveJoinedThreadsStore] as any[];

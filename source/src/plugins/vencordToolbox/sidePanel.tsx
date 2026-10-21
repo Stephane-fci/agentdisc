@@ -79,6 +79,7 @@ function useMapOptions() {
 // fitting alone would blow them up to fill the box (Stephane, 7 Oct, on a new channel).
 function fit(fg: any, ms: number) {
     if (!fg) return;
+    fg.__wake?.(ms + 300);
     fg.zoomToFit(ms, 55);
     const cap = () => {
         if (fg.zoom() > 1.6) fg.zoom(1.6, ms ? 200 : 0);
@@ -187,13 +188,48 @@ function LinkMap({ channel }: { channel: any; }) {
             .onNodeClick((n: MapNode) => {
                 if (n.kind !== "centre") NavigationRouter.transitionTo(`/channels/${n.guild ?? channel.guild_id ?? "@me"}/${n.id}`);
             })
-            .onNodeDrag(() => fg.d3ReheatSimulation?.());
+            .onNodeDrag(() => fg.d3ReheatSimulation?.())
+            .onEngineStop(() => {
+                moving = false;
+                rest(0);
+            });
         fg.d3Force("charge")?.strength(-80);
         fg.d3Force("link")?.distance(42).strength(0.6);
+        // The map's library draws it again on every screen refresh for as long as it is
+        // shown, even when nothing moves. It rests once the dots have settled and the mouse
+        // is elsewhere, and wakes for the mouse, new dots, a new size or a fit (21 Oct, his
+        // lag report).
+        let inside = false;
+        let moving = true;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const rest = (ms: number) => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+                timer = null;
+                if (!inside && !moving) fg.pauseAnimation?.();
+            }, ms + 600);
+        };
+        fg.__wake = (ms = 0) => {
+            fg.resumeAnimation?.();
+            rest(ms);
+        };
+        fg.__moved = () => {
+            moving = true;
+            fg.__wake();
+        };
+        el.addEventListener("pointerenter", () => {
+            inside = true;
+            fg.__wake();
+        });
+        el.addEventListener("pointerleave", () => {
+            inside = false;
+            rest(0);
+        });
         return fg;
     }
 
     useEffect(() => {
+        graph.current?.__wake?.();
         graph.current?.width(width).height(height);
     }, [width, height, ready]);
 
@@ -223,6 +259,7 @@ function LinkMap({ channel }: { channel: any; }) {
             if (!lines.has(a + "|" + b) && !lines.has(b + "|" + a)) lines.set(a + "|" + b, { source: a, target: b });
         }
         fg.__most = most;
+        fg.__moved?.();
         fg.graphData({ nodes, links: [...lines.values()] });
         // The whole map in view, at once and without movement: for a new channel, and when
         // its first dots arrive; later dots leave the view as he set it.
@@ -331,12 +368,28 @@ function Calendar({ channel, days }: { channel: any; days: Record<string, DayInf
     );
 }
 
+// The Discord column that holds the panel gets a mark of its own, for the few rules that
+// shape it. They first found it with :has(), which Chrome checks again for every element on
+// every change of the page (21 Oct, part of the lag he reported).
+function useHostMark(ref: React.RefObject<HTMLDivElement | null>, board: boolean) {
+    useEffect(() => {
+        const host = ref.current?.parentElement;
+        if (!host) return;
+        host.dataset.agentdiscSideHost = "";
+        if (board) host.dataset.agentdiscBoardHost = "";
+        return () => {
+            delete host.dataset.agentdiscSideHost;
+            delete host.dataset.agentdiscBoardHost;
+        };
+    }, []);
+}
+
 // The handle on the panel's left edge: drag it to make the column wider or narrower, like
 // the channel list (Stephane, 7 Oct). The width is kept.
 function ResizeHandle() {
     const onDown = (e: React.MouseEvent) => {
         e.preventDefault();
-        const aside = (e.currentTarget as HTMLElement).closest<HTMLElement>('[class*="membersWrap_"]');
+        const aside = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-agentdisc-side-host]");
         const start = e.clientX;
         const startWidth = aside?.getBoundingClientRect().width ?? 240;
         let width = startWidth;
@@ -359,8 +412,10 @@ function ResizeHandle() {
 
 function SidePanel({ channel }: { channel: any; }) {
     const { data, reading, crawlLeft } = useSideData(channel.id, channel.guild_id);
+    const ref = useRef<HTMLDivElement>(null);
+    useHostMark(ref, false);
     return (
-        <div className="agentdisc-side">
+        <div className="agentdisc-side" ref={ref}>
             <ResizeHandle />
             <LinkMap channel={channel} />
             <Calendar channel={channel} days={data?.days ?? {}} />
@@ -376,7 +431,7 @@ let widthStyle: HTMLStyleElement | null = null;
 
 export function setRightPanelWidth(width: number, keep: boolean) {
     widthStyle ??= document.head.appendChild(Object.assign(document.createElement("style"), { id: "agentdisc-right-width" }));
-    widthStyle.textContent = width > 0 ? `[class*="membersWrap_"]:has(> .agentdisc-side){--custom-member-list-width:${width}px}` : "";
+    widthStyle.textContent = width > 0 ? `[data-agentdisc-side-host]{--custom-member-list-width:${width}px}` : "";
     if (keep) Settings.plugins.VencordToolbox.rightPanelWidth = width;
 }
 
@@ -394,6 +449,7 @@ export function stopRightPanelWidth() {
 // missionBoard.ts and is laid over this place, so it survives every channel switch.
 function BoardSlot({ channelId, threadId }: { channelId: string; threadId: string | null; }) {
     const ref = useRef<HTMLDivElement>(null);
+    useHostMark(ref, true);
     useEffect(() => {
         const element = ref.current!;
         attachSlot(element);

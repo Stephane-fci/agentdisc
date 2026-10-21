@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { channelHeaderSelector, serverHeaderSelector } from "@plugins/panelSwitches";
+import { channelHeaderSelector, chatSelector, serverHeaderSelector } from "@plugins/panelSwitches";
 import { setBoardLook } from "@plugins/vencordToolbox/missionBoard";
 import definePlugin, { OptionType } from "@utils/types";
 import { FluxDispatcher, Menu, ThemeStore } from "@webpack/common";
@@ -129,9 +129,12 @@ const IVORY: Colours = {
     "--scrollbar-auto-track": "transparent",
     "--font-primary": "Inter,\"gg sans\",\"Noto Sans\",\"Helvetica Neue\",Helvetica,Arial,sans-serif",
     // AgentDisc's own colours on light paper (channelGroups, typingIndicator, the toolbox).
-    "--agentdisc-selected": "#E3E0D6",
-    "--agentdisc-selected-text": "#141413",
-    "--agentdisc-selected-glow": "transparent",
+    // The open channel: dark ink with light text, so it stands out at once (21 Oct, his "very
+    // hard to see which channel is selected": the light grey first chosen was almost the
+    // paper's own colour and the open threads' card).
+    "--agentdisc-selected": "#262624",
+    "--agentdisc-selected-text": "#FAF9F5",
+    "--agentdisc-selected-glow": "rgb(20 20 19 / 18%)",
     "--agentdisc-selected-ring": "transparent",
     "--agentdisc-card": "#E8E6DC",
     "--agentdisc-bookmark-text": "#141413",
@@ -155,28 +158,44 @@ const IVORY_FONTS = "@import url('https://fonts.googleapis.com/css2?family=Inter
 const SERIF = "'Source Serif 4',Georgia,serif";
 
 // Ivory's shape (21 Oct): the parts that only colours cannot change. The white sheet is the
-// area right of the channel list, found through panelSwitches; the rest by Discord's stable
-// name starts and by AgentDisc's own classes.
-// The chat area: an element of Discord's whose class starts with chat_, and not one inside
-// another (a thread open beside the channel has its own).
+// chat area, found through panelSwitches (Discord's own class name); the rest by Discord's
+// stable name starts and by AgentDisc's own classes.
+// Until the class name is found: an element of Discord's whose class starts with chat_.
 const CHAT_PART = ':is([class^="chat_"],[class*=" chat_"])';
-const CHAT = `${CHAT_PART}:not(${CHAT_PART} *)`;
-// The paper left around the sheet: top, right, bottom, left.
+// Not a chat inside another (a thread open beside the channel has its own).
+const outermost = (chat: string) => `${chat}:not(${chat} *)`;
+const PAPER = "#F0EEE6";
+const LINE = "#DEDCD1";
+// The paper left around the sheet: top, right, bottom, left; the sheet's line sits just
+// outside its white part, in that paper.
 const SHEET_INSET = "6px 12px 12px 4px";
+const line = (where: string, size: string) => `linear-gradient(${LINE},${LINE}) ${where}/${size} no-repeat`;
+// One round corner of the sheet, 18px square: paper outside the curve, the line on it, and
+// see-through inside, where the sheet's white shows.
+const corner = (at: string) => `radial-gradient(circle at ${at},transparent 16.5px,${LINE} 17.2px,${LINE} 17.8px,${PAPER} 18.5px)`;
 
-function ivoryShape(header: string, server: string) {
+function ivoryShape(header: string, server: string, chat: string) {
     const L = ".theme-light";
     const within = (root: string, inner: string) => root.split(",").map(r => `${L} ${r} ${inner}`).join(",");
     const titleFont = `font-family:${SERIF},"Noto Color Emoji"!important;font-weight:600!important;letter-spacing:0!important`;
+    const CHAT = outermost(chat || CHAT_PART);
     return [
         // The white sheet (his "nice white frame with the borders ... gives the whole feeling"):
-        // the chat area (header, messages and right panel), not a chat inside it, drawn inset
-        // from its own edges with round corners, so the ivory paper shows all round. Its
-        // content moves in by the same space, so nothing is cut off and no scrollbar appears.
-        `${L} ${CHAT}{padding:${SHEET_INSET}!important;box-sizing:border-box!important;clip-path:inset(${SHEET_INSET} round 18px)!important;background:#FFFFFF!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--background-gradient-chat:#FFFFFF!important;--background-gradient-lowest:#FFFFFF!important;--background-gradient-lower:#FFFFFF!important;--background-gradient-low:#FFFFFF!important;--__header-bar-background:#FFFFFF!important;border:none!important;border-radius:0!important}`,
-        `${L} ${CHAT}::after{content:"";position:absolute;inset:${SHEET_INSET};border:1px solid #DEDCD1;border-radius:18px;pointer-events:none;z-index:200}`,
+        // the chat area (header, messages and right panel) moves its content in from its own
+        // edges and paints the paper, the sheet's white and its line in that space. Only the
+        // four round corners are laid over the content, each a small square.
+        // It was first cut out with a round clip over the whole chat, which made Chrome draw
+        // the chat again into a separate picture on every scroll; together with a see-through
+        // layer over the whole chat for the line, his computer lagged (21 Oct). This draws
+        // the same sheet with nothing cut and almost nothing laid over it.
+        `${L} ${CHAT}{padding:${SHEET_INSET}!important;box-sizing:border-box!important;clip-path:none!important;background:linear-gradient(#FFFFFF,#FFFFFF) content-box,${line("left 3px top 5px", "calc(100% - 14px) 1px")},${line("left 3px bottom 11px", "calc(100% - 14px) 1px")},${line("left 3px top 5px", "1px calc(100% - 16px)")},${line("right 11px top 5px", "1px calc(100% - 16px)")},${PAPER}!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--background-gradient-chat:#FFFFFF!important;--background-gradient-lowest:#FFFFFF!important;--background-gradient-lower:#FFFFFF!important;--background-gradient-low:#FFFFFF!important;--__header-bar-background:#FFFFFF!important;border:none!important;border-radius:0!important}`,
+        `${L} ${CHAT}::before,${L} ${CHAT}::after{content:"";position:absolute;left:3px;right:11px;height:18px;pointer-events:none;z-index:200}`,
+        `${L} ${CHAT}::before{top:5px;background:${corner("100% 100%")} left top/18px 18px no-repeat,${corner("0 100%")} right top/18px 18px no-repeat}`,
+        `${L} ${CHAT}::after{bottom:11px;background:${corner("100% 0")} left bottom/18px 18px no-repeat,${corner("0 0")} right bottom/18px 18px no-repeat}`,
         // The channel name bar is part of the sheet: Discord paints it with its own two colours.
-        `${L} ${CHAT} [class*="themed_"]{background:#FFFFFF!important}`,
+        // Only the header bar's own colour part (Discord's header module writes it themed__):
+        // the first rule's themed_ also hit the typing dots and Discord's tab bars (21 Oct review).
+        `${L} ${CHAT} [class*="themed__"]{background:#FFFFFF!important}`,
         // The board laid over the panel keeps the sheet's round corner at the bottom right.
         ".agentdisc-board-frame:not(.agentdisc-board-full){border-end-end-radius:17px}",
         // The channel's name above the messages: a Garamond title, no # before it, no line under it.
@@ -305,13 +324,14 @@ function apply() {
     const looks = LOOKS[key] ?? DARK_LOOKS;
     const rule = (selector: string, set: Colours) => `${selector}{${Object.entries(set).map(([name, value]) => `${name}:${value}!important`).join(";")}}`;
     const chat = CHAT_ONLY[key];
-    const inChat = looks.flatMap(look => [`${look} [class^="chat_"]`, `${look} [class*=" chat_"]`]).join(",");
+    const chatClass = chatSelector();
+    const inChat = looks.flatMap(look => chatClass ? [`${look} ${chatClass}`] : [`${look} [class^="chat_"]`, `${look} [class*=" chat_"]`]).join(",");
     let text = colours ? rule(looks.join(","), colours) + (chat ? rule(inChat, chat) : "") : "";
     if (key === "ivory") {
         const header = channelHeaderSelector() ?? "";
         const server = serverHeaderSelector();
-        if ((!header || !server) && !titleTimer) titleTimer = setTimeout(() => { titleTimer = null; apply(); }, 2000);
-        text = IVORY_FONTS + text + ivoryShape(header, server);
+        if ((!header || !server || !chatClass) && !titleTimer) titleTimer = setTimeout(() => { titleTimer = null; apply(); }, 2000);
+        text = IVORY_FONTS + text + ivoryShape(header, server, chatClass);
     }
     style.textContent = text;
     markLook();

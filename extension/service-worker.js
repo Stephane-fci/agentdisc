@@ -120,12 +120,16 @@ async function agentWaits(ids) {
   };
   // A few at a time: the board is a small server.
   const queue = [...asked];
+  // A thread's question answers with its channel's board: one read per board is enough.
+  const read = new Set();
   async function worker() {
     for (let id; (id = queue.shift());) {
+      if (read.has(id)) continue;
       try {
         const res = await fetch(`${key.origin}/api/board/${id}`, { headers: key.headers, cache: "no-store", credentials: "omit", redirect: "manual" });
         if (!res.ok) continue;
         const board = await res.json();
+        read.add(String(board.channel));
         // One-off planned checks (wakes) and, once the board lists them, the next runs of
         // repeating jobs (jobs, same shape: { at }), for the channel and each card's thread.
         const timers = live => [...((live && live.wakes) || []), ...((live && live.jobs) || [])];

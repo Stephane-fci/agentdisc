@@ -28,7 +28,7 @@ export const ChannelSectionStore = findStoreLazy("ChannelSectionStore") as {
 };
 
 const PARTS = {
-    layout: ["guilds", "sidebar", "sidebarList", "panels", "base", "sidebarResizeHandle"],
+    layout: ["guilds", "sidebar", "sidebarList", "panels", "base", "sidebarResizeHandle", "page"],
     topBar: ["bar", "leading", "trailing", "systemBar"],
     chat: ["chat", "title", "chatContent", "threadSidebarOpen"],
     notice: ["notice", "colorDefault", "closeButton"],
@@ -280,24 +280,16 @@ function lookUp(part: Part, attempt = 1) {
 // The channel header (name, topic, buttons above the messages), for the rename on a click
 // of the channel name.
 // The area right of the channel list (chat and right panel), for a theme's white sheet
-// (Ivory, 21 Oct): the layout's child whose name starts with "page". Empty until found.
+// (Ivory, 21 Oct): Discord's own "page" part of the layout. Empty until found.
 export function pageSelector(): string {
     const L = classes.layout;
-    if (!L?.base) return "";
-    const base = L.base.split(" ").map(c => "." + c).join("");
-    return `${base}>[class^="page_"],${base}>[class*=" page_"]`;
+    return L?.page ? L.page.split(" ").map(c => "." + c).join("") : "";
 }
 
-// The channel's name above the messages and the server's name above the channels, for a
-// theme's title font (Ivory, 20 Oct). Empty until Discord's class names are found.
-export function titleSelectors(): string[] {
-    const sel = (cls: string) => cls.split(" ").map(c => "." + c).join("");
-    const out: string[] = [];
-    const header = channelHeaderSelector();
-    if (header) out.push(header);
+// The server's name bar above the channels. Empty until found.
+export function serverHeaderSelector(): string {
     const H = classes.serverHeader;
-    if (H?.header) out.push(sel(H.header));
-    return out;
+    return H?.header ? H.header.split(" ").map(c => "." + c).join("") : "";
 }
 
 export function channelHeaderSelector() {

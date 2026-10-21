@@ -67,7 +67,7 @@ export function buildPriorityCss(items: PriorityItem[], line?: GroupClasses["lin
         const colour = PRIORITY_COLOURS[state];
         // Ivory (21 Oct, his "more neat"): a small dot of the colour in place of the #, no
         // stripe on the left (the bar widths above are 0 there).
-        rules.push(`${rows.map(r => `html.agentdisc-ivory ${r} ${sel(line.icon)}`).join(",")}{color:transparent!important;background:${colour}!important;border-radius:50%!important;transform:scale(.36)}`);
+        rules.push(`${rows.map(r => `html[data-agentdisc-look="ivory"] ${r} ${sel(line.icon)}`).join(",")}{opacity:1!important;color:transparent!important;background:${colour}!important;border-radius:50%!important;transform:scale(.36)}`);
         rules.push(
             `${rows.map(r => `${r} ${sel(line.link)}`).join(",")}{background:color-mix(in oklab,${colour} ${TINT},transparent)!important;box-shadow:inset var(--agentdisc-bar,3px) 0 0 ${colour},inset 0 0 0 var(--agentdisc-hairline,0px) color-mix(in oklab,${colour} 30%,transparent)!important}`,
             `${rows.map(r => `${r}${sel(line.modeSelected)} ${sel(line.link)}`).join(",")}{background:${SELECTED}!important;box-shadow:inset var(--agentdisc-bar-selected,4px) 0 0 ${colour},0 2px 10px ${SELECTED_GLOW}!important}`
@@ -91,7 +91,10 @@ export function buildGroupCss({ line, group }: GroupClasses) {
             // The channel or thread being read stands out at a glance (Stephane, 1 Oct):
             // a solid purple line with white text instead of Discord's faint grey.
             `${selected} ${sel(line.link)},${selected}:hover ${sel(line.link)}{background:${SELECTED}!important;box-shadow:inset 0 0 0 1px ${SELECTED_RING},0 2px 10px ${SELECTED_GLOW}}`,
-            `${selected} ${sel(line.name)},${selected}:hover ${sel(line.name)},${selected} ${sel(line.icon)},${selected}:hover ${sel(line.icon)}{color:${SELECTED_TEXT}!important}`
+            `${selected} ${sel(line.name)},${selected}:hover ${sel(line.name)},${selected} ${sel(line.icon)},${selected}:hover ${sel(line.icon)}{color:${SELECTED_TEXT}!important}`,
+            // Ivory (21 Oct, his "We still have those hashtags"): no # before channel names;
+            // a bookmarked line shows a dot of its colour there instead (buildPriorityCss).
+            `html[data-agentdisc-look="ivory"] ${sel(line.icon)}{opacity:0!important}`
         );
     }
 

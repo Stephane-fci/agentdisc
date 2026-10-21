@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { pageSelector, titleSelectors } from "@plugins/panelSwitches";
+import { channelHeaderSelector, pageSelector, serverHeaderSelector } from "@plugins/panelSwitches";
 import { setBoardLook } from "@plugins/vencordToolbox/missionBoard";
 import definePlugin, { OptionType } from "@utils/types";
 import { FluxDispatcher, Menu, ThemeStore } from "@webpack/common";
@@ -156,25 +156,36 @@ const SERIF = "'EB Garamond',Georgia,serif";
 // Ivory's shape (21 Oct): the parts that only colours cannot change. The white sheet is the
 // area right of the channel list, found through panelSwitches; the rest by Discord's stable
 // name starts and by AgentDisc's own classes.
-function ivoryShape(page: string) {
+function ivoryShape(page: string, header: string, server: string) {
     const L = ".theme-light";
-    const sheet = page ? page.split(",").map(p => `${L} ${p}`).join(",") : "";
+    const within = (root: string, inner: string) => root.split(",").map(r => `${L} ${r} ${inner}`).join(",");
+    const titleFont = `font-family:${SERIF},"Noto Color Emoji"!important;font-weight:600!important;letter-spacing:0!important`;
     return [
-        sheet && `${sheet}{margin:0 12px 12px 4px!important;border-radius:18px!important;overflow:hidden!important;border:1px solid #EDEBE4!important;box-shadow:0 1px 3px rgb(20 20 19 / 4%)!important;background:#FFFFFF!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--app-frame-border:transparent!important}`,
+        // The white sheet: Discord's page part (chat and right panel) with a margin all round.
+        page && `${L} ${page}{margin:0 12px 12px 4px!important;border-radius:18px!important;overflow:hidden!important;border:1px solid #EDEBE4!important;box-shadow:0 1px 3px rgb(20 20 19 / 4%)!important;background:#FFFFFF!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--app-frame-border:transparent!important;--background-gradient-chat:#FFFFFF!important}`,
+        page && within(page, '[class^="chat_"],') + within(page, '[class*=" chat_"]') + "{border:none!important;border-radius:0!important}",
+        // The channel's name above the messages: a Garamond title, no # before it, no line under it.
+        header && `${within(header, '[class*="titleWrapper_"]')},${within(header, '[class*="titleWrapper_"] *')}{${titleFont};font-size:21px!important}`,
+        header && `${within(header, '[class*="children_"]>[class*="iconWrapper_"]:first-child')}{display:none!important}`,
+        header && `${header.split(",").map(h => `${L} ${h}`).join(",")}{box-shadow:none!important;border-bottom:none!important}`,
+        // The server's name above the channels, in the same title font.
+        server && `${server.split(",").map(h => `${L} ${h}`).join(",")},${within(server, "*")}{${titleFont}}`,
+        server && `${within(server, "h1")},${within(server, "h2")},${within(server, '[class*="name_"]')}{font-size:21px!important}`,
         // A reading column in the middle, and the message box under it.
         `${L} ol[data-list-id="chat-messages"]{max-width:860px!important;margin-inline:auto!important;width:100%!important}`,
         `${L} [class*="chatContent_"]>form{max-width:860px!important;margin-inline:auto!important;width:100%!important}`,
         `${L} [class*="channelTextArea_"]{border-radius:24px!important;border:1px solid #E8E6DC!important;box-shadow:0 2px 8px rgb(20 20 19 / 5%)!important;background:#FFFFFF!important}`,
         `${L} [class*="channelTextArea_"]>[class*="scrollableContainer_"]{border-radius:24px!important;background:#FFFFFF!important}`,
         // The tools above the channels: plain grey line icons, no squares.
-        "html.agentdisc-ivory .vc-list-icon{background:transparent!important;color:#87867F!important}",
-        "html.agentdisc-ivory .vc-list-icon:hover:not(:disabled),html.agentdisc-ivory .vc-list-icon-on{background:rgb(20 20 19 / 6%)!important;color:#141413!important}",
-        "html.agentdisc-ivory .vc-list-icon-warn{background:transparent!important;color:#C4473B!important}",
+        ".vc-list-icon{background:transparent!important;color:#87867F!important}",
+        ".vc-list-icon:hover:not(:disabled),.vc-list-icon-on{background:rgb(20 20 19 / 6%)!important;color:#141413!important}",
+        ".vc-list-icon-warn{background:transparent!important;color:#C4473B!important}",
         // The busy bar: a slim line along the top, its words in quiet grey.
-        "html.agentdisc-ivory .agentdisc-busy-fill{height:3px!important;background:var(--busy)!important}",
-        "html.agentdisc-ivory .agentdisc-busy-fill::after{display:none}",
-        "html.agentdisc-ivory .agentdisc-busy-label{color:#87867F!important;text-shadow:none!important;font-weight:500!important}",
-        "html.agentdisc-ivory .agentdisc-busy-count{background:rgb(20 20 19 / 7%)!important;color:#141413!important}"
+        ".agentdisc-busy{background:transparent!important}",
+        ".agentdisc-busy-fill{height:3px!important;background:var(--busy)!important;overflow:visible!important}",
+        ".agentdisc-busy-fill::after,.agentdisc-busy-flames{display:none!important}",
+        ".agentdisc-busy-label{color:#87867F!important;text-shadow:none!important;font-weight:500!important}",
+        ".agentdisc-busy-count{background:rgb(20 20 19 / 7%)!important;color:#141413!important}"
     ].filter(Boolean).join("");
 }
 
@@ -228,9 +239,19 @@ function wantLight() {
     return style != null && settings.store.theme === "ivory";
 }
 
+// A mark on the page for the parts of AgentDisc drawn elsewhere (the dots of the channel list).
+// An attribute, not a class: Discord rewrites the page's classes when its look changes, which
+// wiped the first mark (21 Oct, his screenshot: no dots, squares and the big bar still there).
+function markLook() {
+    const want = style != null && settings.store.theme === "ivory";
+    if (want) document.documentElement.dataset.agentdiscLook = "ivory";
+    else delete document.documentElement.dataset.agentdiscLook;
+}
+
 // Asked a moment later, never from inside Discord's own change of look.
 function keepLook() {
     setTimeout(() => {
+        markLook();
         if (wantLight()) {
             if (ThemeStore && ThemeStore.theme !== "light") {
                 lightAsked = true;
@@ -272,14 +293,14 @@ function apply() {
     const inChat = looks.flatMap(look => [`${look} [class^="chat_"]`, `${look} [class*=" chat_"]`]).join(",");
     let text = colours ? rule(looks.join(","), colours) + (chat ? rule(inChat, chat) : "") : "";
     if (key === "ivory") {
-        const titles = titleSelectors();
-        if (titles.length) text += `${titles.map(t => `.theme-light ${t}`).join(",")}{font-family:${SERIF}!important;font-weight:600!important;letter-spacing:0!important;font-size:1.2em}`;
         const page = pageSelector();
-        if ((titles.length < 2 || !page) && !titleTimer) titleTimer = setTimeout(() => { titleTimer = null; apply(); }, 2000);
-        text = IVORY_FONTS + text + ivoryShape(page);
+        const header = channelHeaderSelector() ?? "";
+        const server = serverHeaderSelector();
+        if ((!page || !header || !server) && !titleTimer) titleTimer = setTimeout(() => { titleTimer = null; apply(); }, 2000);
+        text = IVORY_FONTS + text + ivoryShape(page, header, server);
     }
     style.textContent = text;
-    document.documentElement.classList.toggle("agentdisc-ivory", key === "ivory");
+    markLook();
     setBoardLook(key === "ivory" ? "ivory" : "dark");
     keepLook();
 }
@@ -332,7 +353,7 @@ export default definePlugin({
         titleTimer = null;
         style?.remove();
         style = null;
-        document.documentElement.classList.remove("agentdisc-ivory");
+        delete document.documentElement.dataset.agentdiscLook;
         keepLook();
     }
 });

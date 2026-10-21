@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { titleSelectors } from "@plugins/panelSwitches";
+import { pageSelector, titleSelectors } from "@plugins/panelSwitches";
 import { setBoardLook } from "@plugins/vencordToolbox/missionBoard";
 import definePlugin, { OptionType } from "@utils/types";
 import { FluxDispatcher, Menu, ThemeStore } from "@webpack/common";
@@ -20,7 +20,12 @@ import { FluxDispatcher, Menu, ThemeStore } from "@webpack/common";
 // Discord's own light look, switched on for this computer only (Discord's local theme
 // override, never his account's setting, so his phone and other computers keep theirs),
 // with Anthropic's ivory papers, clay orange and dark ink (read from anthropic.com's styles
-// that day), the Inter font and serif titles.
+// that day). Made neater on 21 Oct after his screenshots of the Claude app and Wispr Flow
+// ("How can you make it more neat?", then "Yes, definitely better" to the picture): one paper
+// for the whole frame, the chat and right panel on one white sheet with round corners, a
+// centred reading column, a round message box, dots instead of stripes for bookmarks, plain
+// tool icons, a slim busy line, and Wispr Flow's own free fonts (EB Garamond titles, Figtree
+// text; Anthropic's are private), after "the one you picked doesn't really fit".
 
 type Colours = Record<string, string>;
 
@@ -64,9 +69,9 @@ const MIDNIGHT: Colours = {
 
 // Light, warm: the papers go from the darkest (the server column) to the lightest (cards).
 const IVORY: Colours = {
-    "--app-frame-background": "#E8E6DC",
-    "--app-frame-border": "#DEDCD1",
-    "--background-base-lowest": "#E8E6DC",
+    "--app-frame-background": "#F0EEE6",
+    "--app-frame-border": "#E8E6DC",
+    "--background-base-lowest": "#F0EEE6",
     "--background-base-lower": "#F0EEE6",
     "--background-base-low": "#F5F4ED",
     "--background-surface-high": "#FFFFFF",
@@ -123,27 +128,55 @@ const IVORY: Colours = {
     "--scrollbar-thin-thumb": "#D1CFC5",
     "--scrollbar-auto-thumb": "#D1CFC5",
     "--scrollbar-auto-track": "transparent",
-    "--font-primary": "Inter,\"gg sans\",\"Noto Sans\",\"Helvetica Neue\",Helvetica,Arial,sans-serif",
+    "--font-primary": "Figtree,\"gg sans\",\"Noto Sans\",\"Helvetica Neue\",Helvetica,Arial,sans-serif",
     // AgentDisc's own colours on light paper (channelGroups, typingIndicator, the toolbox).
-    "--agentdisc-selected": "#FFFFFF",
+    "--agentdisc-selected": "#E3E0D6",
     "--agentdisc-selected-text": "#141413",
-    "--agentdisc-selected-glow": "rgb(20 20 19 / 9%)",
-    "--agentdisc-selected-ring": "rgb(20 20 19 / 6%)",
+    "--agentdisc-selected-glow": "transparent",
+    "--agentdisc-selected-ring": "transparent",
     "--agentdisc-card": "#E8E6DC",
     "--agentdisc-bookmark-text": "#141413",
-    "--agentdisc-tint": "13%",
+    "--agentdisc-tint": "9%",
+    "--agentdisc-bar": "0px",
+    "--agentdisc-bar-selected": "0px",
+    "--agentdisc-hairline": "1px",
     "--agentdisc-green": "#4E8B60",
     "--agentdisc-red": "#C4473B",
     "--agentdisc-blue": "#2C84DB",
     "--agentdisc-yellow": "#C69A4A",
-    "--agentdisc-pill-text": "#141413",
-    "--agentdisc-pill-mix": "18%",
+    "--agentdisc-pill-text": "#2C84DB",
+    "--agentdisc-pill-mix": "0%",
     "--agentdisc-feedback-text": "#141413",
     "--agentdisc-map-on": "#141413"
 };
 
-const IVORY_FONTS = "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap');";
-const SERIF = "'Source Serif 4',Georgia,serif";
+const IVORY_FONTS = "@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=EB+Garamond:wght@500;600&display=swap');";
+const SERIF = "'EB Garamond',Georgia,serif";
+
+// Ivory's shape (21 Oct): the parts that only colours cannot change. The white sheet is the
+// area right of the channel list, found through panelSwitches; the rest by Discord's stable
+// name starts and by AgentDisc's own classes.
+function ivoryShape(page: string) {
+    const L = ".theme-light";
+    const sheet = page ? page.split(",").map(p => `${L} ${p}`).join(",") : "";
+    return [
+        sheet && `${sheet}{margin:0 12px 12px 4px!important;border-radius:18px!important;overflow:hidden!important;border:1px solid #EDEBE4!important;box-shadow:0 1px 3px rgb(20 20 19 / 4%)!important;background:#FFFFFF!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--app-frame-border:transparent!important}`,
+        // A reading column in the middle, and the message box under it.
+        `${L} ol[data-list-id="chat-messages"]{max-width:860px!important;margin-inline:auto!important;width:100%!important}`,
+        `${L} [class*="chatContent_"]>form{max-width:860px!important;margin-inline:auto!important;width:100%!important}`,
+        `${L} [class*="channelTextArea_"]{border-radius:24px!important;border:1px solid #E8E6DC!important;box-shadow:0 2px 8px rgb(20 20 19 / 5%)!important;background:#FFFFFF!important}`,
+        `${L} [class*="channelTextArea_"]>[class*="scrollableContainer_"]{border-radius:24px!important;background:#FFFFFF!important}`,
+        // The tools above the channels: plain grey line icons, no squares.
+        "html.agentdisc-ivory .vc-list-icon{background:transparent!important;color:#87867F!important}",
+        "html.agentdisc-ivory .vc-list-icon:hover:not(:disabled),html.agentdisc-ivory .vc-list-icon-on{background:rgb(20 20 19 / 6%)!important;color:#141413!important}",
+        "html.agentdisc-ivory .vc-list-icon-warn{background:transparent!important;color:#C4473B!important}",
+        // The busy bar: a slim line along the top, its words in quiet grey.
+        "html.agentdisc-ivory .agentdisc-busy-fill{height:3px!important;background:var(--busy)!important}",
+        "html.agentdisc-ivory .agentdisc-busy-fill::after{display:none}",
+        "html.agentdisc-ivory .agentdisc-busy-label{color:#87867F!important;text-shadow:none!important;font-weight:500!important}",
+        "html.agentdisc-ivory .agentdisc-busy-count{background:rgb(20 20 19 / 7%)!important;color:#141413!important}"
+    ].filter(Boolean).join("");
+}
 
 export const THEMES = { midnight: MIDNIGHT, ivory: IVORY } as const;
 
@@ -240,11 +273,13 @@ function apply() {
     let text = colours ? rule(looks.join(","), colours) + (chat ? rule(inChat, chat) : "") : "";
     if (key === "ivory") {
         const titles = titleSelectors();
-        if (titles.length) text += `${titles.map(t => `.theme-light ${t}`).join(",")}{font-family:${SERIF}!important;font-weight:600!important;letter-spacing:0!important}`;
-        if (titles.length < 2 && !titleTimer) titleTimer = setTimeout(() => { titleTimer = null; apply(); }, 2000);
-        text = IVORY_FONTS + text;
+        if (titles.length) text += `${titles.map(t => `.theme-light ${t}`).join(",")}{font-family:${SERIF}!important;font-weight:600!important;letter-spacing:0!important;font-size:1.2em}`;
+        const page = pageSelector();
+        if ((titles.length < 2 || !page) && !titleTimer) titleTimer = setTimeout(() => { titleTimer = null; apply(); }, 2000);
+        text = IVORY_FONTS + text + ivoryShape(page);
     }
     style.textContent = text;
+    document.documentElement.classList.toggle("agentdisc-ivory", key === "ivory");
     setBoardLook(key === "ivory" ? "ivory" : "dark");
     keepLook();
 }
@@ -297,6 +332,7 @@ export default definePlugin({
         titleTimer = null;
         style?.remove();
         style = null;
+        document.documentElement.classList.remove("agentdisc-ivory");
         keepLook();
     }
 });

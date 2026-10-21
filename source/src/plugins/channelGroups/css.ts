@@ -65,9 +65,12 @@ export function buildPriorityCss(items: PriorityItem[], line?: GroupClasses["lin
         const rows = items.filter(i => i.state === state).map(i => rowOf(i.id));
         if (!rows.length) continue;
         const colour = PRIORITY_COLOURS[state];
+        // Ivory (21 Oct, his "more neat"): a small dot of the colour in place of the #, no
+        // stripe on the left (the bar widths above are 0 there).
+        rules.push(`${rows.map(r => `html.agentdisc-ivory ${r} ${sel(line.icon)}`).join(",")}{color:transparent!important;background:${colour}!important;border-radius:50%!important;transform:scale(.36)}`);
         rules.push(
-            `${rows.map(r => `${r} ${sel(line.link)}`).join(",")}{background:color-mix(in oklab,${colour} ${TINT},transparent)!important;box-shadow:inset 3px 0 0 ${colour}!important}`,
-            `${rows.map(r => `${r}${sel(line.modeSelected)} ${sel(line.link)}`).join(",")}{background:${SELECTED}!important;box-shadow:inset 4px 0 0 ${colour},0 2px 10px ${SELECTED_GLOW}!important}`
+            `${rows.map(r => `${r} ${sel(line.link)}`).join(",")}{background:color-mix(in oklab,${colour} ${TINT},transparent)!important;box-shadow:inset var(--agentdisc-bar,3px) 0 0 ${colour},inset 0 0 0 var(--agentdisc-hairline,0px) color-mix(in oklab,${colour} 30%,transparent)!important}`,
+            `${rows.map(r => `${r}${sel(line.modeSelected)} ${sel(line.link)}`).join(",")}{background:${SELECTED}!important;box-shadow:inset var(--agentdisc-bar-selected,4px) 0 0 ${colour},0 2px 10px ${SELECTED_GLOW}!important}`
         );
     }
     rules.push(`${items.map(i => `${rowOf(i.id)} ${sel(line.name)}`).join(",")}{color:${LINE_TEXT}!important}`);

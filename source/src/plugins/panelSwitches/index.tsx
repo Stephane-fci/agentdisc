@@ -279,6 +279,15 @@ function lookUp(part: Part, attempt = 1) {
 
 // The channel header (name, topic, buttons above the messages), for the rename on a click
 // of the channel name.
+// The area right of the channel list (chat and right panel), for a theme's white sheet
+// (Ivory, 21 Oct): the layout's child whose name starts with "page". Empty until found.
+export function pageSelector(): string {
+    const L = classes.layout;
+    if (!L?.base) return "";
+    const base = L.base.split(" ").map(c => "." + c).join("");
+    return `${base}>[class^="page_"],${base}>[class*=" page_"]`;
+}
+
 // The channel's name above the messages and the server's name above the channels, for a
 // theme's title font (Ivory, 20 Oct). Empty until Discord's class names are found.
 export function titleSelectors(): string[] {

@@ -173,8 +173,10 @@ function ivoryShape(header: string, server: string) {
         // the chat area (header, messages and right panel), not a chat inside it, drawn inset
         // from its own edges with round corners, so the ivory paper shows all round. Its
         // content moves in by the same space, so nothing is cut off and no scrollbar appears.
-        `${L} ${CHAT}{padding:${SHEET_INSET}!important;box-sizing:border-box!important;clip-path:inset(${SHEET_INSET} round 18px)!important;background:#FFFFFF!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--background-gradient-chat:#FFFFFF!important;border:none!important;border-radius:0!important}`,
-        `${L} ${CHAT}::after{content:"";position:absolute;inset:${SHEET_INSET};border:1px solid #E4E1D8;border-radius:18px;pointer-events:none;z-index:200}`,
+        `${L} ${CHAT}{padding:${SHEET_INSET}!important;box-sizing:border-box!important;clip-path:inset(${SHEET_INSET} round 18px)!important;background:#FFFFFF!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--background-gradient-chat:#FFFFFF!important;--background-gradient-lowest:#FFFFFF!important;--background-gradient-lower:#FFFFFF!important;--background-gradient-low:#FFFFFF!important;--__header-bar-background:#FFFFFF!important;border:none!important;border-radius:0!important}`,
+        `${L} ${CHAT}::after{content:"";position:absolute;inset:${SHEET_INSET};border:1px solid #DEDCD1;border-radius:18px;pointer-events:none;z-index:200}`,
+        // The channel name bar is part of the sheet: Discord paints it with its own two colours.
+        `${L} ${CHAT} [class*="themed_"]{background:#FFFFFF!important}`,
         // The board laid over the panel keeps the sheet's round corner at the bottom right.
         ".agentdisc-board-frame:not(.agentdisc-board-full){border-end-end-radius:17px}",
         // The channel's name above the messages: a Garamond title, no # before it, no line under it.

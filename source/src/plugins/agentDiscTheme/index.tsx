@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { channelHeaderSelector, pageSelector, serverHeaderSelector } from "@plugins/panelSwitches";
+import { channelHeaderSelector, serverHeaderSelector } from "@plugins/panelSwitches";
 import { setBoardLook } from "@plugins/vencordToolbox/missionBoard";
 import definePlugin, { OptionType } from "@utils/types";
 import { FluxDispatcher, Menu, ThemeStore } from "@webpack/common";
@@ -24,8 +24,7 @@ import { FluxDispatcher, Menu, ThemeStore } from "@webpack/common";
 // ("How can you make it more neat?", then "Yes, definitely better" to the picture): one paper
 // for the whole frame, the chat and right panel on one white sheet with round corners, a
 // centred reading column, a round message box, dots instead of stripes for bookmarks, plain
-// tool icons, a slim busy line, and Wispr Flow's own free fonts (EB Garamond titles, Figtree
-// text; Anthropic's are private), after "the one you picked doesn't really fit".
+// tool icons and a slim busy line. Wispr Flow's fonts were tried for a morning and taken out.
 
 type Colours = Record<string, string>;
 
@@ -128,7 +127,7 @@ const IVORY: Colours = {
     "--scrollbar-thin-thumb": "#D1CFC5",
     "--scrollbar-auto-thumb": "#D1CFC5",
     "--scrollbar-auto-track": "transparent",
-    "--font-primary": "Figtree,\"gg sans\",\"Noto Sans\",\"Helvetica Neue\",Helvetica,Arial,sans-serif",
+    "--font-primary": "Inter,\"gg sans\",\"Noto Sans\",\"Helvetica Neue\",Helvetica,Arial,sans-serif",
     // AgentDisc's own colours on light paper (channelGroups, typingIndicator, the toolbox).
     "--agentdisc-selected": "#E3E0D6",
     "--agentdisc-selected-text": "#141413",
@@ -150,27 +149,41 @@ const IVORY: Colours = {
     "--agentdisc-map-on": "#141413"
 };
 
-const IVORY_FONTS = "@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=EB+Garamond:wght@500;600&display=swap');";
-const SERIF = "'EB Garamond',Georgia,serif";
+// Back to the first fonts on 21 Oct ("The font is actually shitty ... Going back to the
+// previous one was better"): Source Serif 4 titles and Inter text.
+const IVORY_FONTS = "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap');";
+const SERIF = "'Source Serif 4',Georgia,serif";
 
 // Ivory's shape (21 Oct): the parts that only colours cannot change. The white sheet is the
 // area right of the channel list, found through panelSwitches; the rest by Discord's stable
 // name starts and by AgentDisc's own classes.
-function ivoryShape(page: string, header: string, server: string) {
+// The chat area: an element of Discord's whose class starts with chat_, and not one inside
+// another (a thread open beside the channel has its own).
+const CHAT_PART = ':is([class^="chat_"],[class*=" chat_"])';
+const CHAT = `${CHAT_PART}:not(${CHAT_PART} *)`;
+// The paper left around the sheet: top, right, bottom, left.
+const SHEET_INSET = "6px 12px 12px 4px";
+
+function ivoryShape(header: string, server: string) {
     const L = ".theme-light";
     const within = (root: string, inner: string) => root.split(",").map(r => `${L} ${r} ${inner}`).join(",");
     const titleFont = `font-family:${SERIF},"Noto Color Emoji"!important;font-weight:600!important;letter-spacing:0!important`;
     return [
-        // The white sheet: Discord's page part (chat and right panel) with a margin all round.
-        page && `${L} ${page}{margin:0 12px 12px 4px!important;border-radius:18px!important;overflow:hidden!important;border:1px solid #EDEBE4!important;box-shadow:0 1px 3px rgb(20 20 19 / 4%)!important;background:#FFFFFF!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--app-frame-border:transparent!important;--background-gradient-chat:#FFFFFF!important}`,
-        page && within(page, '[class^="chat_"],') + within(page, '[class*=" chat_"]') + "{border:none!important;border-radius:0!important}",
+        // The white sheet (his "nice white frame with the borders ... gives the whole feeling"):
+        // the chat area (header, messages and right panel), not a chat inside it, drawn inset
+        // from its own edges with round corners, so the ivory paper shows all round. Its
+        // content moves in by the same space, so nothing is cut off and no scrollbar appears.
+        `${L} ${CHAT}{padding:${SHEET_INSET}!important;box-sizing:border-box!important;clip-path:inset(${SHEET_INSET} round 18px)!important;background:#FFFFFF!important;--background-base-lowest:#FFFFFF!important;--background-base-lower:#FFFFFF!important;--background-base-low:#FFFFFF!important;--chat-background:#FFFFFF!important;--background-gradient-chat:#FFFFFF!important;border:none!important;border-radius:0!important}`,
+        `${L} ${CHAT}::after{content:"";position:absolute;inset:${SHEET_INSET};border:1px solid #E4E1D8;border-radius:18px;pointer-events:none;z-index:200}`,
+        // The board laid over the panel keeps the sheet's round corner at the bottom right.
+        ".agentdisc-board-frame:not(.agentdisc-board-full){border-end-end-radius:17px}",
         // The channel's name above the messages: a Garamond title, no # before it, no line under it.
-        header && `${within(header, '[class*="titleWrapper_"]')},${within(header, '[class*="titleWrapper_"] *')}{${titleFont};font-size:21px!important}`,
+        header && `${within(header, '[class*="titleWrapper_"]')},${within(header, '[class*="titleWrapper_"] *')}{${titleFont};font-size:19px!important}`,
         header && `${within(header, '[class*="children_"]>[class*="iconWrapper_"]:first-child')}{display:none!important}`,
         header && `${header.split(",").map(h => `${L} ${h}`).join(",")}{box-shadow:none!important;border-bottom:none!important}`,
         // The server's name above the channels, in the same title font.
         server && `${server.split(",").map(h => `${L} ${h}`).join(",")},${within(server, "*")}{${titleFont}}`,
-        server && `${within(server, "h1")},${within(server, "h2")},${within(server, '[class*="name_"]')}{font-size:21px!important}`,
+        server && `${within(server, "h1")},${within(server, "h2")},${within(server, '[class*="name_"]')}{font-size:19px!important}`,
         // A reading column in the middle, and the message box under it.
         `${L} ol[data-list-id="chat-messages"]{max-width:860px!important;margin-inline:auto!important;width:100%!important}`,
         `${L} [class*="chatContent_"]>form{max-width:860px!important;margin-inline:auto!important;width:100%!important}`,
@@ -293,11 +306,10 @@ function apply() {
     const inChat = looks.flatMap(look => [`${look} [class^="chat_"]`, `${look} [class*=" chat_"]`]).join(",");
     let text = colours ? rule(looks.join(","), colours) + (chat ? rule(inChat, chat) : "") : "";
     if (key === "ivory") {
-        const page = pageSelector();
         const header = channelHeaderSelector() ?? "";
         const server = serverHeaderSelector();
-        if ((!page || !header || !server) && !titleTimer) titleTimer = setTimeout(() => { titleTimer = null; apply(); }, 2000);
-        text = IVORY_FONTS + text + ivoryShape(page, header, server);
+        if ((!header || !server) && !titleTimer) titleTimer = setTimeout(() => { titleTimer = null; apply(); }, 2000);
+        text = IVORY_FONTS + text + ivoryShape(header, server);
     }
     style.textContent = text;
     markLook();

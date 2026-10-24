@@ -7,6 +7,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { redrawChannelList } from "@plugins/channelGroups";
 import { BUSY_BAR_HEIGHT } from "@plugins/vencordToolbox/busyBar";
+import { resetZoom } from "@plugins/vencordToolbox/zoomAreas";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
@@ -418,7 +419,9 @@ export default definePlugin({
             <Menu.MenuCheckboxItem key="server-lines" id="agentdisc-hide-server-lines" label="Hide Events and Boosts" checked={s.hideServerLines} action={flip("hideServerLines")} />,
             <Menu.MenuCheckboxItem key="account" id="agentdisc-hide-account" label="Hide account bar (and call buttons)" checked={s.hideAccountPanel} action={flip("hideAccountPanel")} />,
             <Menu.MenuCheckboxItem key="add-discover" id="agentdisc-hide-add-discover" label="Hide add server and Discover" checked={s.hideAddDiscover} action={flip("hideAddDiscover")} />,
-            <Menu.MenuCheckboxItem key="message-buttons" id="agentdisc-hide-message-buttons" label="Hide message box buttons" checked={s.hideMessageButtons} action={flip("hideMessageButtons")} />
+            <Menu.MenuCheckboxItem key="message-buttons" id="agentdisc-hide-message-buttons" label="Hide message box buttons" checked={s.hideMessageButtons} action={flip("hideMessageButtons")} />,
+            // Ctrl and the mouse wheel zoom one area at a time (24 Oct); this puts them all back.
+            <Menu.MenuItem key="reset-zoom" id="agentdisc-reset-zoom" label="Reset the zoom of every area" action={resetZoom} />
         ];
     },
 

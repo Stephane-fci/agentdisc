@@ -874,13 +874,83 @@ svg.agentdisc-copy-sign {
     user-select: none !important;
 }
 
-.agentdisc-row-resizing .agentdisc-board-frame {
+.agentdisc-row-resizing .agentdisc-board-frame,
+.agentdisc-part-dragging .agentdisc-board-frame {
     pointer-events: none;
+}
+
+/* A part's title bar, when several parts show: grab it to move the part, × hides it. */
+.agentdisc-part-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 20px;
+    padding: 0 6px 0 10px;
+    color: var(--text-muted, #949ba4);
+    font-family: var(--font-primary);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    cursor: grab;
+    user-select: none;
+}
+
+.agentdisc-part-head:active {
+    cursor: grabbing;
+}
+
+.agentdisc-part-grip {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.agentdisc-part-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.agentdisc-part-hide {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font-size: 14px;
+    line-height: 18px;
+    cursor: pointer;
+    opacity: 0;
+}
+
+.agentdisc-part-head:hover .agentdisc-part-hide {
+    opacity: 1;
+}
+
+.agentdisc-part-hide:hover {
+    background: var(--background-mod-subtle, rgb(255 255 255 / 6%));
+    color: var(--interactive-text-hover, #fff);
+}
+
+/* Where a dragged part will land: a line above or below the part it is over. */
+[data-agentdisc-drop="before"] {
+    box-shadow: inset 0 3px 0 var(--agentdisc-selected, #5865f2);
+}
+
+[data-agentdisc-drop="after"] {
+    box-shadow: inset 0 -3px 0 var(--agentdisc-selected, #5865f2);
 }
 
 .agentdisc-modes {
     flex: 0 0 auto;
     display: flex;
+    flex-wrap: wrap;
     gap: 2px;
     margin: 8px 8px 6px;
     padding: 2px;
@@ -888,8 +958,9 @@ svg.agentdisc-copy-sign {
     background: var(--background-mod-subtle, rgb(255 255 255 / 6%));
 }
 
+/* Each button as wide as its word; a narrow panel puts the rest on a second row. */
 .agentdisc-mode {
-    flex: 1 1 auto;
+    flex: 1 0 auto;
     min-width: 0;
     padding: 4px 5px;
     border: none;
@@ -932,7 +1003,25 @@ svg.agentdisc-copy-sign {
     opacity: 0.5;
 }
 
-/* Calendar: the map and the calendar fill their part and scroll inside it. */
+/* Connections fills its part with the map; Calendar stands on its own, no line above it. */
+.agentdisc-part > .agentdisc-side-connections {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.agentdisc-side-connections > .agentdisc-side-map {
+    flex: 1 1 0px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.agentdisc-side-calendar > .agentdisc-side-cal {
+    margin-top: 0;
+    border-top: none;
+}
+
+/* Connections and Calendar fill their part and scroll inside it. */
 .agentdisc-part > .agentdisc-side {
     flex: 1 1 auto;
     width: auto;
@@ -982,5 +1071,19 @@ svg.agentdisc-copy-sign {
 
 /* While the panel's edge is dragged, the frame lets the mouse through. */
 .agentdisc-resizing .agentdisc-board-frame {
+    pointer-events: none;
+}
+
+/* The zoom of an area, shown for a moment beside the mouse (24 Oct). */
+.agentdisc-zoom-badge {
+    position: fixed;
+    z-index: 10001;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--agentdisc-selected, #5865f2);
+    color: var(--agentdisc-selected-text, #fff);
+    font-family: var(--font-primary);
+    font-size: 12px;
+    font-weight: 700;
     pointer-events: none;
 }

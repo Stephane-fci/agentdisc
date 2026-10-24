@@ -42,6 +42,7 @@ import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
 import { renderSidePanel, startPanelModes, startRightPanelWidth, stopPanelModes, stopRightPanelWidth } from "./sidePanel";
 import { keepArrows, keepInvite, renderArrows, renderServerIcon, setTrailing, useTrailing } from "./topBar";
+import { startZoomAreas, stopZoomAreas } from "./zoomAreas";
 
 const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_BOTTOM,", 'position:"bottom"');
 
@@ -106,6 +107,12 @@ export const settings = definePluginSettings({
         type: OptionType.STRING,
         default: "",
         description: "Right panel: the room each stacked part takes (part:weight)",
+        hidden: true
+    },
+    areaZoom: {
+        type: OptionType.STRING,
+        default: "",
+        description: "The zoom of each area set with Ctrl and the mouse wheel (chat, channels, servers, team, calendar)",
         hidden: true
     },
     boardViews: {
@@ -469,6 +476,7 @@ export default definePlugin({
         startBusyBar();
         startBoard();
         startPanelModes();
+        startZoomAreas();
     },
 
     stop() {
@@ -479,6 +487,7 @@ export default definePlugin({
         stopRightPanelWidth();
         stopBusyBar();
         stopPanelModes();
+        stopZoomAreas();
         stopBoard();
         setFeedback(false);
     },

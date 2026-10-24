@@ -32,17 +32,21 @@ function short(name: string, max = 22) {
 }
 
 // The panel's own width, to draw the map across it.
-function useWidth(ref: React.RefObject<HTMLDivElement | null>) {
-    const [width, setWidth] = useState(224);
+function useBox(ref: React.RefObject<HTMLDivElement | null>) {
+    const [box, setBox] = useState({ width: 224, height: 0 });
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
-        // The map follows the column's width and never sets it.
-        const ro = new ResizeObserver(() => setWidth(Math.max(160, Math.round(el.getBoundingClientRect().width))));
+        // The map follows its place's size and never sets it.
+        const ro = new ResizeObserver(() => {
+            const r = el.getBoundingClientRect();
+            const next = { width: Math.max(160, Math.round(r.width)), height: Math.round(r.height) };
+            setBox(prev => prev.width === next.width && prev.height === next.height ? prev : next);
+        });
         ro.observe(el);
         return () => ro.disconnect();
     }, []);
-    return width;
+    return box;
 }
 
 interface MapNode {
@@ -90,7 +94,8 @@ function fit(fg: any, ms: number) {
     else cap();
 }
 
-function LinkMap({ channel }: { channel: any; }) {
+// fill: the map takes the whole height of its part (Connections), less the tick boxes.
+function LinkMap({ channel, fill = false }: { channel: any; fill?: boolean; }) {
     const [ready, setReady] = useState(false);
     const box = useRef<HTMLDivElement>(null);
     const holder = useRef<HTMLDivElement>(null);
@@ -98,8 +103,8 @@ function LinkMap({ channel }: { channel: any; }) {
     const hover = useRef<string | null>(null);
     const fitted = useRef("");
     const titles = useRef(true);
-    const width = useWidth(box);
-    const height = Math.round(Math.min(360, Math.max(190, width * 0.85)));
+    const { width, height: boxHeight } = useBox(box);
+    const height = fill && boxHeight > 0 ? Math.max(120, boxHeight - 34) : Math.round(Math.min(360, Math.max(190, width * 0.85)));
     const { options, flip } = useMapOptions();
     titles.current = options.mapTitles;
 
@@ -420,15 +425,27 @@ function ResizeHandle() {
     return <div className="agentdisc-side-resize" onMouseDown={onDown} title="Drag to resize" />;
 }
 
-// The Calendar view: the map of linked channels and the calendar of his days (7 Oct).
-function SideContent({ channel }: { channel: any; }) {
-    const { data, reading, crawlLeft } = useSideData(channel.id, channel.guild_id);
+// The Connections part: the map of the channels and threads linked with this one (7 Oct).
+// Its own part since 24 Oct, the map filling it (his words: "Calendar" and "Connections"
+// should be two separated blocks).
+function ConnectionsContent({ channel }: { channel: any; }) {
+    const { reading, crawlLeft } = useSideData(channel.id, channel.guild_id);
     return (
-        <div className="agentdisc-side">
-            <LinkMap channel={channel} />
-            <Calendar channel={channel} days={data?.days ?? {}} />
+        <div className="agentdisc-side agentdisc-side-connections">
+            <LinkMap channel={channel} fill />
             {reading && <div className="agentdisc-side-note agentdisc-side-reading">Reading the channel…</div>}
             {!reading && crawlLeft > 0 && <div className="agentdisc-side-note agentdisc-side-reading">Looking for links in other channels ({crawlLeft} left)…</div>}
+        </div>
+    );
+}
+
+// The Calendar part: the month, a dot under each day he wrote in this channel (7 Oct).
+function CalendarContent({ channel }: { channel: any; }) {
+    const { data, reading } = useSideData(channel.id, channel.guild_id);
+    return (
+        <div className="agentdisc-side agentdisc-side-calendar">
+            <Calendar channel={channel} days={data?.days ?? {}} />
+            {reading && <div className="agentdisc-side-note agentdisc-side-reading">Reading the channel…</div>}
         </div>
     );
 }
@@ -475,19 +492,21 @@ function FrameSlot({ role, channelId, threadId, last }: { role: BoardRole; chann
 //   Ideas     the board's page where he drops an idea on the fly; the board sends it to the
 //             right channel and shows when that channel took it (its own frame)
 //   Team      Discord's own member list, people only, no bots (teamList.ts)
-//   Calendar  the map of linked channels and the calendar of his days (7 Oct)
+//   Connections  the map of the channels and threads linked with this one (7 Oct)
+//   Calendar  the calendar of his days in this channel (7 Oct; apart from the map since 24 Oct)
 // One part on fills the panel; several stack in the order of the buttons. Dragging a button
 // moves its part up or down; dragging the line between two parts shares the room between
 // them; a double click shows that part alone. All of it is kept. Board and Ideas show only
 // where the board is set up, and Ideas only once the board says it has that page.
-export type Part = "board" | "ideas" | "team" | "calendar";
-const PARTS: Part[] = ["board", "ideas", "team", "calendar"];
-const LABELS: Record<Part, string> = { board: "Board", ideas: "Ideas", team: "Team", calendar: "Calendar" };
+export type Part = "board" | "ideas" | "team" | "connections" | "calendar";
+const PARTS: Part[] = ["board", "ideas", "team", "connections", "calendar"];
+const LABELS: Record<Part, string> = { board: "Board", ideas: "Ideas", team: "Team", connections: "Connections", calendar: "Calendar" };
 const TITLES: Record<Part, string> = {
     board: "This channel's board",
     ideas: "Drop an idea (Ctrl+J)",
     team: "The people in this server",
-    calendar: "Linked channels and your days"
+    connections: "The channels and threads linked with this one",
+    calendar: "Your days in this channel"
 };
 const HINT = "Click: show or hide. Double click: only this one. Drag: move it up or down.";
 const MIN_PART = 60;
@@ -500,9 +519,14 @@ const list = (text: unknown) => [...new Set(String(text ?? "").split(",").filter
 function readLayout(): Layout {
     const s = Settings.plugins.VencordToolbox ?? {};
     const order = list(s.rightPanelOrder);
+    // A layout kept before Connections had its own part (1.35.0): the map stood with the
+    // calendar, so Connections comes just before Calendar, and is on where Calendar was.
+    const before = !order.includes("connections");
+    if (before && order.includes("calendar")) order.splice(order.indexOf("calendar"), 0, "connections");
     for (const p of PARTS) if (!order.includes(p)) order.push(p);
     // First time: the one view of 1.34, or the older board switch (on: Board, off: Calendar).
     const on = s.rightPanelOn ? list(s.rightPanelOn) : [isPart(s.rightPanelMode) ? s.rightPanelMode : s.rightPanelBoard !== false ? "board" : "calendar"];
+    if (before && on.includes("calendar") && !on.includes("connections")) on.splice(on.indexOf("calendar"), 0, "connections");
     const sizes: Layout["sizes"] = {};
     for (const pair of String(s.rightPanelSizes ?? "").split(",")) {
         const [p, w] = pair.split(":");
@@ -528,7 +552,7 @@ function available(p: Part, board: boolean, ideas: boolean) {
 function shownParts(layout: Layout, board: boolean, ideas: boolean): Part[] {
     const shown = layout.order.filter(p => layout.on.includes(p) && available(p, board, ideas));
     // Nothing it can show (Ideas from a board that lacks it, or no board on this computer).
-    return shown.length ? shown : [board ? "board" : "calendar"];
+    return shown.length ? shown : [board ? "board" : "connections"];
 }
 
 function boardOffersIdeas() {
@@ -649,6 +673,80 @@ function Divider({ order, above, below, layout }: { order: number; above: Part; 
     return <div className="agentdisc-own agentdisc-divider" style={{ order }} onMouseDown={onDown} title="Drag to share the room" />;
 }
 
+// Moving a part by dragging it (Stephane, 24 Oct: "if I want to add the ideas before the
+// board, I should be able to do so"): with two parts or more, each has a slim title bar to
+// grab; dropped on another part or its bar, it goes above it or below it, after the middle.
+// While a part is dragged the board frames let the mouse through, so the board can be a
+// place to drop on too.
+let draggedPart: Part | null = null;
+
+function startPartDrag(e: React.DragEvent, p: Part) {
+    draggedPart = p;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", p);
+    document.documentElement.classList.add("agentdisc-part-dragging");
+}
+
+function endPartDrag() {
+    draggedPart = null;
+    document.documentElement.classList.remove("agentdisc-part-dragging");
+    for (const el of document.querySelectorAll<HTMLElement>("[data-agentdisc-drop]")) delete el.dataset.agentdiscDrop;
+}
+
+const dropSide = (e: React.DragEvent) => {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return e.clientY > box.top + box.height / 2 ? "after" : "before";
+};
+
+function dropTarget(p: Part) {
+    return {
+        onDragOver: (e: React.DragEvent) => {
+            if (!draggedPart || draggedPart === p) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            (e.currentTarget as HTMLElement).dataset.agentdiscDrop = dropSide(e);
+        },
+        onDragLeave: (e: React.DragEvent) => void delete (e.currentTarget as HTMLElement).dataset.agentdiscDrop,
+        onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            const moved = draggedPart;
+            const after = dropSide(e) === "after";
+            endPartDrag();
+            if (!moved || moved === p) return;
+            const layout = readLayout();
+            const order = layout.order.filter(x => x !== moved);
+            order.splice(order.indexOf(p) + (after ? 1 : 0), 0, moved);
+            saveLayout({ ...layout, order });
+        }
+    };
+}
+
+function PartHead({ part, order, layout }: { part: Part; order: number; layout: Layout; }) {
+    return (
+        <div
+            className="agentdisc-own agentdisc-part-head"
+            style={{ order }}
+            draggable
+            title="Drag to move this part"
+            onDragStart={e => startPartDrag(e, part)}
+            onDragEnd={endPartDrag}
+            {...dropTarget(part)}
+        >
+            <span className="agentdisc-part-grip" aria-hidden="true">⠿</span>
+            <span className="agentdisc-part-name">{LABELS[part]}</span>
+            <button
+                type="button"
+                className="agentdisc-part-hide"
+                aria-label={`Hide ${LABELS[part]}`}
+                title="Hide this part"
+                onClick={() => saveLayout({ ...layout, on: layout.on.filter(x => x !== part) })}
+            >
+                ×
+            </button>
+        </div>
+    );
+}
+
 function RightPanel({ channel, threadId }: { channel: any; threadId: string | null; }) {
     const [, redraw] = useReducer((n: number) => n + 1, 0);
     useEffect(() => onBoardFound(redraw), []);
@@ -657,8 +755,10 @@ function RightPanel({ channel, threadId }: { channel: any; threadId: string | nu
     const ideas = board && boardOffersIdeas();
     const layout = readLayout();
     const shown = shownParts(layout, board, ideas);
-    // Order: the buttons first, then each part with a line before it from the second on.
-    const orderOf = (i: number) => 10 + 2 * i;
+    const heads = shown.length > 1;
+    // Order: the buttons first, then for each part the line before it (from the second on),
+    // its title bar (when several show) and the part itself.
+    const orderOf = (i: number) => 12 + 3 * i;
     const teamAt = shown.indexOf("team");
     const ref = useRef<HTMLDivElement>(null);
     useHostMark(ref, teamAt < 0 ? null : { order: orderOf(teamAt), grow: grow(layout, "team") });
@@ -671,12 +771,13 @@ function RightPanel({ channel, threadId }: { channel: any; threadId: string | nu
                 <ModeBar layout={layout} shown={shown} board={board} ideas={ideas} />
             </div>
             {shown.flatMap((p, i) => [
-                i > 0 ? <Divider key={`line-${p}`} order={orderOf(i) - 1} above={shown[i - 1]} below={p} layout={layout} /> : null,
+                i > 0 ? <Divider key={`line-${p}`} order={orderOf(i) - 2} above={shown[i - 1]} below={p} layout={layout} /> : null,
+                heads ? <PartHead key={`head-${p}`} part={p} order={orderOf(i) - 1} layout={layout} /> : null,
                 p === "team" ? null : (
-                    <div key={p} className={`agentdisc-own agentdisc-part agentdisc-part-${p}`} style={{ order: orderOf(i), flexGrow: grow(layout, p) }}>
-                        {p === "calendar"
-                            ? <SideContent channel={channel} />
-                            : <FrameSlot role={p} channelId={channel.id} threadId={threadId} last={p === last} />}
+                    <div key={p} className={`agentdisc-own agentdisc-part agentdisc-part-${p}`} style={{ order: orderOf(i), flexGrow: grow(layout, p) }} {...dropTarget(p)}>
+                        {p === "calendar" ? <CalendarContent channel={channel} />
+                            : p === "connections" ? <ConnectionsContent channel={channel} />
+                                : <FrameSlot role={p} channelId={channel.id} threadId={threadId} last={p === last} />}
                     </div>
                 )
             ])}

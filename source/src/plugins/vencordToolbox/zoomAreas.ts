@@ -46,12 +46,20 @@ function write(next: Partial<Record<Area, Kept>>) {
     apply();
 }
 
+// The server list's column follows its zoom (Stephane, 24 Oct: "when making the channel list
+// smaller, I want the gap to be filled by the channel list"): Discord sizes that column from
+// one value, the icon plus its padding, and the channel list takes the rest of the side.
+const SERVER_COLUMN = (zoom: number) => `:root,.refresh-fast-follow-avatars{--custom-guild-list-width:calc((var(--guildbar-avatar-size) + var(--custom-guild-list-padding) * 2) * ${zoom})!important}`;
+
 function apply() {
     if (!style) return;
-    style.textContent = Object.values(read())
+    const kept = read();
+    const rules = Object.values(kept)
         .filter((k): k is Kept => !!k && typeof k.selector === "string" && /^[.\w-]+$/.test(k.selector) && k.zoom !== 1)
-        .map(k => `${k.selector}{zoom:${k.zoom}}`)
-        .join("\n");
+        .map(k => `${k.selector}{zoom:${k.zoom}}`);
+    const servers = kept.servers?.zoom;
+    if (typeof servers === "number" && servers !== 1) rules.push(SERVER_COLUMN(servers));
+    style.textContent = rules.join("\n");
 }
 
 function scrollerOf(start: Element | null): HTMLElement | null {

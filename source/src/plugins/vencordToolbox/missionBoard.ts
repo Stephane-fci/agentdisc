@@ -57,6 +57,43 @@ let full = false;
 // it (asked of the board on 20 Oct); a board that does not know the message ignores it.
 let look = "dark";
 let dim: HTMLElement | null = null;
+
+// The board's pages in the same frame (24 Oct, his "switch pannels"): the board and the ideas
+// page. AgentDisc shows its own Board and Ideas buttons (modes=1 in the address hides the
+// board's own small switch) and tells the board which page to show; the board answers with
+// the page it shows after every change, and on load with the pages it offers. A board from
+// before the ideas page never says it offers them, so the Ideas button waits for that word.
+export type BoardView = "board" | "ideas";
+let wantView: BoardView = "board";
+let wantFocus = false;
+let offered = new Set<string>(["board"]);
+const viewListeners = new Set<(view: BoardView) => void>();
+const offerListeners = new Set<(views: string[]) => void>();
+
+export function onBoardView(fn: (view: BoardView) => void) {
+    viewListeners.add(fn);
+    return () => void viewListeners.delete(fn);
+}
+
+export function onBoardViews(fn: (views: string[]) => void) {
+    offerListeners.add(fn);
+    return () => void offerListeners.delete(fn);
+}
+
+function sendView() {
+    if (!origin || !frame?.contentWindow || !loaded) return;
+    if (wantView !== "board" && !offered.has(wantView)) return;
+    frame.contentWindow.postMessage({ type: "mission-control:view", view: wantView, focus: wantFocus }, origin);
+    wantFocus = false;
+}
+
+// The page to show; focus puts the cursor in the idea box. Before the board has loaded, the
+// wish waits and goes out when the board says what it offers.
+export function setBoardView(view: BoardView, focus = false) {
+    wantView = view;
+    if (focus) wantFocus = true;
+    sendView();
+}
 // The panel's resize handle sits on its left edge; the frame leaves it free (styles.css).
 //
 // Chrome itself keeps the frame on the panel's place (CSS anchor positioning, 21 Oct): the
@@ -78,7 +115,11 @@ function boardFrame() {
     frame.title = "Mission board";
     // Chrome fires a load for the empty frame the moment it is added; only the board's own
     // page counts.
-    frame.addEventListener("load", () => { if (frame?.getAttribute("src")) loaded = true; });
+    frame.addEventListener("load", () => {
+        if (!frame?.getAttribute("src")) return;
+        loaded = true;
+        sendView();
+    });
     document.body.append(frame);
     return frame;
 }
@@ -202,7 +243,7 @@ export function showBoard(channelId: string, threadId: string | null) {
     if (!loaded || !f.contentWindow) {
         loaded = false;
         // grow=1: the board offers its full-screen button, which this app answers.
-        f.src = `${origin}/c/${channelId}?panel=1&grow=1&look=${look}${threadId ? `&thread=${threadId}` : ""}`;
+        f.src = `${origin}/c/${channelId}?panel=1&grow=1&modes=1&look=${look}${wantView === "ideas" ? "&view=ideas" : ""}${threadId ? `&thread=${threadId}` : ""}`;
         return;
     }
     f.contentWindow.postMessage({ type: "mission-control:show", channel: channelId, thread: threadId }, origin);
@@ -214,6 +255,20 @@ function onMessage(e: MessageEvent) {
     const { data } = e;
     if (data?.type === "mission-control:size") {
         setFull(data.full === true);
+        return;
+    }
+    if (data?.type === "mission-control:views" && Array.isArray(data.views)) {
+        const views = data.views.filter((v: unknown): v is string => typeof v === "string" && /^[a-z]{1,20}$/.test(v)).slice(0, 10);
+        offered = new Set(["board", ...views]);
+        // The board speaks, so its page is there, even before the frame's own load event.
+        loaded = true;
+        offerListeners.forEach(fn => fn(views));
+        sendView();
+        return;
+    }
+    if (data?.type === "mission-control:view" && (data.view === "board" || data.view === "ideas")) {
+        wantView = data.view;
+        viewListeners.forEach(fn => fn(data.view));
         return;
     }
     if (data?.type !== "mission-control:open" || typeof data.channel !== "string" || !/^\d+$/.test(data.channel)) return;
@@ -248,6 +303,8 @@ export function stopBoard() {
     frame?.remove();
     frame = null;
     loaded = false;
+    offered = new Set(["board"]);
+    wantFocus = false;
     shown = "";
     slot = null;
     last = "";

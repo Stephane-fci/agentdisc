@@ -40,7 +40,7 @@ import { startBoard, stopBoard } from "./missionBoard";
 import { startShiftKeys, stopShiftKeys } from "./shiftKeys";
 import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
-import { renderSidePanel, startRightPanelWidth, stopRightPanelWidth } from "./sidePanel";
+import { renderSidePanel, startPanelModes, startRightPanelWidth, stopPanelModes, stopRightPanelWidth } from "./sidePanel";
 import { keepArrows, keepInvite, renderArrows, renderServerIcon, setTrailing, useTrailing } from "./topBar";
 
 const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_BOTTOM,", 'position:"bottom"');
@@ -82,6 +82,18 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         default: true,
         description: "Right panel: the mission board instead of the map, the calendar and the member list (when the board is set up on this computer)",
+        hidden: true
+    },
+    rightPanelMode: {
+        type: OptionType.STRING,
+        default: "",
+        description: "Right panel: board, ideas, team or calendar (the buttons at its top); empty follows the old board switch",
+        hidden: true
+    },
+    boardViews: {
+        type: OptionType.STRING,
+        default: "",
+        description: "The pages the mission board said it offers, so the Ideas button shows at once",
         hidden: true
     },
     rightPanelWidth: {
@@ -438,6 +450,7 @@ export default definePlugin({
         startRightPanelWidth();
         startBusyBar();
         startBoard();
+        startPanelModes();
     },
 
     stop() {
@@ -447,6 +460,7 @@ export default definePlugin({
         stopSideData();
         stopRightPanelWidth();
         stopBusyBar();
+        stopPanelModes();
         stopBoard();
         setFeedback(false);
     },

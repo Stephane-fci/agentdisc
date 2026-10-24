@@ -303,6 +303,7 @@
 /* The right panel above the member list (7 Oct): the map of linked channels, then the
    calendar of his days; the member list keeps the rest of the column and its own scroll. */
 [data-agentdisc-side-host] {
+    position: relative;
     display: flex !important;
     flex-direction: column;
 }
@@ -821,25 +822,94 @@ svg.agentdisc-copy-sign {
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
-/* The mission board in the right panel (14 Oct): its place fills the whole column, and
-   whatever else the column holds (Discord's member list) steps aside. The frame is laid
-   over this place from outside, so it never reloads on a channel switch. */
-[data-agentdisc-board-host] {
-    display: flex !important;
-    flex-direction: column;
-}
-
-[data-agentdisc-board-host] > :not(.agentdisc-board-slot) {
+/* The right panel's views (24 Oct): Board, Ideas, Team, Calendar. In every view but Team the
+   panel fills the whole column and whatever else the column holds (Discord's member list)
+   steps aside; in Team the buttons sit above Discord's member list. The board's frame is laid
+   over its place from outside, so it never reloads on a channel switch. */
+[data-agentdisc-panel-full] > :not(.agentdisc-panel) {
     display: none !important;
 }
 
-.agentdisc-side.agentdisc-board-slot {
+.agentdisc-panel {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: var(--custom-member-list-width, 240px);
+    min-width: 0;
+}
+
+[data-agentdisc-panel-full] > .agentdisc-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+}
+
+/* In Team the drag handle runs along the whole column, member list included. */
+.agentdisc-panel-team {
+    position: static;
+    border-bottom: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+}
+
+.agentdisc-modes {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 2px;
+    margin: 8px 8px 6px;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--background-mod-subtle, rgb(255 255 255 / 6%));
+}
+
+.agentdisc-mode {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 4px 5px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--interactive-text-default, #b5bac1);
+    font-family: var(--font-primary);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.agentdisc-mode:hover {
+    color: var(--interactive-text-hover, #fff);
+    background: var(--background-mod-subtle, rgb(255 255 255 / 6%));
+}
+
+.agentdisc-mode.agentdisc-mode-on,
+.agentdisc-mode.agentdisc-mode-on:hover {
+    background: var(--agentdisc-selected, #5865f2);
+    color: var(--agentdisc-selected-text, #fff);
+}
+
+.agentdisc-mode:focus-visible {
+    outline: 2px solid var(--agentdisc-selected, #5865f2);
+    outline-offset: 1px;
+}
+
+.agentdisc-board-slot {
     position: relative;
     flex: 1 1 auto;
     min-height: 200px;
-    height: 100%;
-    padding: 0;
+}
+
+/* Calendar: the map and the calendar fill the panel and scroll inside it. */
+.agentdisc-panel > .agentdisc-side {
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 0;
+    overflow-y: auto;
     border-bottom: none;
+    padding-top: 2px;
 }
 
 .agentdisc-board-frame {

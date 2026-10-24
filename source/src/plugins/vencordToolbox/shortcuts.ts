@@ -13,6 +13,7 @@ import { ChannelStore, SelectedChannelStore, showToast, Toasts } from "@webpack/
 
 import { plain } from "./channelSearch";
 import { toggleHelp } from "./help";
+import { openIdeas } from "./sidePanel";
 
 // Channel shortcuts (Stephane, 6 Oct), the letter keys whatever the keyboard:
 //   Ctrl+B  bookmark the channel or thread open now, or take the bookmark off. With text
@@ -23,6 +24,8 @@ import { toggleHelp } from "./help";
 //   Ctrl+K  put the channel in the category with its emoji, or take it out to the top.
 //           Discord's own Ctrl+K (quick switcher) is taken off; Ctrl+O finds channels.
 //   Ctrl+H  the window with every shortcut and button.
+//   Ctrl+J  the Ideas view of the right panel, the cursor in the idea box (24 Oct), where
+//           the mission board is set up.
 
 function stop(e: Event) {
     e.preventDefault();
@@ -45,6 +48,8 @@ function onKey(e: KeyboardEvent) {
     } else if (key === "h") {
         stop(e);
         toggleHelp();
+    } else if (key === "j") {
+        if (openIdeas()) stop(e);
     } else if (key === "k") {
         stop(e);
         tidyChannel();

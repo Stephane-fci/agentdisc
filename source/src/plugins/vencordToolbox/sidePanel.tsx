@@ -6,10 +6,12 @@
 
 import { Settings, useSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { showMembers } from "@plugins/panelSwitches";
 import { ChannelStore, NavigationRouter, useEffect, useReducer, useRef, useState } from "@webpack/common";
 
-import { attachSlot, detachSlot, hasBoard, onBoardFound, showBoard } from "./missionBoard";
+import { attachSlot, type BoardView, detachSlot, hasBoard, onBoardFound, onBoardView, onBoardViews, setBoardView, showBoard } from "./missionBoard";
 import { type DayInfo, dayKey, linksOf, pairsAmong, type PlaceName, placeName, useSideData } from "./sideData";
+import { setPeopleOnly, stopTeamList } from "./teamList";
 
 // The right panel (Stephane, 7 Oct), above the member list like Obsidian's side panel:
 //   1. a map of the channels linked from this channel, this channel in the middle; a
@@ -370,18 +372,19 @@ function Calendar({ channel, days }: { channel: any; days: Record<string, DayInf
 
 // The Discord column that holds the panel gets a mark of its own, for the few rules that
 // shape it. They first found it with :has(), which Chrome checks again for every element on
-// every change of the page (21 Oct, part of the lag he reported).
-function useHostMark(ref: React.RefObject<HTMLDivElement | null>, board: boolean) {
+// every change of the page (21 Oct, part of the lag he reported). full: the panel takes the
+// whole column and Discord's member list steps aside (every view but Team).
+function useHostMark(ref: React.RefObject<HTMLDivElement | null>, full: boolean) {
     useEffect(() => {
         const host = ref.current?.parentElement;
         if (!host) return;
         host.dataset.agentdiscSideHost = "";
-        if (board) host.dataset.agentdiscBoardHost = "";
+        if (full) host.dataset.agentdiscPanelFull = "";
         return () => {
             delete host.dataset.agentdiscSideHost;
-            delete host.dataset.agentdiscBoardHost;
+            delete host.dataset.agentdiscPanelFull;
         };
-    }, []);
+    }, [full]);
 }
 
 // The handle on the panel's left edge: drag it to make the column wider or narrower, like
@@ -410,13 +413,11 @@ function ResizeHandle() {
     return <div className="agentdisc-side-resize" onMouseDown={onDown} title="Drag to resize" />;
 }
 
-function SidePanel({ channel }: { channel: any; }) {
+// The Calendar view: the map of linked channels and the calendar of his days (7 Oct).
+function SideContent({ channel }: { channel: any; }) {
     const { data, reading, crawlLeft } = useSideData(channel.id, channel.guild_id);
-    const ref = useRef<HTMLDivElement>(null);
-    useHostMark(ref, false);
     return (
-        <div className="agentdisc-side" ref={ref}>
-            <ResizeHandle />
+        <div className="agentdisc-side">
             <LinkMap channel={channel} />
             <Calendar channel={channel} days={data?.days ?? {}} />
             {reading && <div className="agentdisc-side-note agentdisc-side-reading">Reading the channel…</div>}
@@ -445,35 +446,125 @@ export function stopRightPanelWidth() {
     widthStyle = null;
 }
 
-// The mission board (14 Oct): the whole column is its place; the frame itself lives in
-// missionBoard.ts and is laid over this place, so it survives every channel switch.
-function BoardSlot({ channelId, threadId }: { channelId: string; threadId: string | null; }) {
+// The mission board (14 Oct): its place fills the panel under the buttons; the frame itself
+// lives in missionBoard.ts and is laid over this place, so it survives every channel switch.
+// Board and Ideas are two pages of that same frame: switching between them never reloads it.
+function BoardSlot({ channelId, threadId, view }: { channelId: string; threadId: string | null; view: BoardView; }) {
     const ref = useRef<HTMLDivElement>(null);
-    useHostMark(ref, true);
     useEffect(() => {
         const element = ref.current!;
         attachSlot(element);
         return () => detachSlot(element);
     }, []);
     useEffect(() => showBoard(channelId, threadId), [channelId, threadId]);
+    useEffect(() => setBoardView(view), [view]);
+    return <div className="agentdisc-board-slot" ref={ref} />;
+}
+
+// Four views of the right panel (Stephane, 24 Oct: "I would like to be able to switch
+// pannels"), chosen with a row of buttons at its top and kept across reloads:
+//   Board     the channel's mission board (14 Oct)
+//   Ideas     the board's page where he drops an idea on the fly; the board sends it to the
+//             right channel and shows when that channel took it
+//   Team      Discord's own member list, people only, no bots (teamList.ts)
+//   Calendar  the map of linked channels and the calendar of his days (7 Oct)
+// Board and Ideas show only where the board is set up, and Ideas only once the board says it
+// has that page (a board from before it never does). The choice replaces the old on/off box
+// for the board: on became Board, off became Calendar.
+export type PanelMode = "board" | "ideas" | "team" | "calendar";
+const MODES: PanelMode[] = ["board", "ideas", "team", "calendar"];
+const LABELS: Record<PanelMode, string> = { board: "Board", ideas: "Ideas", team: "Team", calendar: "Calendar" };
+const TITLES: Record<PanelMode, string> = {
+    board: "This channel's board",
+    ideas: "Drop an idea (Ctrl+J)",
+    team: "The people in this server",
+    calendar: "Linked channels and your days"
+};
+
+function savedMode(): PanelMode {
+    const s = Settings.plugins.VencordToolbox ?? {};
+    if (MODES.includes(s.rightPanelMode)) return s.rightPanelMode;
+    return s.rightPanelBoard !== false ? "board" : "calendar";
+}
+
+export function setPanelMode(mode: PanelMode, focus = false) {
+    Settings.plugins.VencordToolbox.rightPanelMode = mode;
+    if (mode === "board" || mode === "ideas") setBoardView(mode, focus);
+}
+
+// Ctrl+J: the Ideas view with the cursor in the idea box, the right panel opened if needed.
+export function openIdeas() {
+    if (!hasBoard()) return false;
+    showMembers();
+    setPanelMode("ideas", true);
+    return true;
+}
+
+function ModeBar({ lit, board, ideas }: { lit: PanelMode; board: boolean; ideas: boolean; }) {
+    const modes = MODES.filter(m => m === "board" ? board : m === "ideas" ? ideas : true);
     return (
-        <div className="agentdisc-side agentdisc-board-slot" ref={ref}>
-            <ResizeHandle />
+        <div className="agentdisc-modes" role="tablist" aria-label="Right panel">
+            {modes.map(m => (
+                <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={m === lit}
+                    title={TITLES[m]}
+                    className={"agentdisc-mode" + (m === lit ? " agentdisc-mode-on" : "")}
+                    // Ideas again puts the cursor back in its box.
+                    onClick={() => setPanelMode(m, m === "ideas")}
+                >
+                    {LABELS[m]}
+                </button>
+            ))}
         </div>
     );
 }
 
-// The board when it is set up on this computer and switched on in the AgentDisc menu;
-// otherwise the map and the calendar above the member list, as before.
-function useBoardOn() {
+function RightPanel({ channel, threadId }: { channel: any; threadId: string | null; }) {
     const [, redraw] = useReducer((n: number) => n + 1, 0);
     useEffect(() => onBoardFound(redraw), []);
-    const { plugins } = useSettings(["plugins.VencordToolbox.rightPanelBoard"]);
-    return hasBoard() && plugins.VencordToolbox?.rightPanelBoard !== false;
+    const { plugins } = useSettings(["plugins.VencordToolbox.rightPanelMode", "plugins.VencordToolbox.rightPanelBoard", "plugins.VencordToolbox.boardViews"]);
+    const board = hasBoard();
+    const saved = savedMode();
+    const mode: PanelMode = !board && (saved === "board" || saved === "ideas") ? "calendar" : saved;
+    const ideas = board && String(plugins.VencordToolbox?.boardViews ?? "").split(",").includes("ideas");
+    const onBoard = mode === "board" || mode === "ideas";
+    const ref = useRef<HTMLDivElement>(null);
+    useHostMark(ref, mode !== "team");
+    useEffect(() => setPeopleOnly(mode === "team"), [mode]);
+    return (
+        <div className={`agentdisc-panel agentdisc-panel-${onBoard ? "board" : mode}`} ref={ref}>
+            <ResizeHandle />
+            <ModeBar lit={mode === "ideas" && !ideas ? "board" : mode} board={board} ideas={ideas} />
+            {onBoard && <BoardSlot channelId={channel.id} threadId={threadId} view={mode} />}
+            {mode === "calendar" && <SideContent channel={channel} />}
+        </div>
+    );
 }
 
-function RightPanel({ channel, threadId }: { channel: any; threadId: string | null; }) {
-    return useBoardOn() ? <BoardSlot channelId={channel.id} threadId={threadId} /> : <SidePanel channel={channel} />;
+// The board's word about its pages is kept, so the Ideas button shows from the start next
+// time; a page the board switched to by itself lights its button.
+let unhook: (() => void)[] = [];
+
+export function startPanelModes() {
+    unhook = [
+        onBoardViews(views => {
+            const next = views.join(",");
+            if (Settings.plugins.VencordToolbox.boardViews !== next) Settings.plugins.VencordToolbox.boardViews = next;
+        }),
+        onBoardView(view => {
+            const saved = savedMode();
+            if ((saved === "board" || saved === "ideas") && saved !== view) Settings.plugins.VencordToolbox.rightPanelMode = view;
+        })
+    ];
+}
+
+export function stopPanelModes() {
+    unhook.forEach(fn => fn());
+    unhook = [];
+    stopTeamList();
 }
 
 // In a thread, the panel shows its channel (Stephane, 7 Oct: the panel vanished in threads),

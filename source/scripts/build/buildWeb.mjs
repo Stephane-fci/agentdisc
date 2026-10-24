@@ -147,7 +147,11 @@ async function loadDir(dir, basePath = "") {
 async function buildExtension(target, files) {
     const entries = {
         "dist/Vencord.js": await readFile("dist/extension.js"),
-        "dist/Vencord.css": await readFile("dist/extension.css"),
+        // AgentDisc: the styles carry the code's build stamp. Chrome keeps the code until the
+        // app is reloaded in chrome://extensions, but reads the styles fresh on every Discord
+        // refresh; the code compares the two and asks for that reload (24 Oct: old code with new
+        // styles put the member list under the board and hid the panel buttons).
+        "dist/Vencord.css": Buffer.concat([Buffer.from(`/* agentdisc-build:${BUILD_TIMESTAMP} */\n`), await readFile("dist/extension.css")]),
         // AgentDisc: the Chrome build leaves out the 5.7 MB style editor (his style box is empty).
         ...(target === "chromium-unpacked" ? {} : await loadDir("dist/vendor/monaco", "dist/")),
         ...Object.fromEntries(await Promise.all(files.map(async f => {

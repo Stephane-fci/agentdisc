@@ -19,6 +19,32 @@
 /// <reference path="../src/modules.d.ts" />
 /// <reference path="../src/globals.d.ts" />
 
+// AgentDisc: the styles on disk carry the build stamp of the code they belong to
+// (buildWeb.mjs). Chrome keeps running the code it loaded until the app is reloaded in
+// chrome://extensions, while the styles are read fresh on each refresh of Discord; when the
+// two differ, a bar at the top says what to do (24 Oct 2026: old code under new styles put the
+// member list under the board and hid the panel buttons).
+function warnIfStale(css: string) {
+    const stamp = /agentdisc-build:(\d+)/.exec(css.slice(0, 200))?.[1];
+    if (!stamp || Number(stamp) === BUILD_TIMESTAMP) return;
+    const show = () => {
+        if (document.getElementById("agentdisc-stale")) return;
+        const bar = document.createElement("div");
+        bar.id = "agentdisc-stale";
+        bar.textContent = "AgentDisc was updated. Reload it in chrome://extensions (the round arrow on its card), then refresh Discord.";
+        Object.assign(bar.style, {
+            position: "fixed", left: "50%", top: "28px", transform: "translateX(-50%)", zIndex: "10000",
+            padding: "8px 14px", borderRadius: "8px", background: "#f0b232", color: "#141413",
+            font: "600 13px/1.3 sans-serif", boxShadow: "0 4px 16px rgb(0 0 0 / 35%)", cursor: "pointer"
+        });
+        bar.title = "Click to hide";
+        bar.onclick = () => bar.remove();
+        document.body.append(bar);
+    };
+    if (document.body) show();
+    else document.addEventListener("DOMContentLoaded", show, { once: true });
+}
+
 // Be very careful with imports in this file to avoid circular dependency issues.
 // Only import pure modules that don't import other parts of Vencord.
 import monacoHtmlLocal from "file://monacoWin.html?minify";
@@ -65,7 +91,11 @@ window.VencordNative = {
             await metaReady;
 
             return fetch(RENDERER_CSS_URL)
-                .then(res => res.text());
+                .then(res => res.text())
+                .then(css => {
+                    warnIfStale(css);
+                    return css;
+                });
         },
         onRendererCssUpdate: NOOP,
     },

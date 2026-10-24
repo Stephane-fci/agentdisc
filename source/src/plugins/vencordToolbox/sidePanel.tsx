@@ -9,7 +9,7 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { showMembers } from "@plugins/panelSwitches";
 import { ChannelStore, NavigationRouter, useEffect, useReducer, useRef, useState } from "@webpack/common";
 
-import { attachSlot, type BoardView, detachSlot, hasBoard, onBoardFound, onBoardView, onBoardViews, setBoardView, showBoard } from "./missionBoard";
+import { attachSlot, type BoardRole, detachSlot, focusIdeas, hasBoard, onBoardFound, onBoardViews, setFrameLast, showBoard } from "./missionBoard";
 import { type DayInfo, dayKey, linksOf, pairsAmong, type PlaceName, placeName, useSideData } from "./sideData";
 import { setPeopleOnly, stopTeamList } from "./teamList";
 
@@ -370,21 +370,28 @@ function Calendar({ channel, days }: { channel: any; days: Record<string, DayInf
     );
 }
 
-// The Discord column that holds the panel gets a mark of its own, for the few rules that
+// The Discord column that holds the panel gets marks of its own, for the few rules that
 // shape it. They first found it with :has(), which Chrome checks again for every element on
-// every change of the page (21 Oct, part of the lag he reported). full: the panel takes the
-// whole column and Discord's member list steps aside (every view but Team).
-function useHostMark(ref: React.RefObject<HTMLDivElement | null>, full: boolean) {
+// every change of the page (21 Oct, part of the lag he reported). Without Team, Discord's
+// member list steps aside; with Team, it takes its place and room in the stack.
+function useHostMark(ref: React.RefObject<HTMLDivElement | null>, team: { order: number; grow: number; } | null) {
     useEffect(() => {
         const host = ref.current?.parentElement;
         if (!host) return;
         host.dataset.agentdiscSideHost = "";
-        if (full) host.dataset.agentdiscPanelFull = "";
+        if (team) {
+            host.dataset.agentdiscTeam = "";
+            host.style.setProperty("--agentdisc-team-order", String(team.order));
+            host.style.setProperty("--agentdisc-team-grow", String(team.grow));
+        } else host.dataset.agentdiscPanelFull = "";
         return () => {
             delete host.dataset.agentdiscSideHost;
             delete host.dataset.agentdiscPanelFull;
+            delete host.dataset.agentdiscTeam;
+            host.style.removeProperty("--agentdisc-team-order");
+            host.style.removeProperty("--agentdisc-team-grow");
         };
-    }, [full]);
+    }, [team?.order, team?.grow, team != null]);
 }
 
 // The handle on the panel's left edge: drag it to make the column wider or narrower, like
@@ -446,106 +453,238 @@ export function stopRightPanelWidth() {
     widthStyle = null;
 }
 
-// The mission board (14 Oct): its place fills the panel under the buttons; the frame itself
-// lives in missionBoard.ts and is laid over this place, so it survives every channel switch.
-// Board and Ideas are two pages of that same frame: switching between them never reloads it.
-function BoardSlot({ channelId, threadId, view }: { channelId: string; threadId: string | null; view: BoardView; }) {
+// A board part's place; the frame itself lives in missionBoard.ts and is laid over it, so it
+// survives every channel switch and every change of the stack. The last part of the stack
+// gets the round corner of the Ivory sheet.
+function FrameSlot({ role, channelId, threadId, last }: { role: BoardRole; channelId: string; threadId: string | null; last: boolean; }) {
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const element = ref.current!;
-        attachSlot(element);
-        return () => detachSlot(element);
+        attachSlot(role, element);
+        return () => detachSlot(role, element);
     }, []);
-    useEffect(() => showBoard(channelId, threadId), [channelId, threadId]);
-    useEffect(() => setBoardView(view), [view]);
+    useEffect(() => showBoard(role, channelId, threadId), [channelId, threadId]);
+    useEffect(() => setFrameLast(role, last), [last]);
     return <div className="agentdisc-board-slot" ref={ref} />;
 }
 
-// Four views of the right panel (Stephane, 24 Oct: "I would like to be able to switch
-// pannels"), chosen with a row of buttons at its top and kept across reloads:
+// The right panel made of parts (Stephane, 24 Oct: "I could decide to display each of them on
+// their own or stack them, with the possibility of moving up and down to choose the room they
+// take"). Four parts, each switched on or off by its button at the top of the panel:
 //   Board     the channel's mission board (14 Oct)
 //   Ideas     the board's page where he drops an idea on the fly; the board sends it to the
-//             right channel and shows when that channel took it
+//             right channel and shows when that channel took it (its own frame)
 //   Team      Discord's own member list, people only, no bots (teamList.ts)
 //   Calendar  the map of linked channels and the calendar of his days (7 Oct)
-// Board and Ideas show only where the board is set up, and Ideas only once the board says it
-// has that page (a board from before it never does). The choice replaces the old on/off box
-// for the board: on became Board, off became Calendar.
-export type PanelMode = "board" | "ideas" | "team" | "calendar";
-const MODES: PanelMode[] = ["board", "ideas", "team", "calendar"];
-const LABELS: Record<PanelMode, string> = { board: "Board", ideas: "Ideas", team: "Team", calendar: "Calendar" };
-const TITLES: Record<PanelMode, string> = {
+// One part on fills the panel; several stack in the order of the buttons. Dragging a button
+// moves its part up or down; dragging the line between two parts shares the room between
+// them; a double click shows that part alone. All of it is kept. Board and Ideas show only
+// where the board is set up, and Ideas only once the board says it has that page.
+export type Part = "board" | "ideas" | "team" | "calendar";
+const PARTS: Part[] = ["board", "ideas", "team", "calendar"];
+const LABELS: Record<Part, string> = { board: "Board", ideas: "Ideas", team: "Team", calendar: "Calendar" };
+const TITLES: Record<Part, string> = {
     board: "This channel's board",
     ideas: "Drop an idea (Ctrl+J)",
     team: "The people in this server",
     calendar: "Linked channels and your days"
 };
+const HINT = "Click: show or hide. Double click: only this one. Drag: move it up or down.";
+const MIN_PART = 60;
 
-function savedMode(): PanelMode {
+interface Layout { order: Part[]; on: Part[]; sizes: Partial<Record<Part, number>>; }
+
+const isPart = (p: unknown): p is Part => PARTS.includes(p as Part);
+const list = (text: unknown) => [...new Set(String(text ?? "").split(",").filter(isPart))];
+
+function readLayout(): Layout {
     const s = Settings.plugins.VencordToolbox ?? {};
-    if (MODES.includes(s.rightPanelMode)) return s.rightPanelMode;
-    return s.rightPanelBoard !== false ? "board" : "calendar";
+    const order = list(s.rightPanelOrder);
+    for (const p of PARTS) if (!order.includes(p)) order.push(p);
+    // First time: the one view of 1.34, or the older board switch (on: Board, off: Calendar).
+    const on = s.rightPanelOn ? list(s.rightPanelOn) : [isPart(s.rightPanelMode) ? s.rightPanelMode : s.rightPanelBoard !== false ? "board" : "calendar"];
+    const sizes: Layout["sizes"] = {};
+    for (const pair of String(s.rightPanelSizes ?? "").split(",")) {
+        const [p, w] = pair.split(":");
+        const n = Number(w);
+        if (isPart(p) && n > 0.05 && n < 20) sizes[p] = n;
+    }
+    return { order, on, sizes };
 }
 
-export function setPanelMode(mode: PanelMode, focus = false) {
-    Settings.plugins.VencordToolbox.rightPanelMode = mode;
-    if (mode === "board" || mode === "ideas") setBoardView(mode, focus);
+function saveLayout(next: Layout) {
+    const s = Settings.plugins.VencordToolbox;
+    s.rightPanelOrder = next.order.join(",");
+    s.rightPanelOn = next.on.join(",");
+    s.rightPanelSizes = Object.entries(next.sizes).map(([p, w]) => `${p}:${Math.round(w! * 100) / 100}`).join(",");
 }
 
-// Ctrl+J: the Ideas view with the cursor in the idea box, the right panel opened if needed.
+const grow = (layout: Layout, p: Part) => layout.sizes[p] ?? 1;
+
+function available(p: Part, board: boolean, ideas: boolean) {
+    return p === "board" ? board : p === "ideas" ? ideas : true;
+}
+
+function shownParts(layout: Layout, board: boolean, ideas: boolean): Part[] {
+    const shown = layout.order.filter(p => layout.on.includes(p) && available(p, board, ideas));
+    // Nothing it can show (Ideas from a board that lacks it, or no board on this computer).
+    return shown.length ? shown : [board ? "board" : "calendar"];
+}
+
+function boardOffersIdeas() {
+    return String(Settings.plugins.VencordToolbox?.boardViews ?? "").split(",").includes("ideas");
+}
+
+// Ctrl+J: Ideas switched on (the other parts stay), the right panel opened if needed, and the
+// cursor in the idea box.
 export function openIdeas() {
     if (!hasBoard()) return false;
     showMembers();
-    setPanelMode("ideas", true);
+    const layout = readLayout();
+    if (!layout.on.includes("ideas")) saveLayout({ ...layout, on: [...layout.on, "ideas"] });
+    focusIdeas();
     return true;
 }
 
-function ModeBar({ lit, board, ideas }: { lit: PanelMode; board: boolean; ideas: boolean; }) {
-    const modes = MODES.filter(m => m === "board" ? board : m === "ideas" ? ideas : true);
+function ModeBar({ layout, shown, board, ideas }: { layout: Layout; shown: Part[]; board: boolean; ideas: boolean; }) {
+    const [dragged, setDragged] = useState<Part | null>(null);
+    const parts = layout.order.filter(p => available(p, board, ideas));
+    const toggle = (p: Part) => {
+        if (shown.includes(p)) {
+            // The last part shown stays: the panel is never empty.
+            if (shown.length === 1) return;
+            saveLayout({ ...layout, on: layout.on.filter(x => x !== p) });
+        } else {
+            saveLayout({ ...layout, on: [...layout.on.filter(x => x !== p), p] });
+            if (p === "ideas") focusIdeas();
+        }
+    };
+    const alone = (p: Part) => {
+        saveLayout({ ...layout, on: [p] });
+        if (p === "ideas") focusIdeas();
+    };
+    const drop = (target: Part, after: boolean) => {
+        if (!dragged || dragged === target) return;
+        const order = layout.order.filter(p => p !== dragged);
+        order.splice(order.indexOf(target) + (after ? 1 : 0), 0, dragged);
+        saveLayout({ ...layout, order });
+    };
     return (
-        <div className="agentdisc-modes" role="tablist" aria-label="Right panel">
-            {modes.map(m => (
+        <div className="agentdisc-modes" role="toolbar" aria-label="Right panel">
+            {parts.map(p => (
                 <button
-                    key={m}
+                    key={p}
                     type="button"
-                    role="tab"
-                    aria-selected={m === lit}
-                    title={TITLES[m]}
-                    className={"agentdisc-mode" + (m === lit ? " agentdisc-mode-on" : "")}
-                    // Ideas again puts the cursor back in its box.
-                    onClick={() => setPanelMode(m, m === "ideas")}
+                    aria-pressed={shown.includes(p)}
+                    title={`${TITLES[p]}. ${HINT}`}
+                    draggable
+                    className={"agentdisc-mode" + (shown.includes(p) ? " agentdisc-mode-on" : "") + (dragged === p ? " agentdisc-mode-dragged" : "")}
+                    onClick={() => toggle(p)}
+                    onDoubleClick={() => alone(p)}
+                    onDragStart={e => {
+                        setDragged(p);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", p);
+                    }}
+                    onDragEnd={() => setDragged(null)}
+                    onDragOver={e => {
+                        if (!dragged) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={e => {
+                        e.preventDefault();
+                        const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                        drop(p, e.clientX > box.left + box.width / 2);
+                        setDragged(null);
+                    }}
                 >
-                    {LABELS[m]}
+                    {LABELS[p]}
                 </button>
             ))}
         </div>
     );
 }
 
+// The line between two stacked parts: dragged up or down, it shares their room.
+function Divider({ order, above, below, layout }: { order: number; above: Part; below: Part; layout: Layout; }) {
+    const onDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const host = (e.currentTarget as HTMLElement).parentElement;
+        if (!host) return;
+        const element = (p: Part) => p === "team"
+            ? host.querySelector<HTMLElement>(":scope > :not(.agentdisc-own)")
+            : host.querySelector<HTMLElement>(`:scope > .agentdisc-part-${p}`);
+        const top = element(above);
+        const bottom = element(below);
+        if (!top || !bottom) return;
+        const h1 = top.getBoundingClientRect().height;
+        const h2 = bottom.getBoundingClientRect().height;
+        const total = h1 + h2;
+        const weight = grow(layout, above) + grow(layout, below);
+        if (total < 2 * MIN_PART) return;
+        const start = e.clientY;
+        let w1 = grow(layout, above);
+        const apply = (p: Part, el: HTMLElement, w: number) => {
+            if (p === "team") host.style.setProperty("--agentdisc-team-grow", String(w));
+            else el.style.flexGrow = String(w);
+        };
+        const move = (ev: MouseEvent) => {
+            const next = Math.min(total - MIN_PART, Math.max(MIN_PART, h1 + ev.clientY - start));
+            w1 = weight * next / total;
+            apply(above, top, w1);
+            apply(below, bottom, weight - w1);
+        };
+        const up = () => {
+            document.removeEventListener("mousemove", move);
+            document.removeEventListener("mouseup", up);
+            document.documentElement.classList.remove("agentdisc-row-resizing");
+            const now = readLayout();
+            saveLayout({ ...now, sizes: { ...now.sizes, [above]: w1, [below]: weight - w1 } });
+        };
+        document.addEventListener("mousemove", move);
+        document.addEventListener("mouseup", up);
+        document.documentElement.classList.add("agentdisc-row-resizing");
+    };
+    return <div className="agentdisc-own agentdisc-divider" style={{ order }} onMouseDown={onDown} title="Drag to share the room" />;
+}
+
 function RightPanel({ channel, threadId }: { channel: any; threadId: string | null; }) {
     const [, redraw] = useReducer((n: number) => n + 1, 0);
     useEffect(() => onBoardFound(redraw), []);
-    const { plugins } = useSettings(["plugins.VencordToolbox.rightPanelMode", "plugins.VencordToolbox.rightPanelBoard", "plugins.VencordToolbox.boardViews"]);
+    useSettings(["plugins.VencordToolbox.rightPanelOrder", "plugins.VencordToolbox.rightPanelOn", "plugins.VencordToolbox.rightPanelSizes", "plugins.VencordToolbox.rightPanelMode", "plugins.VencordToolbox.rightPanelBoard", "plugins.VencordToolbox.boardViews"]);
     const board = hasBoard();
-    const saved = savedMode();
-    const mode: PanelMode = !board && (saved === "board" || saved === "ideas") ? "calendar" : saved;
-    const ideas = board && String(plugins.VencordToolbox?.boardViews ?? "").split(",").includes("ideas");
-    const onBoard = mode === "board" || mode === "ideas";
+    const ideas = board && boardOffersIdeas();
+    const layout = readLayout();
+    const shown = shownParts(layout, board, ideas);
+    // Order: the buttons first, then each part with a line before it from the second on.
+    const orderOf = (i: number) => 10 + 2 * i;
+    const teamAt = shown.indexOf("team");
     const ref = useRef<HTMLDivElement>(null);
-    useHostMark(ref, mode !== "team");
-    useEffect(() => setPeopleOnly(mode === "team"), [mode]);
+    useHostMark(ref, teamAt < 0 ? null : { order: orderOf(teamAt), grow: grow(layout, "team") });
+    useEffect(() => setPeopleOnly(teamAt >= 0), [teamAt >= 0]);
+    const last = shown[shown.length - 1];
     return (
-        <div className={`agentdisc-panel agentdisc-panel-${onBoard ? "board" : mode}`} ref={ref}>
-            <ResizeHandle />
-            <ModeBar lit={mode === "ideas" && !ideas ? "board" : mode} board={board} ideas={ideas} />
-            {onBoard && <BoardSlot channelId={channel.id} threadId={threadId} view={mode} />}
-            {mode === "calendar" && <SideContent channel={channel} />}
-        </div>
+        <>
+            <div className="agentdisc-own agentdisc-panel-bar" ref={ref}>
+                <ResizeHandle />
+                <ModeBar layout={layout} shown={shown} board={board} ideas={ideas} />
+            </div>
+            {shown.flatMap((p, i) => [
+                i > 0 ? <Divider key={`line-${p}`} order={orderOf(i) - 1} above={shown[i - 1]} below={p} layout={layout} /> : null,
+                p === "team" ? null : (
+                    <div key={p} className={`agentdisc-own agentdisc-part agentdisc-part-${p}`} style={{ order: orderOf(i), flexGrow: grow(layout, p) }}>
+                        {p === "calendar"
+                            ? <SideContent channel={channel} />
+                            : <FrameSlot role={p} channelId={channel.id} threadId={threadId} last={p === last} />}
+                    </div>
+                )
+            ])}
+        </>
     );
 }
 
-// The board's word about its pages is kept, so the Ideas button shows from the start next
-// time; a page the board switched to by itself lights its button.
+// The board's word about its pages is kept, so the Ideas button shows from the start next time.
 let unhook: (() => void)[] = [];
 
 export function startPanelModes() {
@@ -553,10 +692,6 @@ export function startPanelModes() {
         onBoardViews(views => {
             const next = views.join(",");
             if (Settings.plugins.VencordToolbox.boardViews !== next) Settings.plugins.VencordToolbox.boardViews = next;
-        }),
-        onBoardView(view => {
-            const saved = savedMode();
-            if ((saved === "board" || saved === "ideas") && saved !== view) Settings.plugins.VencordToolbox.rightPanelMode = view;
         })
     ];
 }

@@ -300,18 +300,12 @@
     cursor: copy;
 }
 
-/* The right panel above the member list (7 Oct): the map of linked channels, then the
-   calendar of his days; the member list keeps the rest of the column and its own scroll. */
+/* The right panel's column (7 Oct; parts since 24 Oct, further down): one stack, top to
+   bottom, the drag handle for its width along its left edge. */
 [data-agentdisc-side-host] {
     position: relative;
     display: flex !important;
     flex-direction: column;
-}
-
-[data-agentdisc-side-host] > [class*="members_"] {
-    flex: 1 1 auto;
-    min-height: 0;
-    height: auto !important;
 }
 
 .agentdisc-side {
@@ -822,34 +816,66 @@ svg.agentdisc-copy-sign {
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
-/* The right panel's views (24 Oct): Board, Ideas, Team, Calendar. In every view but Team the
-   panel fills the whole column and whatever else the column holds (Discord's member list)
-   steps aside; in Team the buttons sit above Discord's member list. The board's frame is laid
-   over its place from outside, so it never reloads on a channel switch. */
-[data-agentdisc-panel-full] > :not(.agentdisc-panel) {
+/* The right panel made of parts (24 Oct): the buttons on top, then the parts switched on,
+   stacked, with a line between two parts that shares their room. Without Team, whatever else
+   the column holds (Discord's member list) steps aside; with Team, the member list takes its
+   place and room in the stack. The board's frames are laid over their places from outside, so
+   they never reload on a channel switch. */
+[data-agentdisc-panel-full] > :not(.agentdisc-own) {
     display: none !important;
 }
 
-.agentdisc-panel {
-    position: relative;
+[data-agentdisc-team] > :not(.agentdisc-own) {
+    order: var(--agentdisc-team-order, 50);
+    flex: var(--agentdisc-team-grow, 1) 1 0px !important;
+    min-height: 60px;
+    height: auto !important;
+}
+
+.agentdisc-panel-bar {
+    order: 0;
     flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
     box-sizing: border-box;
     width: var(--custom-member-list-width, 240px);
     min-width: 0;
 }
 
-[data-agentdisc-panel-full] > .agentdisc-panel {
-    flex: 1 1 auto;
-    min-height: 0;
-    height: 100%;
+.agentdisc-part {
+    flex: 1 1 0px;
+    display: flex;
+    flex-direction: column;
+    min-height: 60px;
+    min-width: 0;
+    overflow: hidden;
 }
 
-/* In Team the drag handle runs along the whole column, member list included. */
-.agentdisc-panel-team {
-    position: static;
-    border-bottom: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+.agentdisc-divider {
+    position: relative;
+    flex: 0 0 7px;
+    cursor: row-resize;
+}
+
+.agentdisc-divider::after {
+    content: "";
+    position: absolute;
+    inset: 3px 8px;
+    background: var(--border-subtle, rgb(255 255 255 / 8%));
+}
+
+.agentdisc-divider:hover::after,
+.agentdisc-row-resizing .agentdisc-divider::after {
+    inset: 2px 8px;
+    background: color-mix(in oklab, var(--agentdisc-selected, #5865f2) 70%, transparent);
+}
+
+.agentdisc-row-resizing,
+.agentdisc-row-resizing * {
+    cursor: row-resize !important;
+    user-select: none !important;
+}
+
+.agentdisc-row-resizing .agentdisc-board-frame {
+    pointer-events: none;
 }
 
 .agentdisc-modes {
@@ -899,11 +925,15 @@ svg.agentdisc-copy-sign {
 .agentdisc-board-slot {
     position: relative;
     flex: 1 1 auto;
-    min-height: 200px;
+    min-height: 0;
 }
 
-/* Calendar: the map and the calendar fill the panel and scroll inside it. */
-.agentdisc-panel > .agentdisc-side {
+.agentdisc-mode-dragged {
+    opacity: 0.5;
+}
+
+/* Calendar: the map and the calendar fill their part and scroll inside it. */
+.agentdisc-part > .agentdisc-side {
     flex: 1 1 auto;
     width: auto;
     min-height: 0;

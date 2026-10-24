@@ -196,8 +196,8 @@ function ivoryShape(header: string, server: string, chat: string) {
         // Only the header bar's own colour part (Discord's header module writes it themed__):
         // the first rule's themed_ also hit the typing dots and Discord's tab bars (21 Oct review).
         `${L} ${CHAT} [class*="themed__"]{background:#FFFFFF!important}`,
-        // The board laid over the panel keeps the sheet's round corner at the bottom right.
-        ".agentdisc-board-frame:not(.agentdisc-board-full){border-end-end-radius:17px}",
+        // The board laid over the panel's last part keeps the sheet's round corner at the bottom right.
+        ".agentdisc-board-frame.agentdisc-board-last:not(.agentdisc-board-full){border-end-end-radius:17px}",
         // The channel's name above the messages: a Garamond title, no # before it, no line under it.
         header && `${within(header, '[class*="titleWrapper_"]')},${within(header, '[class*="titleWrapper_"] *')}{${titleFont};font-size:19px!important}`,
         header && `${within(header, '[class*="children_"]>[class*="iconWrapper_"]:first-child')}{display:none!important}`,

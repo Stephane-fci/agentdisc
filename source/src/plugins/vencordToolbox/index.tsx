@@ -90,6 +90,24 @@ export const settings = definePluginSettings({
         description: "Right panel: board, ideas, team or calendar (the buttons at its top); empty follows the old board switch",
         hidden: true
     },
+    rightPanelOrder: {
+        type: OptionType.STRING,
+        default: "",
+        description: "Right panel: the order of its parts, top to bottom (board, ideas, team, calendar)",
+        hidden: true
+    },
+    rightPanelOn: {
+        type: OptionType.STRING,
+        default: "",
+        description: "Right panel: the parts switched on; empty follows the earlier one-view choice",
+        hidden: true
+    },
+    rightPanelSizes: {
+        type: OptionType.STRING,
+        default: "",
+        description: "Right panel: the room each stacked part takes (part:weight)",
+        hidden: true
+    },
     boardViews: {
         type: OptionType.STRING,
         default: "",

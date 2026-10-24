@@ -7,21 +7,28 @@
 import { EXTENSION_BASE_URL, metaReady } from "@utils/web-metadata";
 import { ChannelStore, MessageActions, NavigationRouter, SelectedChannelStore } from "@webpack/common";
 
-// The mission board in the right panel (Stephane, 14 Oct): one Kanban board per channel,
-// shown instead of the map, the calendar and the member list. It follows the channel he
-// opens and marks the open thread's card; a click on a card's thread opens that thread.
+// The mission board in the right panel (Stephane, 14 Oct): one Kanban board per channel. It
+// follows the channel he opens and marks the open thread's card; a click on a card's thread
+// opens that thread.
 //
 // The board's address comes from a setup file beside the app on his computer
 // (dist/mission-board.json); the browser's own background part adds the board's key to the
 // board's requests (service-worker.js). Without the setup file the panel stays as it was.
 //
-// One frame lives for the whole session, laid over the panel's place, so switching channels
-// never reloads it: the board is told which channel to show by a message.
+// Each frame lives for the whole session, laid over its place in the panel, so switching
+// channels never reloads it: the board is told which channel to show by a message.
 //
-// The board can grow to almost the whole window (Stephane, 20 Oct: "a pop-up that takes up
-// almost all of the screen, where I would see the board in full"): its own button asks, the
-// same frame moves over a dim layer and keeps following the channel he opens. A click on the
-// dim layer, Esc, or opening a card's message puts it back over the panel.
+// Two frames at most (24 Oct, his panel made of parts): one on the board's own page, one on
+// its ideas page, where he drops an idea on the fly. Each is made the first time its part is
+// switched on and is kept, hidden, while its part is off, so nothing he typed is lost. The
+// address carries modes=1 (AgentDisc shows its own buttons, so the board hides its small
+// Board/Ideas switch) and view=ideas for the ideas frame. A board from before the ideas page
+// never says it offers it, so the Ideas part waits for that word.
+//
+// A frame can grow to almost the whole window (Stephane, 20 Oct: "a pop-up that takes up
+// almost all of the screen, where I would see the board in full"): the board's own button
+// asks, the frame moves over a dim layer and keeps following the channel he opens. A click on
+// the dim layer, Esc, or opening a card's message puts it back over the panel.
 
 let origin: string | null = null;
 const listeners = new Set<() => void>();
@@ -46,234 +53,277 @@ async function loadBoard() {
     } catch { }
 }
 
-let frame: HTMLIFrameElement | null = null;
-let loaded = false;
-let shown = "";
-let slot: HTMLElement | null = null;
-let raf = 0;
-let last = "";
-let full = false;
+export type BoardRole = "board" | "ideas";
+
 // The look AgentDisc shows ("ivory" or "dark", from the theme switch), so the board can match
 // it (asked of the board on 20 Oct); a board that does not know the message ignores it.
 let look = "dark";
-let dim: HTMLElement | null = null;
-
-// The board's pages in the same frame (24 Oct, his "switch pannels"): the board and the ideas
-// page. AgentDisc shows its own Board and Ideas buttons (modes=1 in the address hides the
-// board's own small switch) and tells the board which page to show; the board answers with
-// the page it shows after every change, and on load with the pages it offers. A board from
-// before the ideas page never says it offers them, so the Ideas button waits for that word.
-export type BoardView = "board" | "ideas";
-let wantView: BoardView = "board";
-let wantFocus = false;
 let offered = new Set<string>(["board"]);
-const viewListeners = new Set<(view: BoardView) => void>();
 const offerListeners = new Set<(views: string[]) => void>();
-
-export function onBoardView(fn: (view: BoardView) => void) {
-    viewListeners.add(fn);
-    return () => void viewListeners.delete(fn);
-}
 
 export function onBoardViews(fn: (views: string[]) => void) {
     offerListeners.add(fn);
     return () => void offerListeners.delete(fn);
 }
 
-function sendView() {
-    if (!origin || !frame?.contentWindow || !loaded) return;
-    if (wantView !== "board" && !offered.has(wantView)) return;
-    frame.contentWindow.postMessage({ type: "mission-control:view", view: wantView, focus: wantFocus }, origin);
-    wantFocus = false;
-}
-
-// The page to show; focus puts the cursor in the idea box. Before the board has loaded, the
-// wish waits and goes out when the board says what it offers.
-export function setBoardView(view: BoardView, focus = false) {
-    wantView = view;
-    if (focus) wantFocus = true;
-    sendView();
-}
 // The panel's resize handle sits on its left edge; the frame leaves it free (styles.css).
 //
-// Chrome itself keeps the frame on the panel's place (CSS anchor positioning, 21 Oct): the
-// place is the anchor and the frame follows it through every resize with no script running.
-// Before, a script measured the place on every screen refresh, all day long, which kept the
-// computer busy for nothing (his lag report, 21 Oct). A watcher on the place's size only
-// hides the frame when the place is gone or too small. A browser without anchors keeps the
-// old way.
+// Chrome itself keeps a frame on its place (CSS anchor positioning, 21 Oct): the place is the
+// anchor and the frame follows it through every resize with no script running. Before, a
+// script measured the place on every screen refresh, all day long, which kept the computer
+// busy for nothing (his lag report, 21 Oct). A watcher on the place's size only hides the
+// frame when the place is gone or too small. A browser without anchors keeps the old way.
 const ANCHORS = typeof CSS !== "undefined" && CSS.supports?.("anchor-name: --agentdisc-board") === true;
-const ANCHOR = "--agentdisc-board";
 const HANDLE = 4;
-let seen = false;
-let watcher: ResizeObserver | null = null;
 
-function boardFrame() {
-    if (frame) return frame;
-    frame = document.createElement("iframe");
-    frame.className = "agentdisc-board-frame" + (ANCHORS ? " agentdisc-board-anchored" : "");
-    frame.title = "Mission board";
-    // Chrome fires a load for the empty frame the moment it is added; only the board's own
-    // page counts.
-    frame.addEventListener("load", () => {
-        if (!frame?.getAttribute("src")) return;
-        loaded = true;
-        sendView();
-    });
-    document.body.append(frame);
-    return frame;
-}
+let dim: HTMLElement | null = null;
 
-function show(on: boolean) {
-    if (frame) frame.style.display = on ? "block" : "none";
-}
-
-function place() {
-    raf = 0;
-    if (!frame) return;
-    // Big, the frame keeps its place whatever the panel does (styles.css, agentdisc-board-full).
-    if (full || ANCHORS) {
-        const next = full ? "full" : seen && slot ? "shown" : "hidden";
-        if (next !== last) {
-            last = next;
-            if (!ANCHORS) Object.assign(frame.style, { left: "", top: "", width: "", height: "" });
-            show(next !== "hidden");
-        }
-        return;
-    }
-    const rect = slot?.isConnected ? slot.getBoundingClientRect() : null;
-    const visible = !!rect && rect.width > 40 && rect.height > 40;
-    const next = visible ? `${rect!.left + HANDLE}|${rect!.top}|${rect!.width - HANDLE}|${rect!.height}` : "hidden";
-    if (next !== last) {
-        last = next;
-        if (!visible) show(false);
-        else Object.assign(frame.style, {
-            display: "block",
-            left: `${rect!.left + HANDLE}px`,
-            top: `${rect!.top}px`,
-            width: `${rect!.width - HANDLE}px`,
-            height: `${rect!.height}px`
-        });
-    }
-    if (slot) raf = requestAnimationFrame(place);
-}
-
-function schedule() {
-    if (!raf) raf = requestAnimationFrame(place);
-}
-
-// The panel's place is on screen: lay the frame over it and keep it there.
-export function attachSlot(element: HTMLElement) {
-    if (slot && slot !== element) slot.style.removeProperty("anchor-name");
-    slot = element;
-    boardFrame();
-    if (ANCHORS) {
-        element.style.setProperty("anchor-name", ANCHOR);
-        seen = false;
-        watcher ??= new ResizeObserver(entries => {
-            const box = entries[entries.length - 1]?.contentRect;
-            seen = !!box && box.width > 40 && box.height > 40;
-            schedule();
-        });
-        watcher.disconnect();
-        watcher.observe(element);
-    }
-    schedule();
-}
-
-export function detachSlot(element: HTMLElement) {
-    if (slot !== element) return;
-    element.style.removeProperty("anchor-name");
-    watcher?.disconnect();
+class BoardFrame {
+    frame: HTMLIFrameElement | null = null;
+    loaded = false;
+    shown = "";
+    slot: HTMLElement | null = null;
     seen = false;
-    slot = null;
-    schedule();
+    watcher: ResizeObserver | null = null;
+    raf = 0;
+    last = "";
+    full = false;
+    focus = false;
+    bottom = false;
+
+    constructor(readonly role: BoardRole) { }
+
+    get anchor() {
+        return `--agentdisc-${this.role}`;
+    }
+
+    element() {
+        if (this.frame) return this.frame;
+        const f = this.frame = document.createElement("iframe");
+        f.className = "agentdisc-board-frame" + (ANCHORS ? " agentdisc-board-anchored" : "");
+        f.title = this.role === "ideas" ? "Ideas" : "Mission board";
+        if (ANCHORS) f.style.setProperty("position-anchor", this.anchor);
+        f.classList.toggle("agentdisc-board-last", this.bottom);
+        // Chrome fires a load for the empty frame the moment it is added; only the board's own
+        // page counts.
+        f.addEventListener("load", () => {
+            if (!f.getAttribute("src")) return;
+            this.loaded = true;
+            this.sendFocus();
+        });
+        document.body.append(f);
+        return f;
+    }
+
+    post(message: object) {
+        if (origin && this.frame?.contentWindow && this.loaded) this.frame.contentWindow.postMessage(message, origin);
+    }
+
+    // The cursor in the idea box, once the board is there and offers its ideas page.
+    sendFocus() {
+        if (this.role !== "ideas" || !this.focus || !this.loaded || !offered.has("ideas")) return;
+        this.post({ type: "mission-control:view", view: "ideas", focus: true });
+        this.focus = false;
+    }
+
+    display(on: boolean) {
+        if (this.frame) this.frame.style.display = on ? "block" : "none";
+    }
+
+    place() {
+        this.raf = 0;
+        const f = this.frame;
+        if (!f) return;
+        // Big, the frame keeps its place whatever the panel does (styles.css, agentdisc-board-full).
+        if (this.full || ANCHORS) {
+            const next = this.full ? "full" : this.seen && this.slot ? "shown" : "hidden";
+            if (next !== this.last) {
+                this.last = next;
+                if (!ANCHORS) Object.assign(f.style, { left: "", top: "", width: "", height: "" });
+                this.display(next !== "hidden");
+            }
+            return;
+        }
+        const rect = this.slot?.isConnected ? this.slot.getBoundingClientRect() : null;
+        const visible = !!rect && rect.width > 40 && rect.height > 40;
+        const next = visible ? `${rect!.left + HANDLE}|${rect!.top}|${rect!.width - HANDLE}|${rect!.height}` : "hidden";
+        if (next !== this.last) {
+            this.last = next;
+            if (!visible) this.display(false);
+            else Object.assign(f.style, {
+                display: "block",
+                left: `${rect!.left + HANDLE}px`,
+                top: `${rect!.top}px`,
+                width: `${rect!.width - HANDLE}px`,
+                height: `${rect!.height}px`
+            });
+        }
+        if (this.slot) this.raf = requestAnimationFrame(() => this.place());
+    }
+
+    schedule() {
+        if (!this.raf) this.raf = requestAnimationFrame(() => this.place());
+    }
+
+    attach(element: HTMLElement) {
+        if (this.slot && this.slot !== element) this.slot.style.removeProperty("anchor-name");
+        this.slot = element;
+        this.element();
+        if (ANCHORS) {
+            element.style.setProperty("anchor-name", this.anchor);
+            this.seen = false;
+            this.watcher ??= new ResizeObserver(entries => {
+                const box = entries[entries.length - 1]?.contentRect;
+                this.seen = !!box && box.width > 40 && box.height > 40;
+                this.schedule();
+            });
+            this.watcher.disconnect();
+            this.watcher.observe(element);
+        }
+        this.schedule();
+    }
+
+    detach(element: HTMLElement) {
+        if (this.slot !== element) return;
+        element.style.removeProperty("anchor-name");
+        this.watcher?.disconnect();
+        this.seen = false;
+        this.slot = null;
+        this.schedule();
+    }
+
+    // The board's own button shows the real size only once it hears it from here.
+    tellSize() {
+        if (origin && this.frame?.contentWindow) this.frame.contentWindow.postMessage({ type: "mission-control:size", full: this.full }, origin);
+    }
+
+    setFull(next: boolean) {
+        if (!this.frame || this.full === next) {
+            this.tellSize();
+            return;
+        }
+        // One big frame at a time.
+        if (next) for (const other of Object.values(frames)) if (other !== this && other.full) other.setFull(false);
+        this.full = next;
+        this.frame.classList.toggle("agentdisc-board-full", next);
+        if (next) {
+            if (!dim) {
+                dim = document.createElement("div");
+                dim.className = "agentdisc-board-dim";
+                dim.addEventListener("click", () => bigFrame()?.setFull(false));
+            }
+            document.body.append(dim);
+            document.addEventListener("keydown", onEscape, true);
+        } else if (!bigFrame()) {
+            dim?.remove();
+            document.removeEventListener("keydown", onEscape, true);
+        }
+        this.last = "";
+        this.schedule();
+        this.tellSize();
+    }
+
+    // Show a channel's board, marking the open thread's card. The first time the frame loads
+    // the page; after that a message switches it with no reload.
+    show(channelId: string, threadId: string | null) {
+        if (!origin) return;
+        const f = this.element();
+        const key = `${channelId}|${threadId ?? ""}`;
+        if (key === this.shown) return;
+        this.shown = key;
+        if (!this.loaded || !f.contentWindow) {
+            this.loaded = false;
+            // grow=1: the board offers its full-screen button, which this app answers.
+            f.src = `${origin}/c/${channelId}?panel=1&grow=1&modes=1&look=${look}${this.role === "ideas" ? "&view=ideas" : ""}${threadId ? `&thread=${threadId}` : ""}`;
+            return;
+        }
+        f.contentWindow.postMessage({ type: "mission-control:show", channel: channelId, thread: threadId }, origin);
+    }
+
+    remove() {
+        if (this.raf) cancelAnimationFrame(this.raf);
+        this.raf = 0;
+        this.watcher?.disconnect();
+        this.watcher = null;
+        this.slot?.style.removeProperty("anchor-name");
+        this.frame?.remove();
+        this.frame = null;
+        this.loaded = false;
+        this.full = false;
+        this.focus = false;
+        this.shown = "";
+        this.slot = null;
+        this.last = "";
+        this.seen = false;
+    }
+}
+
+const frames: Record<BoardRole, BoardFrame> = { board: new BoardFrame("board"), ideas: new BoardFrame("ideas") };
+
+const bigFrame = () => Object.values(frames).find(f => f.full) ?? null;
+
+function onEscape(e: KeyboardEvent) {
+    const big = bigFrame();
+    if (e.key !== "Escape" || !big) return;
+    e.preventDefault();
+    e.stopPropagation();
+    big.setFull(false);
+}
+
+// A part's place is on screen: lay its frame over it and keep it there.
+export function attachSlot(role: BoardRole, element: HTMLElement) {
+    frames[role].attach(element);
+}
+
+export function detachSlot(role: BoardRole, element: HTMLElement) {
+    frames[role].detach(element);
+}
+
+export function showBoard(role: BoardRole, channelId: string, threadId: string | null) {
+    frames[role].show(channelId, threadId);
+}
+
+// The frame of the stack's last part takes the sheet's round corner (Ivory).
+export function setFrameLast(role: BoardRole, bottom: boolean) {
+    const f = frames[role];
+    f.bottom = bottom;
+    f.frame?.classList.toggle("agentdisc-board-last", bottom);
+}
+
+// Ctrl+J and a click that switches Ideas on: the cursor in the idea box.
+export function focusIdeas() {
+    frames.ideas.focus = true;
+    frames.ideas.sendFocus();
 }
 
 export function setBoardLook(next: string) {
     if (next === look) return;
     look = next;
-    if (origin && frame?.contentWindow && loaded) frame.contentWindow.postMessage({ type: "mission-control:look", look }, origin);
-}
-
-// The board's own button shows the real size only once it hears it from here.
-function tellSize() {
-    if (origin && frame?.contentWindow) frame.contentWindow.postMessage({ type: "mission-control:size", full }, origin);
-}
-
-function onEscape(e: KeyboardEvent) {
-    if (e.key !== "Escape" || !full) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setFull(false);
-}
-
-function setFull(next: boolean) {
-    if (!frame || full === next) {
-        tellSize();
-        return;
-    }
-    full = next;
-    frame.classList.toggle("agentdisc-board-full", full);
-    if (full) {
-        if (!dim) {
-            dim = document.createElement("div");
-            dim.className = "agentdisc-board-dim";
-            dim.addEventListener("click", () => setFull(false));
-        }
-        document.body.append(dim);
-        document.addEventListener("keydown", onEscape, true);
-    } else {
-        dim?.remove();
-        document.removeEventListener("keydown", onEscape, true);
-    }
-    last = "";
-    schedule();
-    tellSize();
-}
-
-// Show a channel's board, marking the open thread's card. The first time the frame loads
-// the page; after that a message switches the board with no reload.
-export function showBoard(channelId: string, threadId: string | null) {
-    if (!origin) return;
-    const f = boardFrame();
-    const key = `${channelId}|${threadId ?? ""}`;
-    if (key === shown) return;
-    shown = key;
-    if (!loaded || !f.contentWindow) {
-        loaded = false;
-        // grow=1: the board offers its full-screen button, which this app answers.
-        f.src = `${origin}/c/${channelId}?panel=1&grow=1&modes=1&look=${look}${wantView === "ideas" ? "&view=ideas" : ""}${threadId ? `&thread=${threadId}` : ""}`;
-        return;
-    }
-    f.contentWindow.postMessage({ type: "mission-control:show", channel: channelId, thread: threadId }, origin);
+    for (const f of Object.values(frames)) f.post({ type: "mission-control:look", look });
 }
 
 // A click on a card's thread or icon in the board opens that thread or message here.
 function onMessage(e: MessageEvent) {
-    if (!origin || e.origin !== origin || !frame || e.source !== frame.contentWindow) return;
+    if (!origin || e.origin !== origin) return;
+    const from = Object.values(frames).find(f => f.frame && e.source === f.frame.contentWindow);
+    if (!from) return;
     const { data } = e;
     if (data?.type === "mission-control:size") {
-        setFull(data.full === true);
+        from.setFull(data.full === true);
         return;
     }
     if (data?.type === "mission-control:views" && Array.isArray(data.views)) {
         const views = data.views.filter((v: unknown): v is string => typeof v === "string" && /^[a-z]{1,20}$/.test(v)).slice(0, 10);
         offered = new Set(["board", ...views]);
         // The board speaks, so its page is there, even before the frame's own load event.
-        loaded = true;
+        from.loaded = true;
         offerListeners.forEach(fn => fn(views));
-        sendView();
-        return;
-    }
-    if (data?.type === "mission-control:view" && (data.view === "board" || data.view === "ideas")) {
-        wantView = data.view;
-        viewListeners.forEach(fn => fn(data.view));
+        from.sendFocus();
         return;
     }
     if (data?.type !== "mission-control:open" || typeof data.channel !== "string" || !/^\d+$/.test(data.channel)) return;
     // From the big board, back to the panel first, so he lands on the message.
-    setFull(false);
+    from.setFull(false);
     const guild = typeof data.guild === "string" && /^\d+$/.test(data.guild) ? data.guild : ChannelStore.getChannel(data.channel)?.guild_id ?? "@me";
     // A card's icon names the exact message to look at (14 Oct): Discord jumps to it and
     // lights it up, in a thread too. In the channel already open, going to the same address
@@ -293,19 +343,11 @@ export function startBoard() {
 
 export function stopBoard() {
     window.removeEventListener("message", onMessage);
-    setFull(false);
-    if (raf) cancelAnimationFrame(raf);
-    raf = 0;
-    watcher?.disconnect();
-    watcher = null;
-    seen = false;
-    slot?.style.removeProperty("anchor-name");
-    frame?.remove();
-    frame = null;
-    loaded = false;
+    for (const f of Object.values(frames)) {
+        f.setFull(false);
+        f.remove();
+    }
+    dim?.remove();
+    document.removeEventListener("keydown", onEscape, true);
     offered = new Set(["board"]);
-    wantFocus = false;
-    shown = "";
-    slot = null;
-    last = "";
 }

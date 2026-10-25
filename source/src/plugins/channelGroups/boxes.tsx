@@ -107,6 +107,8 @@ export interface CategoryFamily {
     name: string;
     label: string;
     main: any | null;
+    // Its archive categories, in the server's order (25 Oct: room for Ctrl+K when the main one is full).
+    archives: any[];
     position: number;
 }
 
@@ -133,8 +135,9 @@ export function categoryFamilies(guildId: string): CategoryFamily[] {
         const name = familyName(c.name);
         const key = `${sameSign(emoji)}|${words(name)}`;
         let family = families.get(key);
-        if (!family) families.set(key, family = { key, emoji, name, label: "", main: null, position: c.position });
-        if (!family.main && !ARCHIVE.test(c.name)) {
+        if (!family) families.set(key, family = { key, emoji, name, label: "", main: null, archives: [], position: c.position });
+        if (ARCHIVE.test(c.name)) family.archives.push(c);
+        else if (!family.main) {
             family.main = c;
             family.position = c.position;
         }
@@ -335,6 +338,47 @@ export async function moveAfterBookmarks(channelId: string, isBookmarked: (id: s
     }
 }
 
+// Discord takes at most 50 channels in one category. When the main category is full, its
+// least recently used channel goes to the family's first archive with room, as the server's
+// own rule says (the active category keeps the recently used ones, older ones go to its
+// archives), and the channel then moves in (25 Oct: Ctrl+K did nothing in his two 🥑
+// channels: "🥑 Tools & Skills" held 50).
+const CATEGORY_LIMIT = 50;
+
+const lastUsed = (c: any) => {
+    const id = ChannelStore.getChannel(c.id)?.lastMessageId ?? c.lastMessageId ?? c.id;
+    try {
+        return BigInt(id);
+    } catch {
+        return 0n;
+    }
+};
+
+// The id of the channel moved out (or "" when there was room), or null when no room was made.
+async function makeRoom(guildId: string, category: any, family: CategoryFamily, all: any[]): Promise<string | null> {
+    const inside = all.filter(c => c.parent_id === category.id);
+    if (inside.length < CATEGORY_LIMIT) return "";
+    const archive = family.archives.find(a => all.filter(c => c.parent_id === a.id).length < CATEGORY_LIMIT);
+    if (!archive) {
+        showToast(`${category.name} is full (50 channels, Discord's limit) and so are its archives.`, Toasts.Type.FAILURE);
+        return null;
+    }
+    const oldest = inside.reduce((a, b) => lastUsed(b) < lastUsed(a) ? b : a);
+    const archived = all.filter(c => c.parent_id === archive.id && c.id !== oldest.id).sort((a, b) => a.position - b.position);
+    try {
+        await RestAPI.patch({
+            url: `/guilds/${guildId}/channels`,
+            // First in the archive: the most recently used of what it holds.
+            body: [{ id: oldest.id, parent_id: archive.id, position: 0, lock_permissions: false }, ...archived.map((c, i) => ({ id: c.id, position: i + 1 }))]
+        });
+        showToast(`${category.name} was full: #${oldest.name} went to ${archive.name}`, Toasts.Type.MESSAGE);
+        return oldest.id;
+    } catch (e) {
+        showToast(`${category.name} is full and no room could be made: ${errorText(e)}`, Toasts.Type.FAILURE);
+        return null;
+    }
+}
+
 export async function tidyChannel(): Promise<boolean> {
     const open = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
     const channel = open?.isThread?.() ? ChannelStore.getChannel(open.parent_id) : open;
@@ -347,6 +391,8 @@ export async function tidyChannel(): Promise<boolean> {
     const group = selectable.some(c => c.id === channel.id) ? selectable : records(lists?.VOCAL);
 
     let category: any = null;
+    // A channel moved out to make room is no longer among the category's channels.
+    let skip = "";
     if (!channel.parent_id) {
         const family = familyForName(channel.name, categoryFamilies(guildId));
         category = family?.main ?? null;
@@ -355,11 +401,14 @@ export async function tidyChannel(): Promise<boolean> {
             showToast(family ? `Only archive categories for ${family.label}.` : emoji ? `No category starts with ${emoji}.` : "No category matches this channel's name.", Toasts.Type.FAILURE);
             return true;
         }
+        const moved = await makeRoom(guildId, category, family!, records(lists?.SELECTABLE).concat(records(lists?.VOCAL)));
+        if (moved === null) return true;
+        if (moved) skip = moved;
     }
 
     const parentId = category?.id ?? null;
     const others = group
-        .filter(c => c.id !== channel.id && (c.parent_id ?? null) === parentId)
+        .filter(c => c.id !== channel.id && c.id !== skip && (c.parent_id ?? null) === parentId)
         .sort((a, b) => a.position - b.position);
     try {
         await RestAPI.patch({

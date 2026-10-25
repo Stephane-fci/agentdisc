@@ -51,12 +51,18 @@ function write(next: Partial<Record<Area, Kept>>) {
 // one value, the icon plus its padding, and the channel list takes the rest of the side.
 const SERVER_COLUMN = (zoom: number) => `:root,.refresh-fast-follow-avatars{--custom-guild-list-width:calc((var(--guildbar-avatar-size) + var(--custom-guild-list-padding) * 2) * ${zoom})!important}`;
 
+// A zoomed box draws its fixed sizes zoomed too, while sizes given in parts of its place keep
+// filling it. The Team list has a fixed width, so zoomed out it shrank into a narrow box with
+// room left around it (25 Oct, his "the team one is messed up when zoomed out"); it is told to
+// fill its place, and only its text and pictures get smaller.
+const FILL = "width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;min-width:0!important";
+
 function apply() {
     if (!style) return;
     const kept = read();
-    const rules = Object.values(kept)
-        .filter((k): k is Kept => !!k && typeof k.selector === "string" && /^[.\w-]+$/.test(k.selector) && k.zoom !== 1)
-        .map(k => `${k.selector}{zoom:${k.zoom}}`);
+    const rules = (Object.entries(kept) as [Area, Kept | undefined][])
+        .filter((e): e is [Area, Kept] => !!e[1] && typeof e[1].selector === "string" && /^[.\w-]+$/.test(e[1].selector) && e[1].zoom !== 1)
+        .map(([area, k]) => `${k.selector}{zoom:${k.zoom}${area === "team" ? `;${FILL}` : ""}}`);
     const servers = kept.servers?.zoom;
     if (typeof servers === "number" && servers !== 1) rules.push(SERVER_COLUMN(servers));
     style.textContent = rules.join("\n");

@@ -306,6 +306,10 @@
     position: relative;
     display: flex !important;
     flex-direction: column;
+    /* Every part starts at the top, whatever room is left (25 Oct, his "Every block should
+       always align top"): Discord's own value for this column put the free room above. */
+    justify-content: flex-start !important;
+    align-items: stretch !important;
 }
 
 .agentdisc-side {

@@ -504,7 +504,7 @@ const LABELS: Record<Part, string> = { board: "Board", ideas: "Ideas", team: "Te
 const TITLES: Record<Part, string> = {
     board: "This channel's board",
     ideas: "Drop an idea (Ctrl+J)",
-    team: "The people in this server",
+    team: "The members of this server (a right-click on one hides them here)",
     connections: "The channels and threads linked with this one",
     calendar: "Your days in this channel"
 };

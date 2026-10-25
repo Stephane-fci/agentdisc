@@ -18,6 +18,7 @@
 
 import "./styles.css";
 
+import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
@@ -27,7 +28,7 @@ import { Devs } from "@utils/constants";
 import { copyWithToast } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
 import { findComponentByCodeLazy } from "@webpack";
-import { ChannelStore, Popout, SelectedChannelStore, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
+import { ChannelStore, Menu, Popout, SelectedChannelStore, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
 import type { PropsWithChildren } from "react";
 
 import { startBusyBar, stopBusyBar } from "./busyBar";
@@ -41,6 +42,7 @@ import { startShiftKeys, stopShiftKeys } from "./shiftKeys";
 import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
 import { renderSidePanel, startPanelModes, startRightPanelWidth, stopPanelModes, stopRightPanelWidth } from "./sidePanel";
+import { isHiddenInTeam, toggleHiddenInTeam } from "./teamList";
 import { keepArrows, keepInvite, renderArrows, renderServerIcon, setTrailing, useTrailing } from "./topBar";
 import { startZoomAreas, stopZoomAreas } from "./zoomAreas";
 
@@ -89,6 +91,12 @@ export const settings = definePluginSettings({
         type: OptionType.STRING,
         default: "",
         description: "Right panel: board, ideas, team or calendar (the buttons at its top); empty follows the old board switch",
+        hidden: true
+    },
+    teamHidden: {
+        type: OptionType.STRING,
+        default: "",
+        description: "Right panel, Team: the members hidden there (a right-click on a member hides or shows them)",
         hidden: true
     },
     rightPanelOrder: {
@@ -324,6 +332,18 @@ function VencordPopoutButton() {
     );
 }
 
+const teamMenu: NavContextMenuPatchCallback = (children, { user }: { user?: { id: string; }; }) => {
+    if (!user?.id) return;
+    const hidden = isHiddenInTeam(user.id);
+    children.push(
+        <Menu.MenuItem
+            id="agentdisc-team-hide"
+            label={hidden ? "Show in Team" : "Hide in Team"}
+            action={() => toggleHiddenInTeam(user.id)}
+        />
+    );
+};
+
 export default definePlugin({
     name: "VencordToolbox",
     description: "Adds a button to the titlebar that houses Vencord quick actions",
@@ -331,6 +351,11 @@ export default definePlugin({
     authors: [Devs.Ven, Devs.AutumnVN],
 
     settings,
+
+    // Team (25 Oct): a right-click on a member hides them from the Team part, or shows them again.
+    contextMenus: {
+        "user-context": teamMenu
+    },
 
     patches: [
         // Ctrl+K and Ctrl+P are AgentDisc's (tidy a channel, new channel, Stephane 6 Oct):

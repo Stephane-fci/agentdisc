@@ -4,11 +4,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { Settings } from "@api/Settings";
 import { findStoreLazy } from "@webpack";
-import { UserStore } from "@webpack/common";
 
-// The Team view of the right panel (Stephane, 24 Oct: "the original pannel with only the
-// people in the server"): Discord's own member list with the bots taken out.
+// The Team part of the right panel (Stephane, 24 Oct: "the original pannel with only the
+// people in the server"): Discord's own member list, without the members he hides. At first
+// every bot was taken out, his agents too; on 25 Oct he asked "where are claude code, codex
+// and Joh??", so the agents stay and he hides any member himself with a right-click ("Hide in
+// Team"), a helper bot such as the board's reader for a start. The list is kept on this
+// computer only.
 //
 // The list is filtered where Discord reads it, so it draws exactly as for a server without
 // bots: each group keeps only its people and its count follows, a group left with nobody
@@ -28,7 +32,31 @@ let originals: { getProps?: Function; getSections?: Function; getVersion?: Funct
 let lastLists = new Map<string, { version: number; rows: unknown; out: any; }>();
 let lastThreads = new Map<string, { version: unknown; out: any; }>();
 
-const isBot = (user: any) => user?.bot === true;
+let hidden = new Set<string>();
+// Bumped on each change of the hidden list, so the list draws again.
+let revision = 0;
+
+function readHidden() {
+    hidden = new Set(String(Settings.plugins.VencordToolbox?.teamHidden ?? "").split(",").filter(id => /^\d{15,21}$/.test(id)));
+}
+
+export function isHiddenInTeam(id: string) {
+    readHidden();
+    return hidden.has(id);
+}
+
+export function toggleHiddenInTeam(id: string) {
+    readHidden();
+    if (hidden.has(id)) hidden.delete(id);
+    else hidden.add(id);
+    Settings.plugins.VencordToolbox.teamHidden = [...hidden].join(",");
+    revision++;
+    lastLists = new Map();
+    lastThreads = new Map();
+    redraw();
+}
+
+const isHidden = (user: any) => !!user?.id && hidden.has(user.id);
 
 function people(props: any) {
     if (!props || !Array.isArray(props.groups) || !Array.isArray(props.rows)) return props;
@@ -44,7 +72,7 @@ function people(props: any) {
         for (let i = start + 1; i <= start + count; i++) {
             const row = props.rows[i];
             // A row not loaded yet stays: Discord draws it as a waiting line.
-            if (row?.type === "MEMBER" && isBot(row.user)) continue;
+            if (row?.type === "MEMBER" && isHidden(row.user)) continue;
             members.push(row);
         }
         if (!members.length) continue;
@@ -52,7 +80,7 @@ function people(props: any) {
         groups.push({ ...group, count: members.length, index: rows.length });
         rows.push({ ...heading, count: members.length, index: rows.length }, ...members);
     }
-    const out = { ...props, groups, rows, version: props.version + SHIFT };
+    const out = { ...props, groups, rows, version: props.version + SHIFT + revision * 1_000_000 };
     lastLists.set(props.listId, { version: props.version, rows: props.rows, out });
     return out;
 }
@@ -65,7 +93,7 @@ function threadPeople(threadId: string, sections: any, version: unknown) {
     if (hit && hit.version === version && version !== undefined) return hit.out;
     const out: Record<string, any> = {};
     for (const [id, section] of Object.entries<any>(sections)) {
-        const ids = Array.isArray(section?.userIds) ? section.userIds.filter((u: string) => !isBot(UserStore.getUser(u))) : section?.userIds;
+        const ids = Array.isArray(section?.userIds) ? section.userIds.filter((u: string) => !hidden.has(u)) : section?.userIds;
         if (Array.isArray(ids) && !ids.length) continue;
         out[id] = { ...section, userIds: ids };
     }
@@ -91,7 +119,7 @@ function install() {
         };
         if (typeof version === "function") ThreadMemberListStore.getMemberListVersion = function (...args: any[]) {
             const answer = version.apply(this, args);
-            return on && typeof answer === "number" ? answer + SHIFT : answer;
+            return on && typeof answer === "number" ? answer + SHIFT + revision * 1_000_000 : answer;
         };
         installed = true;
     } catch { }
@@ -106,6 +134,7 @@ function redraw() {
 
 // People only while the Team view shows.
 export function setPeopleOnly(next: boolean) {
+    readHidden();
     if (next) install();
     if (on === next) return;
     on = next;

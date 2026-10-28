@@ -161,12 +161,25 @@ function messageBoxHasText() {
     return !!(box?.textContent ?? "").replace(/[\s\u200b\ufeff]/g, "");
 }
 
-// Each quote in italics, with an empty line before the next one (Stephane, 13 Oct).
-function quote(text: string) {
+// Each quote in italics, with an empty line before the next one (Stephane, 13 Oct). after: what
+// follows the quote before the arrow, such as a board card's link.
+function quoteInBox(text: string, after = "") {
     const clean = text.replace(/\s+/g, " ").trim().replace(/\*/g, "\\*");
     if (!clean) return;
-    insertTextIntoChatInputBox((messageBoxHasText() ? "\n\n" : "") + `*"${clean}"* >> `);
+    insertTextIntoChatInputBox((messageBoxHasText() ? "\n\n" : "") + `*"${clean}"* ${after}>> `);
     ComponentDispatch?.dispatchToLastSubscribed?.("TEXTAREA_FOCUS");
+}
+
+function quote(text: string) {
+    quoteInBox(text);
+}
+
+// A board card quoted from its window (Stephane, 28 Oct: "directly quote it in the current
+// channel, the same way as when I press double cap and highlight something and click"): its
+// title like feedback mode's quotes, then its link in angle brackets, so Discord shows no
+// preview of the locked board page. Never sent.
+export function quoteCard(title: string, link: string) {
+    quoteInBox(title, `<${link}> `);
 }
 
 function onClick(e: MouseEvent) {

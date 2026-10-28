@@ -7,6 +7,8 @@
 import { EXTENSION_BASE_URL, metaReady } from "@utils/web-metadata";
 import { ChannelStore, MessageActions, NavigationRouter, SelectedChannelStore } from "@webpack/common";
 
+import { quoteCard } from "./feedback";
+
 // The mission board in the right panel (Stephane, 14 Oct): one Kanban board per channel. It
 // follows the channel he opens and marks the open thread's card; a click on a card's thread
 // opens that thread.
@@ -55,6 +57,11 @@ async function loadBoard() {
 
 export type BoardRole = "board" | "ideas";
 
+// A board card's own link, the only kind a quote may carry: this board's address (from the
+// setup file, never written here), then /c/<channel>?card=<card id>.
+const CARD_PATH = /^\/c\/\d{15,21}\?card=c[0-9a-f]{6,12}$/;
+const isCardLink = (link: string) => !!origin && link.startsWith(origin) && CARD_PATH.test(link.slice(origin.length));
+
 // The look AgentDisc shows ("ivory" or "dark", from the theme switch), so the board can match
 // it (asked of the board on 20 Oct); a board that does not know the message ignores it.
 let look = "dark";
@@ -102,6 +109,8 @@ class BoardFrame {
         const f = this.frame = document.createElement("iframe");
         f.className = "agentdisc-board-frame" + (ANCHORS ? " agentdisc-board-anchored" : "");
         f.title = this.role === "ideas" ? "Ideas" : "Mission board";
+        // The card's link button copies through the clipboard straight away (28 Oct).
+        f.setAttribute("allow", "clipboard-write");
         if (ANCHORS) f.style.setProperty("position-anchor", this.anchor);
         f.classList.toggle("agentdisc-board-last", this.bottom);
         // Chrome fires a load for the empty frame the moment it is added; only the board's own
@@ -109,6 +118,7 @@ class BoardFrame {
         f.addEventListener("load", () => {
             if (!f.getAttribute("src")) return;
             this.loaded = true;
+            this.tellCan();
             this.sendFocus();
         });
         document.body.append(f);
@@ -117,6 +127,11 @@ class BoardFrame {
 
     post(message: object) {
         if (origin && this.frame?.contentWindow && this.loaded) this.frame.contentWindow.postMessage(message, origin);
+    }
+
+    // What this app answers, so the board shows only buttons that work: quote a card (28 Oct).
+    tellCan() {
+        this.post({ type: "mission-control:can", can: ["quote"] });
     }
 
     // The cursor in the idea box, once the board is there and offers its ideas page.
@@ -318,7 +333,18 @@ function onMessage(e: MessageEvent) {
         // The board speaks, so its page is there, even before the frame's own load event.
         from.loaded = true;
         offerListeners.forEach(fn => fn(views));
+        from.tellCan();
         from.sendFocus();
+        return;
+    }
+    // A card quoted from its window: into the open channel's message box, from the big board
+    // back to the panel first (28 Oct).
+    if (data?.type === "mission-control:quote") {
+        const link = typeof data.link === "string" ? data.link : "";
+        const title = typeof data.title === "string" ? data.title.replace(/\s+/g, " ").trim() : "";
+        if (!isCardLink(link) || !title || title.length > 300) return;
+        from.setFull(false);
+        quoteCard(title, link);
         return;
     }
     if (data?.type !== "mission-control:open" || typeof data.channel !== "string" || !/^\d+$/.test(data.channel)) return;

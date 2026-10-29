@@ -18,7 +18,7 @@ import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack"
 import { ActiveJoinedThreadsStore, ChannelStore, FluxDispatcher, GuildChannelStore, GuildStore, Menu, NavigationRouter, ReadStateStore, SelectedChannelStore, SelectedGuildStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
 
 import { moveAfterBookmarks, openNewChannel } from "./boxes";
-import { buildGroupCss, buildPriorityCss, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
+import { buildGroupCss, buildPriorityCss, GAP_ABOVE, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
 import { askSoon, plannedChecks, startWaits, stopWaits } from "./waits";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
@@ -747,6 +747,12 @@ export default definePlugin({
                     replace: "rowHeight:$self.rowHeight(this.getRowHeight),"
                 },
                 {
+                    // Opening a thread scrolls the list to it: Discord places it by its rank
+                    // among all the channel's threads, folded ones included.
+                    match: /(\i)=(\i)\.threadOffset\*(\i)\((\i)\)/,
+                    replace: "$1=$self.threadTop(this.props.guildChannels,$2,$3($4))"
+                },
+                {
                     // The show or hide all threads button, above the list and outside its
                     // scrolling; Discord's "new unreads" bars keep their own places.
                     match: /children:\[(?=\(0,\i\.jsx\)\("div",\{className:\i\.\i,children:\(0,\i\.jsx\)\(\i,\{position:"top")/,
@@ -822,6 +828,22 @@ export default definePlugin({
     },
     threadTrim() {
         return classes.line ? THREAD_TRIM : 0;
+    },
+
+    // Where a thread starts inside its channel's line, as the list draws it: Discord counts
+    // every thread of the channel, so under a folded channel it aimed below the thread and
+    // scrolled the whole list away from it (Stephane, 29 Oct: "Suddenly the whole list of
+    // channels switches and I'm completely lost").
+    threadTop(guildChannels: any, place: { section: number; row: number; threadOffset: number; }, line: number) {
+        try {
+            const row: ChannelRow | undefined = guildChannels.getChannelFromSectionRow(place.section, place.row)?.channel;
+            const shown = row ? shownThreads(row) : NONE;
+            const rank = row ? shown.indexOf(row.threadIds[place.threadOffset]) : -1;
+            if (rank < 0) return place.threadOffset * line;
+            return (classes.group ? GAP_ABOVE : 0) + line + rank * (line - (classes.line ? THREAD_TRIM : 0));
+        } catch {
+            return place.threadOffset * line;
+        }
     },
 
     setList(instance: any) {

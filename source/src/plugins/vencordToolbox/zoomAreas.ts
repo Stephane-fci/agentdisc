@@ -62,7 +62,13 @@ function apply() {
     const kept = read();
     const rules = (Object.entries(kept) as [Area, Kept | undefined][])
         .filter((e): e is [Area, Kept] => !!e[1] && typeof e[1].selector === "string" && /^[.\w-]+$/.test(e[1].selector) && e[1].zoom !== 1)
-        .map(([area, k]) => `${k.selector}{zoom:${k.zoom}${area === "team" ? `;${FILL}` : ""}}`);
+        // The Team rule stays off the column that holds the panel: while a thread's members
+        // load, Discord draws its "nobody in this thread" view as that column, with the member
+        // list's own name, and the fill rule spread it over the whole chat for a moment (30 Oct,
+        // his "I see the tab at the bottom, and then it suddenly moves to the right panel").
+        .map(([area, k]) => area === "team"
+            ? `${k.selector}:not(:has(> .agentdisc-own)){zoom:${k.zoom};${FILL}}`
+            : `${k.selector}{zoom:${k.zoom}}`);
     const servers = kept.servers?.zoom;
     if (typeof servers === "number" && servers !== 1) rules.push(SERVER_COLUMN(servers));
     style.textContent = rules.join("\n");

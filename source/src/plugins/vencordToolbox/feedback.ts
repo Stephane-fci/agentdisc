@@ -18,10 +18,17 @@ import { ComponentDispatch } from "@webpack/common";
 // shortcut such as Ctrl+V does not count. Text he selects himself is taken as it is.
 // Shift pressed twice turns the mode on and off (shiftKeys.ts), like the button in the
 // channel bar; Esc turns it off.
+//
+// A text block (three backticks) counts too (30 Oct: "the highlighter tool doesn't work
+// within a block of text"): its lines are its paragraphs, and in a table, drawn with box lines
+// or pipes, the sentence's step is the cell under the mouse. Box lines are never part of what
+// lights up, so a table's border lines give nothing.
 
 const HIGHLIGHT = "agentdisc-feedback";
 const CONTENT = '[id^="message-content-"]';
 const BLOCK = "li, h1, h2, h3, blockquote";
+const TABLE_MARK = /[│|]/;
+const BOX_EDGE = /[\s│|┌┐└┘├┤┬┴┼─]/;
 
 let on = false;
 // What lights up: 0 the paragraph, 1 the sentence, 2 the piece of the sentence. Each new
@@ -70,10 +77,11 @@ function textOf(scope: HTMLElement) {
         const parent = n.parentElement;
         // The "(edited)" mark is not part of the message.
         if (parent?.closest("time")) continue;
-        // Lists, headings, quotes and code blocks are their own blocks: the message text
+        // Lists, headings, quotes and text blocks are their own blocks: the message text
         // around them leaves them out, and they end the paragraph before them.
         const block = parent?.closest(BLOCK);
-        if (parent?.closest("pre") || block && block !== scope && scope.contains(block)) {
+        const pre = parent?.closest("pre");
+        if (pre && !pre.contains(scope) || block && block !== scope && scope.contains(block)) {
             if (text && !text.endsWith("\n")) text += "\n";
             continue;
         }
@@ -96,11 +104,12 @@ function pieceAt(x: number, y: number, size: Size): Range | null {
     if (!caret || caret.node.nodeType !== Node.TEXT_NODE) return null;
     const parent = caret.node.parentElement;
     const content = parent?.closest<HTMLElement>(CONTENT);
-    if (!content || parent?.closest("pre")) return null;
+    if (!content) return null;
     // The block must sit inside the message text: each Discord message is itself a list
     // item, which must not count as a bullet point.
     const block = parent!.closest<HTMLElement>(BLOCK);
-    const scope = block && content.contains(block) ? block : content;
+    const pre = parent!.closest("pre");
+    const scope = pre ? pre.querySelector("code") ?? pre : block && content.contains(block) ? block : content;
 
     const { text, pieces } = textOf(scope);
     const own = pieces.find(p => p.node === caret.node);
@@ -112,7 +121,13 @@ function pieceAt(x: number, y: number, size: Size): Range | null {
     let end = text.indexOf("\n", at);
     if (end < 0) end = text.length;
 
-    if (size >= 1) {
+    if (size >= 1 && pre && TABLE_MARK.test(text.slice(start, end))) {
+        // The cell of a table under the point.
+        const before = text.slice(start, at);
+        start += Math.max(before.lastIndexOf("│"), before.lastIndexOf("|")) + 1;
+        const after = TABLE_MARK.exec(text.slice(at, end));
+        if (after) end = at + after.index;
+    } else if (size >= 1) {
         // The sentence: after the last ". ", "! " or "? " before the point, up to the next one.
         const before = text.slice(start, at);
         const stops = [...before.matchAll(/[.!?…]["')\]]*\s+/g)];
@@ -129,8 +144,9 @@ function pieceAt(x: number, y: number, size: Size): Range | null {
         const after = /[,:;](?=\s)/.exec(text.slice(at, end));
         if (after) end = at + after.index;
     }
-    while (start < end && /\s/.test(text[start])) start++;
-    while (end > start && /\s/.test(text[end - 1])) end--;
+    const edge = pre ? BOX_EDGE : /\s/;
+    while (start < end && edge.test(text[start])) start++;
+    while (end > start && edge.test(text[end - 1])) end--;
     if (end <= start) return null;
 
     const range = document.createRange();
@@ -186,6 +202,8 @@ function onClick(e: MouseEvent) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement | null;
     if (!target?.closest?.(CONTENT)) return;
+    // Discord's copy button on a text block stays a button.
+    if (target.closest('pre button, pre [role="button"]')) return;
     // Text he selected himself goes in as it is.
     const selected = window.getSelection()?.toString() ?? "";
     const range = selected.trim() ? null : pieceAt(e.clientX, e.clientY, size);

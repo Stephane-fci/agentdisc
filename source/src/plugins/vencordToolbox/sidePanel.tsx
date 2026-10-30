@@ -9,7 +9,7 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { showMembers } from "@plugins/panelSwitches";
 import { ChannelStore, NavigationRouter, useEffect, useReducer, useRef, useState } from "@webpack/common";
 
-import { attachSlot, type BoardRole, detachSlot, focusIdeas, hasBoard, onBoardFound, onBoardViews, setFrameLast, showBoard } from "./missionBoard";
+import { attachSlot, type BoardRole, detachSlot, focusIdeas, hasBoard, hasBoardHere, onBoardFound, onBoardViews, setFrameLast, showBoard } from "./missionBoard";
 import { type DayInfo, dayKey, linksOf, pairsAmong, type PlaceName, placeName, useSideData } from "./sideData";
 import { setPeopleOnly, stopTeamList } from "./teamList";
 
@@ -473,14 +473,14 @@ export function stopRightPanelWidth() {
 // A board part's place; the frame itself lives in missionBoard.ts and is laid over it, so it
 // survives every channel switch and every change of the stack. The last part of the stack
 // gets the round corner of the Ivory sheet.
-function FrameSlot({ role, channelId, threadId, last }: { role: BoardRole; channelId: string; threadId: string | null; last: boolean; }) {
+function FrameSlot({ role, guildId, channelId, threadId, last }: { role: BoardRole; guildId: string; channelId: string; threadId: string | null; last: boolean; }) {
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const element = ref.current!;
         attachSlot(role, element);
         return () => detachSlot(role, element);
     }, []);
-    useEffect(() => showBoard(role, channelId, threadId), [channelId, threadId]);
+    useEffect(() => showBoard(role, guildId, channelId, threadId), [guildId, channelId, threadId]);
     useEffect(() => setFrameLast(role, last), [last]);
     return <div className="agentdisc-board-slot" ref={ref} />;
 }
@@ -497,7 +497,9 @@ function FrameSlot({ role, channelId, threadId, last }: { role: BoardRole; chann
 // One part on fills the panel; several stack in the order of the buttons. Dragging a button
 // moves its part up or down; dragging the line between two parts shares the room between
 // them; a double click shows that part alone. All of it is kept. Board and Ideas show only
-// where the board is set up, and Ideas only once the board says it has that page.
+// where the board is set up for this server (30 Oct: a server with no board offers neither, and
+// the layout he saved stays as it is for the servers that have one), and Ideas only once the
+// board says it has that page.
 export type Part = "board" | "ideas" | "team" | "connections" | "calendar";
 const PARTS: Part[] = ["board", "ideas", "team", "connections", "calendar"];
 const LABELS: Record<Part, string> = { board: "Board", ideas: "Ideas", team: "Team", connections: "Connections", calendar: "Calendar" };
@@ -562,7 +564,7 @@ function boardOffersIdeas() {
 // Ctrl+J: Ideas switched on (the other parts stay), the right panel opened if needed, and the
 // cursor in the idea box.
 export function openIdeas() {
-    if (!hasBoard()) return false;
+    if (!hasBoardHere()) return false;
     showMembers();
     const layout = readLayout();
     if (!layout.on.includes("ideas")) saveLayout({ ...layout, on: [...layout.on, "ideas"] });
@@ -751,7 +753,7 @@ function RightPanel({ channel, threadId }: { channel: any; threadId: string | nu
     const [, redraw] = useReducer((n: number) => n + 1, 0);
     useEffect(() => onBoardFound(redraw), []);
     useSettings(["plugins.VencordToolbox.rightPanelOrder", "plugins.VencordToolbox.rightPanelOn", "plugins.VencordToolbox.rightPanelSizes", "plugins.VencordToolbox.rightPanelMode", "plugins.VencordToolbox.rightPanelBoard", "plugins.VencordToolbox.boardViews"]);
-    const board = hasBoard();
+    const board = hasBoard(channel.guild_id);
     const ideas = board && boardOffersIdeas();
     const layout = readLayout();
     const shown = shownParts(layout, board, ideas);
@@ -777,7 +779,7 @@ function RightPanel({ channel, threadId }: { channel: any; threadId: string | nu
                     <div key={p} className={`agentdisc-own agentdisc-part agentdisc-part-${p}`} style={{ order: orderOf(i), flexGrow: grow(layout, p) }} {...dropTarget(p)}>
                         {p === "calendar" ? <CalendarContent channel={channel} />
                             : p === "connections" ? <ConnectionsContent channel={channel} />
-                                : <FrameSlot role={p} channelId={channel.id} threadId={threadId} last={p === last} />}
+                                : <FrameSlot role={p} guildId={channel.guild_id} channelId={channel.id} threadId={threadId} last={p === last} />}
                     </div>
                 )
             ])}

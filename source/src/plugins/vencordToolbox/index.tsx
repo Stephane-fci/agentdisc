@@ -37,7 +37,7 @@ import { isFeedbackOn, onFeedbackChange, setFeedback } from "./feedback";
 import { LinksPanel } from "./links";
 import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
-import { startBoard, stopBoard } from "./missionBoard";
+import { followServer, startBoard, stopBoard } from "./missionBoard";
 import { startShiftKeys, stopShiftKeys } from "./shiftKeys";
 import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
@@ -489,6 +489,12 @@ export default definePlugin({
                 channel,
                 onClick: () => copyWithToast(`https://discord.com/channels/${channel.guild_id ?? "@me"}/${channel.id}/${message.id}`, "Message link copied")
             };
+        }
+    },
+
+    flux: {
+        CHANNEL_SELECT({ guildId }: { guildId?: string | null; }) {
+            followServer(guildId);
         }
     },
 

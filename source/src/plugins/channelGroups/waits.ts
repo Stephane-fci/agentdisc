@@ -5,6 +5,7 @@
  */
 
 import { metaReady } from "@utils/web-metadata";
+import { ChannelStore } from "@webpack/common";
 
 // Waiting bookmarks (Stephane, 18 Oct): a bookmarked line turns blue while an agent has
 // planned its next check there, like the next run of something. The agents' planned checks
@@ -15,6 +16,10 @@ import { metaReady } from "@utils/web-metadata";
 // The page asks through the app's small in-between script (content.js) with a window
 // message, every two minutes while Discord is on screen, and at once when a bookmark
 // changes or Discord comes back on screen.
+//
+// Each server its own board (30 Oct): with each id goes its server, which the page knows, so
+// the background part asks only that server's board. A conversation Discord has not loaded
+// has no known server: once boards are set up per server it is asked of nobody, never guessed.
 
 const ASK = "AGENTDISC_WAITS";
 const ANSWER = "AGENTDISC_WAITS_ANSWER";
@@ -30,6 +35,7 @@ let asked = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
 let soon: ReturnType<typeof setTimeout> | null = null;
 let running = false;
+let askedAgain = false;
 
 export function plannedChecks(id: string) {
     return waits.get(id);
@@ -45,7 +51,20 @@ function ask() {
         return;
     }
     asked++;
-    window.postMessage({ type: ASK, seq: asked, ids: list }, location.origin);
+    const guilds: Record<string, string> = {};
+    for (const id of list) {
+        const guild = ChannelStore?.getChannel(id)?.guild_id;
+        if (guild) guilds[id] = guild;
+    }
+    window.postMessage({ type: ASK, seq: asked, ids: list, guilds }, location.origin);
+    // Right after a start Discord may not have its channels yet: once more shortly after.
+    if (!askedAgain && Object.keys(guilds).length < list.length) {
+        askedAgain = true;
+        soon ??= setTimeout(() => {
+            soon = null;
+            ask();
+        }, 20_000);
+    }
 }
 
 function onMessage(e: MessageEvent) {
@@ -96,5 +115,6 @@ export function stopWaits() {
     if (soon) clearTimeout(soon);
     timer = null;
     soon = null;
+    askedAgain = false;
     waits = new Map();
 }

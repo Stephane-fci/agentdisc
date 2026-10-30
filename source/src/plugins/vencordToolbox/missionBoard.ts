@@ -20,8 +20,8 @@ import { quoteCard } from "./feedback";
 // Each frame lives for the whole session, laid over its place in the panel, so switching
 // channels never reloads it: the board is told which channel to show by a message.
 //
-// Two frames at most (24 Oct, his panel made of parts): one on the board's own page, one on
-// its ideas page, where he drops an idea on the fly. Each is made the first time its part is
+// Two frames per board at most (24 Oct, his panel made of parts): one on the board's own page,
+// one on its ideas page, where he drops an idea on the fly. Each is made the first time its part is
 // switched on and is kept, hidden, while its part is off, so nothing he typed is lost. The
 // address carries modes=1 (AgentDisc shows its own buttons, so the board hides its small
 // Board/Ideas switch) and view=ideas for the ideas frame. A board from before the ideas page
@@ -31,11 +31,57 @@ import { quoteCard } from "./feedback";
 // almost all of the screen, where I would see the board in full"): the board's own button
 // asks, the frame moves over a dim layer and keeps following the channel he opens. A click on
 // the dim layer, Esc, or opening a card's message puts it back over the panel.
+//
+// Each server its own board (Stephane, 30 Oct: "All boards, by themselves, should be built on
+// their own Cloudflare account and they will only be seen by people using the Discord app"):
+// the setup file may also name a board per server, { "board": "<default>", "boards":
+// { "<guild id>": "<address>" } }. A server shows its own entry, else the default, else no
+// board at all, so a person with the app and no entry gets nothing. An entry with an unusable
+// address counts as no board, never as the default. The addresses stay in that file on the
+// person's computer. A frame stays bound to one board's address for its whole life: nothing of
+// one server goes to another server's board, and going back to a server reloads nothing.
 
-let origin: string | null = null;
+export interface BoardSetup {
+    main: string | null;
+    boards: Map<string, string | null>;
+}
+
+const httpsOrigin = (address: unknown) => {
+    try {
+        const url = new URL(String(address ?? ""));
+        return url.protocol === "https:" ? url.origin : null;
+    } catch {
+        return null;
+    }
+};
+
+export function readSetup(file: any): BoardSetup {
+    const boards = new Map<string, string | null>();
+    if (file?.boards && typeof file.boards === "object" && !Array.isArray(file.boards)) {
+        for (const [guild, address] of Object.entries(file.boards)) if (/^\d{15,21}$/.test(guild)) boards.set(guild, httpsOrigin(address));
+    }
+    return { main: httpsOrigin(file?.board), boards };
+}
+
+// The board of a server, or null. A private chat (no server) counts as the default.
+export function chooseBoard(from: BoardSetup | null, guild: string | null | undefined) {
+    if (!from) return null;
+    return guild && from.boards.has(guild) ? from.boards.get(guild)! : from.main;
+}
+
+// Ideas is his own page and stays on the default board; with no default it follows the server.
+export function chooseOrigin(from: BoardSetup | null, role: BoardRole, guild: string | null | undefined) {
+    return role === "ideas" && from?.main ? from.main : chooseBoard(from, guild);
+}
+
+let setup: BoardSetup | null = null;
 const listeners = new Set<() => void>();
 
-export const hasBoard = () => origin != null;
+export const hasBoard = (guild: string | null | undefined) => chooseBoard(setup, guild) != null;
+
+const currentGuild = () => ChannelStore.getChannel(SelectedChannelStore.getChannelId())?.guild_id ?? null;
+
+export const hasBoardHere = () => hasBoard(currentGuild());
 
 export function onBoardFound(fn: () => void) {
     listeners.add(fn);
@@ -48,9 +94,9 @@ async function loadBoard() {
         if (!EXTENSION_BASE_URL) return;
         const res = await fetch(EXTENSION_BASE_URL + "dist/mission-board.json", { cache: "no-store" });
         if (!res.ok) return;
-        const url = new URL(String((await res.json())?.board ?? ""));
-        if (url.protocol !== "https:") return;
-        origin = url.origin;
+        const next = readSetup(await res.json());
+        if (!next.main && !next.boards.size) return;
+        setup = next;
         listeners.forEach(fn => fn());
     } catch { }
 }
@@ -60,12 +106,14 @@ export type BoardRole = "board" | "ideas";
 // A board card's own link, the only kind a quote may carry: this board's address (from the
 // setup file, never written here), then /c/<channel>?card=<card id>.
 const CARD_PATH = /^\/c\/\d{15,21}\?card=c[0-9a-f]{6,12}$/;
-const isCardLink = (link: string) => !!origin && link.startsWith(origin) && CARD_PATH.test(link.slice(origin.length));
+const isCardLink = (link: string, origin: string) => link.startsWith(origin) && CARD_PATH.test(link.slice(origin.length));
 
 // The look AgentDisc shows ("ivory" or "dark", from the theme switch), so the board can match
 // it (asked of the board on 20 Oct); a board that does not know the message ignores it.
 let look = "dark";
-let offered = new Set<string>(["board"]);
+// What each board said it offers, by its address.
+const offered = new Map<string, Set<string>>();
+let ideasFocus = false;
 const offerListeners = new Set<(views: string[]) => void>();
 
 export function onBoardViews(fn: (views: string[]) => void) {
@@ -95,10 +143,9 @@ class BoardFrame {
     raf = 0;
     last = "";
     full = false;
-    focus = false;
     bottom = false;
 
-    constructor(readonly role: BoardRole) { }
+    constructor(readonly role: BoardRole, readonly origin: string) { }
 
     get anchor() {
         return `--agentdisc-${this.role}`;
@@ -126,7 +173,7 @@ class BoardFrame {
     }
 
     post(message: object) {
-        if (origin && this.frame?.contentWindow && this.loaded) this.frame.contentWindow.postMessage(message, origin);
+        if (this.frame?.contentWindow && this.loaded) this.frame.contentWindow.postMessage(message, this.origin);
     }
 
     // What this app answers, so the board shows only buttons that work: quote a card (28 Oct).
@@ -136,13 +183,18 @@ class BoardFrame {
 
     // The cursor in the idea box, once the board is there and offers its ideas page.
     sendFocus() {
-        if (this.role !== "ideas" || !this.focus || !this.loaded || !offered.has("ideas")) return;
+        if (this.role !== "ideas" || !ideasFocus || active.ideas !== this || !this.loaded || !offered.get(this.origin)?.has("ideas")) return;
         this.post({ type: "mission-control:view", view: "ideas", focus: true });
-        this.focus = false;
+        ideasFocus = false;
     }
 
     display(on: boolean) {
         if (this.frame) this.frame.style.display = on ? "block" : "none";
+    }
+
+    setLast(bottom: boolean) {
+        this.bottom = bottom;
+        this.frame?.classList.toggle("agentdisc-board-last", bottom);
     }
 
     place() {
@@ -209,7 +261,7 @@ class BoardFrame {
 
     // The board's own button shows the real size only once it hears it from here.
     tellSize() {
-        if (origin && this.frame?.contentWindow) this.frame.contentWindow.postMessage({ type: "mission-control:size", full: this.full }, origin);
+        if (this.frame?.contentWindow) this.frame.contentWindow.postMessage({ type: "mission-control:size", full: this.full }, this.origin);
     }
 
     setFull(next: boolean) {
@@ -218,7 +270,7 @@ class BoardFrame {
             return;
         }
         // One big frame at a time.
-        if (next) for (const other of Object.values(frames)) if (other !== this && other.full) other.setFull(false);
+        if (next) for (const other of frames.values()) if (other !== this && other.full) other.setFull(false);
         this.full = next;
         this.frame.classList.toggle("agentdisc-board-full", next);
         if (next) {
@@ -239,20 +291,22 @@ class BoardFrame {
     }
 
     // Show a channel's board, marking the open thread's card. The first time the frame loads
-    // the page; after that a message switches it with no reload.
-    show(channelId: string, threadId: string | null) {
-        if (!origin) return;
+    // the page; after that a message switches it with no reload. No channel: only the Ideas
+    // frame on the default board in a server with its own board (30 Oct), which opens on its
+    // ideas page knowing no channel and keeps the last channel it was told.
+    show(channelId: string | null, threadId: string | null) {
         const f = this.element();
+        if (!channelId && this.shown) return;
         const key = `${channelId}|${threadId ?? ""}`;
         if (key === this.shown) return;
         this.shown = key;
         if (!this.loaded || !f.contentWindow) {
             this.loaded = false;
             // grow=1: the board offers its full-screen button, which this app answers.
-            f.src = `${origin}/c/${channelId}?panel=1&grow=1&modes=1&look=${look}${this.role === "ideas" ? "&view=ideas" : ""}${threadId ? `&thread=${threadId}` : ""}`;
+            f.src = `${this.origin}/${channelId ? `c/${channelId}` : ""}?panel=1&grow=1&modes=1&look=${look}${this.role === "ideas" ? "&view=ideas" : ""}${threadId ? `&thread=${threadId}` : ""}`;
             return;
         }
-        f.contentWindow.postMessage({ type: "mission-control:show", channel: channelId, thread: threadId }, origin);
+        if (channelId) f.contentWindow.postMessage({ type: "mission-control:show", channel: channelId, thread: threadId }, this.origin);
     }
 
     remove() {
@@ -265,7 +319,6 @@ class BoardFrame {
         this.frame = null;
         this.loaded = false;
         this.full = false;
-        this.focus = false;
         this.shown = "";
         this.slot = null;
         this.last = "";
@@ -273,9 +326,49 @@ class BoardFrame {
     }
 }
 
-const frames: Record<BoardRole, BoardFrame> = { board: new BoardFrame("board"), ideas: new BoardFrame("ideas") };
+// One frame per part and board, made when first needed and kept, hidden, afterwards. Only the
+// part's current one sits on the part's place.
+const frames = new Map<string, BoardFrame>();
+const active: Record<BoardRole, BoardFrame | null> = { board: null, ideas: null };
+const places: Record<BoardRole, HTMLElement | null> = { board: null, ideas: null };
+const lastPart: Record<BoardRole, boolean> = { board: false, ideas: false };
 
-const bigFrame = () => Object.values(frames).find(f => f.full) ?? null;
+const bigFrame = () => [...frames.values()].find(f => f.full) ?? null;
+
+function leaveFrame(role: BoardRole) {
+    const f = active[role];
+    if (!f) return;
+    if (f.full) f.setFull(false);
+    if (places[role]) f.detach(places[role]!);
+    active[role] = null;
+}
+
+// The part's frame for this server's board, on the part's place.
+function frameFor(role: BoardRole, guild: string) {
+    const origin = chooseOrigin(setup, role, guild);
+    if (active[role]?.origin !== origin) leaveFrame(role);
+    if (!origin) return null;
+    if (!active[role]) {
+        const key = `${role}|${origin}`;
+        const f = frames.get(key) ?? new BoardFrame(role, origin);
+        frames.set(key, f);
+        active[role] = f;
+        f.setLast(lastPart[role]);
+        if (places[role]) f.attach(places[role]!);
+    }
+    return active[role];
+}
+
+// Another server opened, whatever the panel does: a board that is not this server's goes away,
+// big or not.
+export function followServer(guild: string | null | undefined) {
+    if (!setup?.boards.size) return;
+    for (const role of ["board", "ideas"] as const) {
+        // A private chat has no server: only his own board may stay big there, as it always could.
+        const wanted = guild ? chooseOrigin(setup, role, guild) : setup.main;
+        if (active[role] && active[role]!.origin !== wanted) leaveFrame(role);
+    }
+}
 
 function onEscape(e: KeyboardEvent) {
     const big = bigFrame();
@@ -287,52 +380,71 @@ function onEscape(e: KeyboardEvent) {
 
 // A part's place is on screen: lay its frame over it and keep it there.
 export function attachSlot(role: BoardRole, element: HTMLElement) {
-    frames[role].attach(element);
+    places[role] = element;
+    active[role]?.attach(element);
 }
 
 export function detachSlot(role: BoardRole, element: HTMLElement) {
-    frames[role].detach(element);
+    if (places[role] === element) places[role] = null;
+    active[role]?.detach(element);
 }
 
-export function showBoard(role: BoardRole, channelId: string, threadId: string | null) {
-    frames[role].show(channelId, threadId);
+export function showBoard(role: BoardRole, guild: string, channelId: string, threadId: string | null) {
+    const f = frameFor(role, guild);
+    if (!f) return;
+    // A server with its own board: its channels are never told to the default board's Ideas.
+    if (f.origin === chooseBoard(setup, guild)) f.show(channelId, threadId);
+    else f.show(null, null);
 }
 
 // The frame of the stack's last part takes the sheet's round corner (Ivory).
 export function setFrameLast(role: BoardRole, bottom: boolean) {
-    const f = frames[role];
-    f.bottom = bottom;
-    f.frame?.classList.toggle("agentdisc-board-last", bottom);
+    lastPart[role] = bottom;
+    active[role]?.setLast(bottom);
 }
 
 // Ctrl+J and a click that switches Ideas on: the cursor in the idea box.
 export function focusIdeas() {
-    frames.ideas.focus = true;
-    frames.ideas.sendFocus();
+    ideasFocus = true;
+    active.ideas?.sendFocus();
 }
 
 export function setBoardLook(next: string) {
     if (next === look) return;
     look = next;
-    for (const f of Object.values(frames)) f.post({ type: "mission-control:look", look });
+    for (const f of frames.values()) f.post({ type: "mission-control:look", look });
+}
+
+// Where a card's click opens. The default board goes anywhere, as before. A server's own board
+// stays inside its server (30 Oct): a channel the page places elsewhere is refused, and one it
+// does not know opens in this server.
+function openGuild(origin: string, data: any) {
+    const said = typeof data.guild === "string" && /^\d+$/.test(data.guild) ? data.guild : null;
+    const known = ChannelStore.getChannel(data.channel)?.guild_id ?? null;
+    if (!setup || origin === setup.main) return said ?? known ?? "@me";
+    const own = [...setup.boards].filter(([, board]) => board === origin).map(([guild]) => guild);
+    if ((said && !own.includes(said)) || (known && !own.includes(known))) return null;
+    const here = currentGuild();
+    return said ?? known ?? (here && own.includes(here) ? here : null);
 }
 
 // A click on a card's thread or icon in the board opens that thread or message here.
 function onMessage(e: MessageEvent) {
-    if (!origin || e.origin !== origin) return;
-    const from = Object.values(frames).find(f => f.frame && e.source === f.frame.contentWindow);
-    if (!from) return;
+    const from = [...frames.values()].find(f => f.frame && e.source === f.frame.contentWindow);
+    if (!from || e.origin !== from.origin) return;
     const { data } = e;
     if (data?.type === "mission-control:size") {
+        if (active[from.role] !== from) return;
         from.setFull(data.full === true);
         return;
     }
     if (data?.type === "mission-control:views" && Array.isArray(data.views)) {
         const views = data.views.filter((v: unknown): v is string => typeof v === "string" && /^[a-z]{1,20}$/.test(v)).slice(0, 10);
-        offered = new Set(["board", ...views]);
+        offered.set(from.origin, new Set(["board", ...views]));
         // The board speaks, so its page is there, even before the frame's own load event.
         from.loaded = true;
-        offerListeners.forEach(fn => fn(views));
+        // The kept word is about the board Ideas uses here, not a client's board in its server.
+        if (from.origin === chooseOrigin(setup, "ideas", currentGuild())) offerListeners.forEach(fn => fn(views));
         from.tellCan();
         from.sendFocus();
         return;
@@ -342,15 +454,16 @@ function onMessage(e: MessageEvent) {
     if (data?.type === "mission-control:quote") {
         const link = typeof data.link === "string" ? data.link : "";
         const title = typeof data.title === "string" ? data.title.replace(/\s+/g, " ").trim() : "";
-        if (!isCardLink(link) || !title || title.length > 300) return;
+        if (!isCardLink(link, from.origin) || !title || title.length > 300) return;
         from.setFull(false);
         quoteCard(title, link);
         return;
     }
     if (data?.type !== "mission-control:open" || typeof data.channel !== "string" || !/^\d+$/.test(data.channel)) return;
+    const guild = openGuild(from.origin, data);
+    if (!guild) return;
     // From the big board, back to the panel first, so he lands on the message.
     from.setFull(false);
-    const guild = typeof data.guild === "string" && /^\d+$/.test(data.guild) ? data.guild : ChannelStore.getChannel(data.channel)?.guild_id ?? "@me";
     // A card's icon names the exact message to look at (14 Oct): Discord jumps to it and
     // lights it up, in a thread too. In the channel already open, going to the same address
     // does nothing, so Discord's own jump is used there.
@@ -369,11 +482,15 @@ export function startBoard() {
 
 export function stopBoard() {
     window.removeEventListener("message", onMessage);
-    for (const f of Object.values(frames)) {
+    for (const f of frames.values()) {
         f.setFull(false);
         f.remove();
     }
+    frames.clear();
+    active.board = active.ideas = null;
+    places.board = places.ideas = null;
     dim?.remove();
     document.removeEventListener("keydown", onEscape, true);
-    offered = new Set(["board"]);
+    offered.clear();
+    ideasFocus = false;
 }

@@ -45,7 +45,7 @@ document.addEventListener(
             // asked from the mission board by the background part, which holds its key.
             if (event.data.type === 'AGENTDISC_WAITS' && Array.isArray(event.data.ids)) {
                 const seq = event.data.seq;
-                send({ action: "agentdiscWaits", ids: event.data.ids.slice(0, 60) })
+                send({ action: "agentdiscWaits", ids: event.data.ids.slice(0, 60), guilds: event.data.guilds })
                     .then(waits => { if (waits) window.postMessage({ type: "AGENTDISC_WAITS_ANSWER", seq, waits }, location.origin); })
                     .catch(() => {});
             }

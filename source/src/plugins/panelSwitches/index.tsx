@@ -34,7 +34,9 @@ const PARTS = {
     notice: ["notice", "colorDefault", "closeButton"],
     promoNotice: ["notice", "noticeContent", "noticeText", "closeButton"],
     serverHeader: ["container", "header", "headerContent", "guildDropdown", "inviteButton"],
-    serverItems: ["listItem", "tutorialContainer", "iconBadge", "unavailableBadge"]
+    serverItems: ["listItem", "tutorialContainer", "iconBadge", "unavailableBadge"],
+    // The APP tag beside a bot's name, wherever it shows; the forum's OP tag shares its look.
+    botTag: ["botTag", "botTagOP", "botTagRegular"]
 } as const;
 
 // The buttons at the right of the message box, by Discord's own names for them. Send
@@ -117,6 +119,14 @@ export const settings = definePluginSettings({
         default: true,
         onChange: () => apply()
     },
+    // Stephane, 30 Oct: "Can you remove the app tag on every agent, every bot profile?"
+    // Discord gives every bot that tag and lets no bot drop it, so it is hidden here.
+    hideAppTag: {
+        type: OptionType.BOOLEAN,
+        description: "Hide the APP tag beside bots and agents",
+        default: true,
+        onChange: () => apply()
+    },
     membersClosedByChatOnly: {
         type: OptionType.BOOLEAN,
         description: "Chat only closed the member list and reopens it when switched off",
@@ -142,7 +152,7 @@ export function isHidden(panel: Panel) {
 
 function buildCss() {
     const rules: string[] = [];
-    const { layout: L, topBar: T, chat: C, notice: N, promoNotice: P, serverHeader: H, serverItems: S } = classes;
+    const { layout: L, topBar: T, chat: C, notice: N, promoNotice: P, serverHeader: H, serverItems: S, botTag: B } = classes;
     const sel = (cls: string | undefined) => cls?.split(" ").map(c => "." + c).join("") ?? null;
 
     if (L) {
@@ -209,6 +219,7 @@ function buildCss() {
         rules.push(`${item}:has([data-list-item-id="guildsnav___create-join-button"]),${item}:has([data-list-item-id="guildsnav___guild-discover-button"]){display:none!important}`);
     }
     if (s.hideMessageButtons) rules.push(".vc-message-button{display:none!important}");
+    if (s.hideAppTag && B) rules.push(`${sel(B.botTag.split(" ")[0])}:not(${sel(B.botTagOP.split(" ")[0])}){display:none!important}`);
 
     return rules.join("\n");
 }
@@ -404,7 +415,7 @@ export default definePlugin({
     },
 
     toolboxActions() {
-        const s = settings.use(["chatOnly", "hideServerList", "hideChannelList", "hideChannelHeader", "hideNotices", "hideServerHeader", "hideServerLines", "hideAccountPanel", "hideAddDiscover", "hideMessageButtons"]);
+        const s = settings.use(["chatOnly", "hideServerList", "hideChannelList", "hideChannelHeader", "hideNotices", "hideServerHeader", "hideServerLines", "hideAccountPanel", "hideAddDiscover", "hideMessageButtons", "hideAppTag"]);
         const membersHidden = useStateFromStores([ChannelSectionStore as any], () => !ChannelSectionStore.getState().isMembersOpen);
         const flip = (key: keyof typeof s) => () => { settings.store[key] = !settings.store[key]; };
 
@@ -420,6 +431,7 @@ export default definePlugin({
             <Menu.MenuCheckboxItem key="account" id="agentdisc-hide-account" label="Hide account bar (and call buttons)" checked={s.hideAccountPanel} action={flip("hideAccountPanel")} />,
             <Menu.MenuCheckboxItem key="add-discover" id="agentdisc-hide-add-discover" label="Hide add server and Discover" checked={s.hideAddDiscover} action={flip("hideAddDiscover")} />,
             <Menu.MenuCheckboxItem key="message-buttons" id="agentdisc-hide-message-buttons" label="Hide message box buttons" checked={s.hideMessageButtons} action={flip("hideMessageButtons")} />,
+            <Menu.MenuCheckboxItem key="app-tag" id="agentdisc-hide-app-tag" label="Hide the APP tag on bots" checked={s.hideAppTag} action={flip("hideAppTag")} />,
             // Ctrl and the mouse wheel zoom one area at a time (24 Oct); this puts them all back.
             <Menu.MenuItem key="reset-zoom" id="agentdisc-reset-zoom" label="Reset the zoom of every area" action={resetZoom} />
         ];

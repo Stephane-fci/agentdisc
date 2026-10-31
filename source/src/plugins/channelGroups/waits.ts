@@ -23,6 +23,7 @@ import { ChannelStore } from "@webpack/common";
 
 const ASK = "AGENTDISC_WAITS";
 const ANSWER = "AGENTDISC_WAITS_ANSWER";
+const BOOKMARKS = "AGENTDISC_BOOKMARKS";
 // Each answer reads one board per bookmark on a small server; an agent at work shows green
 // from its typing anyway, so two minutes is soon enough.
 const EVERY_MS = 120_000;
@@ -43,6 +44,14 @@ export function plannedChecks(id: string) {
 
 function ask() {
     const list = ids().filter(id => /^\d{15,21}$/.test(id));
+    const guilds: Record<string, string> = {};
+    for (const id of list) {
+        const guild = ChannelStore?.getChannel(id)?.guild_id;
+        if (guild) guilds[id] = guild;
+    }
+    // The whole list, empty too, for each server's board, which keeps it so the channel cleanup never deletes a
+    // bookmarked channel (Stephane, 31 Oct: "every channel that has been bookmarked recently ... should never be deleted").
+    window.postMessage({ type: BOOKMARKS, ids: list, guilds }, location.origin);
     if (!list.length) {
         if (waits.size) {
             waits = new Map();
@@ -51,11 +60,6 @@ function ask() {
         return;
     }
     asked++;
-    const guilds: Record<string, string> = {};
-    for (const id of list) {
-        const guild = ChannelStore?.getChannel(id)?.guild_id;
-        if (guild) guilds[id] = guild;
-    }
     window.postMessage({ type: ASK, seq: asked, ids: list, guilds }, location.origin);
     // Right after a start Discord may not have its channels yet: once more shortly after.
     if (!askedAgain && Object.keys(guilds).length < list.length) {

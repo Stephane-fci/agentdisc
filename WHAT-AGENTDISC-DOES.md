@@ -82,7 +82,7 @@ A channel whose threads are open sits on one rounded soft blue card together wit
 
 ## Panels you can hide
 
-From the Panels group of the menu, each part of Discord can be hidden on its own: the server list, the channel list, the channel header (with it go the buttons it holds), notice banners, the server name bar, the Events and Server Boosts lines, the account bar at the bottom (with the call buttons), the add server and Discover buttons, the gift, GIF, sticker, emoji and apps buttons of the message box, the APP tag Discord puts beside every bot's name (hidden from the start; the forum's OP tag stays), and the member list. A hidden channel list slides back while the mouse sits at the left edge of the window.
+From the Panels group of the menu, each part of Discord can be hidden on its own: the server list, the channel list, the channel header (with it go the buttons it holds), notice banners, the server name bar, the Events and Server Boosts lines, the account bar at the bottom (with the call buttons), the add server and Discover buttons, the gift, GIF, sticker, emoji and apps buttons of the message box, the APP tag Discord puts beside every bot's name (hidden from the start; the forum's OP tag stays), the preview cards under links (hidden from the start, on this computer only; bots' cards, GIFs and images stay), and the member list. A hidden channel list slides back while the mouse sits at the left edge of the window.
 
 The server list and member list also have their own buttons in the channel bar (see above).
 
@@ -110,7 +110,7 @@ The invite and settings buttons that pop up when the mouse passes over a channel
 
 ## Stephane's starting setup
 
-The Midnight theme is on. Hidden: the server list, notice banners, the Events and Boosts lines, the account bar, the add server and Discover buttons, the message box buttons, and the APP tag beside bots. Shown: the channel list, the channel header and the server name bar (they hold the buttons), the busy bar and everything else. Typing signs show the dots with the small photos, the busy threads sign is on, and signs also show on the channel you are in. The voice is a calm, clear American man.
+The Midnight theme is on. Hidden: the server list, notice banners, the Events and Boosts lines, the account bar, the add server and Discover buttons, the message box buttons, the APP tag beside bots and the preview cards under links. Shown: the channel list, the channel header and the server name bar (they hold the buttons), the busy bar and everything else. Typing signs show the dots with the small photos, the busy threads sign is on, and signs also show on the channel you are in. The voice is a calm, clear American man.
 
 ## Settings
 

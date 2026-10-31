@@ -43,6 +43,11 @@ document.addEventListener(
 
             // AgentDisc waiting bookmarks: the checks agents planned in these conversations,
             // asked from the mission board by the background part, which holds its key.
+            // AgentDisc bookmarks: the whole list, for each server's board (31 Oct), sent by the background part.
+            if (event.data.type === 'AGENTDISC_BOOKMARKS' && Array.isArray(event.data.ids)) {
+                send({ action: "agentdiscBookmarks", ids: event.data.ids, guilds: event.data.guilds }).catch(() => {});
+            }
+
             if (event.data.type === 'AGENTDISC_WAITS' && Array.isArray(event.data.ids)) {
                 const seq = event.data.seq;
                 send({ action: "agentdiscWaits", ids: event.data.ids.slice(0, 60), guilds: event.data.guilds })

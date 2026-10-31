@@ -15,6 +15,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     agentWaits(message.ids, message.guilds).then(sendResponse, () => sendResponse({}));
     return true;
   }
+  if (message.action === "agentdiscBookmarks" && sender.id === chrome.runtime.id) {
+    sendBookmarks(message.ids, message.guilds).then(() => sendResponse({}), () => sendResponse({}));
+    return true;
+  }
 });
 
 // AgentDisc read aloud: while the voice plays, YouTube tabs go down to a fifth of their
@@ -159,6 +163,37 @@ async function agentWaits(ids, guilds) {
   await Promise.all([...perBoard].map(([key, list]) => askBoard(key, list, add)));
   for (const id of Object.keys(out)) out[id] = [...new Set(out[id])];
   return out;
+}
+
+// AgentDisc bookmarks for the channel cleanup (Stephane, 31 Oct): "every channel that has been bookmarked recently ...
+// should never be deleted". The page sends the whole list with every question about planned checks and at once when a
+// bookmark changes; each board gets every bookmark of its own server, with no limit, and the main board also every
+// bookmark whose server the page does not know yet, so its list always holds all of its server's bookmarks, an empty
+// list included. A client's board is told only when it has bookmarks of its own. The board remembers every id it was
+// sent for 30 days, so a list that arrives late or partly never removes a bookmark.
+async function sendBookmarks(ids, guilds) {
+  const keys = await boardKeys();
+  if (!keys.length || !Array.isArray(ids)) return;
+  const all = [...new Set(ids.map(String).filter(id => ID.test(id)))];
+  const choice = await boardChoice(keys);
+  const perBoard = new Map(choice.main ? [[choice.main, []]] : []);
+  for (const id of all) {
+    const guild = guilds && typeof guilds === "object" ? String(guilds[id] ?? "") : "";
+    const origin = ID.test(guild) && choice.boards.has(guild) ? choice.boards.get(guild) : choice.main;
+    if (!origin) continue;
+    if (!perBoard.has(origin)) perBoard.set(origin, []);
+    perBoard.get(origin).push(id);
+  }
+  await Promise.all([...perBoard].map(async ([origin, list]) => {
+    const key = keys.find(k => k.origin === origin);
+    if (!key) return;
+    try {
+      await fetch(`${origin}/api/bookmarks`, {
+        method: "POST", body: JSON.stringify({ ids: list }), cache: "no-store", credentials: "omit", redirect: "manual",
+        headers: { ...key.headers, "Content-Type": "application/json", "X-Mission": "1" }
+      });
+    } catch {}
+  }));
 }
 
 async function askBoard(key, list, add) {

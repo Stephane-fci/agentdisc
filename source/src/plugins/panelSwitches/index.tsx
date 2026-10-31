@@ -43,6 +43,8 @@ const PARTS = {
 // (shown only when Discord's send button setting is on) always stays.
 const MESSAGE_BUTTONS = new Set(["gift", "gif", "sticker", "emoji", "expression", "appLauncher"]);
 
+const LINK_PREVIEWS = new Set(["link", "article", "video"]);
+
 type Part = keyof typeof PARTS;
 const classes: Partial<Record<Part, Record<string, string>>> = {};
 
@@ -118,6 +120,14 @@ export const settings = definePluginSettings({
         description: "Hide the gift, GIF, sticker, emoji and apps buttons in the message box",
         default: true,
         onChange: () => apply()
+    },
+    // Stephane, 31 Oct: "I would like to not see the preview card pictures anymore. Can you make
+    // it so they just don't appear at all?" Only on this computer: Discord's own switch would
+    // hide them on his phone too, and bots' cards (alerts, reports), GIFs and images stay.
+    hideLinkPreviews: {
+        type: OptionType.BOOLEAN,
+        description: "Hide the preview cards of links (bots' cards, GIFs and images stay)",
+        default: true
     },
     // Stephane, 30 Oct: "Can you remove the app tag on every agent, every bot profile?"
     // Discord gives every bot that tag and lets no bot drop it, so it is hidden here.
@@ -405,7 +415,21 @@ export default definePlugin({
             match: /(?<=\?null:\(0,\i\.jsx\)\("div",\{className:\i\.\i,children:)(\i)(?=\}\))/,
             replace: "$self.wrapMessageButtons($1)"
         }
+    }, {
+        // Each card under a message is drawn one by one; a link's preview is skipped.
+        find: "}renderStickersAccessories(",
+        replacement: {
+            match: /(?<=renderEmbeds\(\i\)\{.{0,200}?\.embeds\.map\(\((\i),\i\)=>\{)/,
+            replace: "if($self.isLinkPreview($1))return null;"
+        }
     }],
+
+    // A link's preview card: a page, an article or a video, or a card that names the site it
+    // comes from. Cards bots make carry no site, so alerts and reports stay.
+    isLinkPreview(embed: any) {
+        if (!settings.store.hideLinkPreviews || !embed) return false;
+        return LINK_PREVIEWS.has(embed.type) || embed.type === "rich" && !!embed.provider?.name;
+    },
 
     wrapMessageButtons(buttons: any) {
         if (!Array.isArray(buttons)) return buttons;
@@ -415,7 +439,7 @@ export default definePlugin({
     },
 
     toolboxActions() {
-        const s = settings.use(["chatOnly", "hideServerList", "hideChannelList", "hideChannelHeader", "hideNotices", "hideServerHeader", "hideServerLines", "hideAccountPanel", "hideAddDiscover", "hideMessageButtons", "hideAppTag"]);
+        const s = settings.use(["chatOnly", "hideServerList", "hideChannelList", "hideChannelHeader", "hideNotices", "hideServerHeader", "hideServerLines", "hideAccountPanel", "hideAddDiscover", "hideMessageButtons", "hideAppTag", "hideLinkPreviews"]);
         const membersHidden = useStateFromStores([ChannelSectionStore as any], () => !ChannelSectionStore.getState().isMembersOpen);
         const flip = (key: keyof typeof s) => () => { settings.store[key] = !settings.store[key]; };
 
@@ -432,6 +456,7 @@ export default definePlugin({
             <Menu.MenuCheckboxItem key="add-discover" id="agentdisc-hide-add-discover" label="Hide add server and Discover" checked={s.hideAddDiscover} action={flip("hideAddDiscover")} />,
             <Menu.MenuCheckboxItem key="message-buttons" id="agentdisc-hide-message-buttons" label="Hide message box buttons" checked={s.hideMessageButtons} action={flip("hideMessageButtons")} />,
             <Menu.MenuCheckboxItem key="app-tag" id="agentdisc-hide-app-tag" label="Hide the APP tag on bots" checked={s.hideAppTag} action={flip("hideAppTag")} />,
+            <Menu.MenuCheckboxItem key="link-previews" id="agentdisc-hide-link-previews" label="Hide link previews" checked={s.hideLinkPreviews} action={flip("hideLinkPreviews")} />,
             // Ctrl and the mouse wheel zoom one area at a time (24 Oct); this puts them all back.
             <Menu.MenuItem key="reset-zoom" id="agentdisc-reset-zoom" label="Reset the zoom of every area" action={resetZoom} />
         ];

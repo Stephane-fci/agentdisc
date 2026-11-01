@@ -204,6 +204,9 @@ function setWorkingOnly(on: boolean) {
 // channels in their categories, archives included, and any channel marked with their emoji,
 // wherever it sits. Nothing else changes. Per server, and kept after a reload.
 interface Focus { categories: Set<string>; keys: Set<string>; families: CategoryFamily[]; }
+// One more choice in the menu (1 Nov: "hide 'Archived Categories' basically every category that
+// has the word archive in it"): every family's archive categories, with their channels.
+const ARCHIVES = "agentdisc:archives";
 const focusCache = new Map<string, Focus | null>();
 
 function focusOf(guildId: string) {
@@ -216,6 +219,7 @@ function focusOf(guildId: string) {
         const families = categoryFamilies(guildId);
         const categories = new Set<string>();
         for (const family of families) {
+            if (keys.has(ARCHIVES)) for (const c of family.archives) categories.add(c.id);
             if (!keys.has(family.key)) continue;
             for (const c of [family.main, ...family.archives]) if (c) categories.add(c.id);
         }
@@ -256,6 +260,9 @@ function FocusMenu({ guildId, families }: { guildId: string; families: CategoryF
                 {families.map((f, i) => (
                     <Menu.MenuCheckboxItem key={f.key} id={`agentdisc-focus-${i}`} label={f.label} checked={chosen.has(f.key)} action={() => flip(f.key)} />
                 ))}
+            </Menu.MenuGroup>
+            <Menu.MenuGroup>
+                <Menu.MenuCheckboxItem id="agentdisc-focus-archives" label="Every archive category" checked={chosen.has(ARCHIVES)} action={() => flip(ARCHIVES)} />
             </Menu.MenuGroup>
         </Menu.Menu>
     );

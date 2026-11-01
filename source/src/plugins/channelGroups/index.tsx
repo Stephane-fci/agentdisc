@@ -16,9 +16,9 @@ import { useInvite } from "@plugins/vencordToolbox/topBar";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
-import { ActiveJoinedThreadsStore, ChannelStore, FluxDispatcher, GuildChannelStore, GuildStore, Menu, NavigationRouter, ReadStateStore, SelectedChannelStore, SelectedGuildStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
+import { ActiveJoinedThreadsStore, ChannelStore, ContextMenuApi, FluxDispatcher, GuildChannelStore, GuildStore, Menu, NavigationRouter, ReadStateStore, SelectedChannelStore, SelectedGuildStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
 
-import { moveAfterBookmarks, openNewChannel } from "./boxes";
+import { categoryFamilies, type CategoryFamily, familyForName, moveAfterBookmarks, openNewChannel } from "./boxes";
 import { buildGroupCss, buildPriorityCss, GAP_ABOVE, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
 import { askSoon, plannedChecks, startWaits, stopWaits } from "./waits";
 
@@ -49,6 +49,17 @@ const settings = definePluginSettings({
     keepPlace: {
         type: OptionType.CUSTOM,
         default: {} as Record<string, true>
+    },
+    // Focus (1 Nov): per server, the category families it hides, and whether it is on.
+    hiddenFamilies: {
+        type: OptionType.CUSTOM,
+        default: {} as Record<string, string[]>,
+        onChange: () => focusChanged()
+    },
+    focusOn: {
+        type: OptionType.CUSTOM,
+        default: {} as Record<string, true>,
+        onChange: () => focusChanged()
     }
 });
 
@@ -143,6 +154,7 @@ function readWorking() {
 }
 
 function rebuildList() {
+    focusCache.clear();
     try {
         const guildId = SelectedGuildStore.getGuildId();
         if (guildId) ChannelListStore.agentdiscRefresh?.(guildId);
@@ -186,6 +198,74 @@ function setWorkingOnly(on: boolean) {
     workingListeners.forEach(fn => fn());
 }
 
+// Focus (Stephane, 1 Nov: "everything from my client is hidden ... I will finally be able to
+// look at my own stuff"): the square after the working one hides the category families he
+// chose in its menu (a right-click on it), with every channel of theirs and its threads: the
+// channels in their categories, archives included, and any channel marked with their emoji,
+// wherever it sits. Nothing else changes. Per server, and kept after a reload.
+interface Focus { categories: Set<string>; keys: Set<string>; families: CategoryFamily[]; }
+const focusCache = new Map<string, Focus | null>();
+
+function focusOf(guildId: string) {
+    if (!settings.store.focusOn?.[guildId]) return null;
+    const known = focusCache.get(guildId);
+    if (known !== undefined) return known;
+    const keys = new Set(settings.store.hiddenFamilies?.[guildId] ?? NONE);
+    let focus: Focus | null = null;
+    if (keys.size) {
+        const families = categoryFamilies(guildId);
+        const categories = new Set<string>();
+        for (const family of families) {
+            if (!keys.has(family.key)) continue;
+            for (const c of [family.main, ...family.archives]) if (c) categories.add(c.id);
+        }
+        focus = { categories, keys, families };
+    }
+    focusCache.set(guildId, focus);
+    return focus;
+}
+
+function hiddenByFocus(id: string) {
+    const channel = ChannelStore.getChannel(id);
+    if (!channel?.guild_id) return false;
+    const focus = focusOf(channel.guild_id);
+    if (!focus) return false;
+    if (channel.type === CATEGORY) return focus.categories.has(id);
+    if (channel.parent_id && focus.categories.has(channel.parent_id)) return true;
+    const family = familyForName(channel.name ?? "", focus.families);
+    return !!family && focus.keys.has(family.key);
+}
+
+function focusChanged() {
+    focusCache.clear();
+    rebuildList();
+}
+
+function FocusMenu({ guildId, families }: { guildId: string; families: CategoryFamily[]; }) {
+    const { hiddenFamilies } = settings.use(["hiddenFamilies"]);
+    const chosen = new Set(hiddenFamilies?.[guildId] ?? NONE);
+    const flip = (key: string) => {
+        const next = new Set(chosen);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        settings.store.hiddenFamilies = { ...settings.store.hiddenFamilies, [guildId]: [...next] };
+    };
+    return (
+        <Menu.Menu navId="agentdisc-focus" onClose={ContextMenuApi.closeContextMenu} aria-label="Categories to hide">
+            <Menu.MenuGroup label="Hide while focusing">
+                {families.map((f, i) => (
+                    <Menu.MenuCheckboxItem key={f.key} id={`agentdisc-focus-${i}`} label={f.label} checked={chosen.has(f.key)} action={() => flip(f.key)} />
+                ))}
+            </Menu.MenuGroup>
+        </Menu.Menu>
+    );
+}
+
+function openFocusMenu(event: React.MouseEvent, guildId: string) {
+    const families = categoryFamilies(guildId);
+    ContextMenuApi.openContextMenu(event as any, () => <FocusMenu guildId={guildId} families={families} />);
+}
+
 function useWorkingOnly() {
     const [, bump] = useReducer((n: number) => n + 1, 0);
     useEffect(() => {
@@ -195,12 +275,14 @@ function useWorkingOnly() {
     return workingOnly;
 }
 
-// A category with nothing left to show has no title in the working view.
+// A category with nothing left to show has no title in the working view, and a category
+// focus hides has none either.
 function hideSection(guildChannels: any, section: number) {
-    if (!workingOnly) return false;
     try {
         const category = guildChannels?.getCategoryFromSection?.(section);
-        return typeof category?.isEmpty === "function" && category.isEmpty();
+        if (!category) return false;
+        if (workingOnly && typeof category.isEmpty === "function" && category.isEmpty()) return true;
+        return typeof category.id === "string" && hiddenByFocus(category.id);
     } catch {
         return false;
     }
@@ -485,6 +567,7 @@ function visibleOnly(_guildId: string, ids: string[]) {
         const selected = SelectedChannelStore.getChannelId();
         return ids.filter(id => {
             const c = ChannelStore.getChannel(id);
+            if (hiddenByFocus(c?.isThread?.() ? c.parent_id : id)) return false;
             if (!c?.isThread?.()) return true;
             return !isFolded(c.parent_id) || id === selected || isPriority(id);
         });
@@ -559,6 +642,7 @@ const PLUS = "M13 5a1 1 0 1 0-2 0v6H5a1 1 0 1 0 0 2h6v6a1 1 0 1 0 2 0v-6h6a1 1 0
 const CLOSE = "M17.3 18.7a1 1 0 0 0 1.4-1.4L13.42 12l5.3-5.3a1 1 0 0 0-1.42-1.4L12 10.58l-5.3-5.3a1 1 0 0 0-1.4 1.42L10.58 12l-5.3 5.3a1 1 0 1 0 1.42 1.4L12 13.42l5.3 5.3Z";
 const FLAG = "M5 21V4m0 0h11.5l-2 4 2 4H5";
 const PULSE = "M3 12h4l3-7 4 14 3-7h4";
+const EYE_OFF = "M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.6 3.3M6.6 6.6C3.9 8.3 2.5 12 2.5 12S6 18 12 18a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2";
 
 const CategoryCollapseStore = findStoreLazy("CategoryCollapseStore") as { isCollapsed(id: string): boolean; };
 
@@ -641,7 +725,7 @@ function ChannelFilter({ guildId, onClose }: { guildId: string; onClose(): void;
 // category, filter the channels, create a channel, add people, and since 1 Nov where agents work
 // now. Every square keeps its place,
 // greyed out when there is nothing to do, so the hand learns where each one is.
-function ToolSquare({ label, on, disabled, warn, onClick, children }: { label: string; on?: boolean; disabled?: boolean; warn?: boolean; onClick(): void; children: React.ReactNode; }) {
+function ToolSquare({ label, on, disabled, warn, onClick, onContextMenu, children }: { label: string; on?: boolean; disabled?: boolean; warn?: boolean; onClick(e: React.MouseEvent): void; onContextMenu?(e: React.MouseEvent): void; children: React.ReactNode; }) {
     return (
         <button
             type="button"
@@ -650,6 +734,7 @@ function ToolSquare({ label, on, disabled, warn, onClick, children }: { label: s
             aria-label={label}
             disabled={disabled}
             onClick={onClick}
+            onContextMenu={onContextMenu}
         >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">{children}</svg>
         </button>
@@ -660,7 +745,15 @@ const line = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinec
 
 function ListTools({ guildId }: { guildId: string; }) {
     useListedChanges();
-    const { folded, priority } = settings.use(["folded", "priority"]);
+    const { folded, priority, hiddenFamilies, focusOn } = settings.use(["folded", "priority", "hiddenFamilies", "focusOn"]);
+    const chosen = hiddenFamilies?.[guildId]?.length ?? 0;
+    const focusing = !!focusOn?.[guildId] && chosen > 0;
+    const setFocus = (on: boolean) => {
+        const next = { ...settings.store.focusOn };
+        if (on) next[guildId] = true;
+        else delete next[guildId];
+        settings.store.focusOn = next;
+    };
     const [filterOpen, setFilterOpen] = useState(false);
     const working = useWorkingOnly();
     const invite = useInvite(guildId);
@@ -701,6 +794,17 @@ function ListTools({ guildId }: { guildId: string; }) {
                 </ToolSquare>
                 <ToolSquare label={working ? "Back to every channel" : "Only where agents work now"} on={working} onClick={() => setWorkingOnly(!working)}>
                     <path d={PULSE} {...line} />
+                </ToolSquare>
+                <ToolSquare
+                    label={focusing ? "Show the hidden categories again (right-click to choose)" : chosen ? "Hide the chosen categories (right-click to choose)" : "Choose categories to hide"}
+                    on={focusing}
+                    onClick={e => chosen ? setFocus(!focusing) : openFocusMenu(e, guildId)}
+                    onContextMenu={e => {
+                        e.preventDefault();
+                        openFocusMenu(e, guildId);
+                    }}
+                >
+                    <path d={EYE_OFF} {...line} />
                 </ToolSquare>
             </div>
             {filterOpen && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setFilterOpen(false)} />}
@@ -916,9 +1020,10 @@ export default definePlugin({
                     replace: "$1||$2||(!this.category.isCollapsed&&$3)||$4||$self.keepVisible(this.id)"
                 },
                 {
-                    // The working view keeps only the channels where agents work (or their threads do).
+                    // The working view keeps only the channels where agents work (or their threads
+                    // do), and focus leaves out the categories he chose to hide.
                     match: /(getShownChannelIds\(\)\{return null==this\.shownChannelIds&&\(this\.shownChannelIds=\i\(\)\(this\.channels\)\.values\(\)\.filter\((\i)=>4===\2\.renderLevel)/,
-                    replace: "$1&&$self.inWorkingView($2.id)"
+                    replace: "$1&&$self.keepInList($2.id)"
                 }
             ]
         },
@@ -949,7 +1054,7 @@ export default definePlugin({
     visibleOnly,
     keepVisible,
     hideSection,
-    inWorkingView: (id: string) => !workingOnly || workingTop.has(id),
+    keepInList: (id: string) => (!workingOnly || workingTop.has(id)) && !hiddenByFocus(id),
     hideTopLine,
     onlyHiddenTopLines,
 

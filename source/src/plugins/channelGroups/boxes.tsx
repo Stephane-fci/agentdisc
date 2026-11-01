@@ -149,7 +149,7 @@ export function categoryFamilies(guildId: string): CategoryFamily[] {
 
 // The family a channel belongs in: the one with the channel's emoji (the best name match
 // when several share it), or, for a name without an emoji, the family whose name it holds.
-function familyForName(name: string, families: CategoryFamily[]) {
+export function familyForName(name: string, families: CategoryFamily[]) {
     const emoji = leadingEmoji(name);
     const channelWords = ` ${words(name)} `;
     const score = (f: CategoryFamily) => words(f.name).split(" ").filter(w => w && channelWords.includes(` ${w} `)).length;

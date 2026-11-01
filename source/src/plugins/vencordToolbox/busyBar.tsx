@@ -54,19 +54,29 @@ function onTyping({ channelId, userId }: { channelId?: string; userId?: string; 
     listeners.forEach(l => l());
 }
 
-function countNow() {
-    const guildId = SelectedGuildStore.getGuildId() ?? null;
+// The conversations where an agent works right now in one server, the ones the bar counts.
+// The channel list's "working now" view reads the same list (1 Nov).
+export function workingIn(guildId: string | null): string[] {
     const since = Date.now() - GRACE_MS;
-    let count = 0;
+    const ids: string[] = [];
     for (const [channelId, agents] of typing) {
         for (const [userId, at] of agents) if (at < since) agents.delete(userId);
         if (!agents.size) {
             typing.delete(channelId);
             continue;
         }
-        if ((ChannelStore.getChannel(channelId)?.guild_id ?? null) === guildId) count++;
+        if ((ChannelStore.getChannel(channelId)?.guild_id ?? null) === guildId) ids.push(channelId);
     }
-    return count;
+    return ids;
+}
+
+export function onWorkingChange(fn: () => void) {
+    listeners.add(fn);
+    return () => void listeners.delete(fn);
+}
+
+function countNow() {
+    return workingIn(SelectedGuildStore.getGuildId() ?? null).length;
 }
 
 function useCount() {

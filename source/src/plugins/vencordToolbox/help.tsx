@@ -40,7 +40,7 @@ const BUTTONS: [string, string][] = [
     ["Inbox, help, AgentDisc", "Channel bar, at its end: Discord's inbox and help, and every AgentDisc switch and setting"],
     ["# of a channel", "At the top, or in the channel list: turns into a link icon under the mouse; a click copies the link of that channel"],
     ["Link icon on a message", "In the bar that shows on hover: copy the link of that message"],
-    ["Squares above the channels", "From left: hide or show every thread, remove every bookmark, close or open every category, filter the channels, create a channel, add people"],
+    ["Squares above the channels", "From left: hide or show every thread, remove every bookmark, close or open every category, filter the channels, create a channel, add people, where agents work now"],
     ["Arrow left of a channel", "Fold or open that channel's threads"],
     ["Board, Ideas, Team, Connections, Calendar", "Top of the right panel: a click shows or hides that part, a double click shows it alone, dragging a button or a part's title bar moves the part, dragging the line between two parts shares the room. Parts: the channel's mission board; a box to drop an idea, which goes to the right channel; the server's members (a right-click on one hides or shows them there); the map of the channels and threads linked with this one; your calendar. Board and Ideas only where the board is set up"],
     ["Mission board", "Right panel, Board: the board of the channel you are in, its open thread's card marked; a click on a card's thread opens it"],

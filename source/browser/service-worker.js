@@ -134,7 +134,8 @@ async function boardChoice(keys) {
     const res = await fetch(chrome.runtime.getURL("dist/mission-board.json"), { cache: "no-store" });
     if (res.ok) file = await res.json();
   } catch {}
-  if (!file) return { main: keys[0] ? keys[0].origin : null, boards: new Map() };
+  // Without that file the answer is sure only with one board; with several, nothing goes out rather than to the wrong one.
+  if (!file) return { main: keys.length === 1 ? keys[0].origin : null, boards: new Map() };
   const listed = file.boards && typeof file.boards === "object" && !Array.isArray(file.boards) ? Object.entries(file.boards) : [];
   return { main: https(file.board), boards: new Map(listed.filter(([guild]) => ID.test(guild)).map(([guild, address]) => [guild, https(address)])) };
 }

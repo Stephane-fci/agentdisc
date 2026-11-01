@@ -10,6 +10,7 @@ import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings, Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { onWorkingChange, workingIn } from "@plugins/vencordToolbox/busyBar";
 import { allPlaces, find, ICONS, type Place } from "@plugins/vencordToolbox/channelSearch";
 import { useInvite } from "@plugins/vencordToolbox/topBar";
 import { Logger } from "@utils/Logger";
@@ -450,6 +451,7 @@ const SEARCH = "M15.62 17.03a9 9 0 1 1 1.41-1.41l4.68 4.67a1 1 0 0 1-1.42 1.42l-
 const PLUS = "M13 5a1 1 0 1 0-2 0v6H5a1 1 0 1 0 0 2h6v6a1 1 0 1 0 2 0v-6h6a1 1 0 1 0 0-2h-6V5Z";
 const CLOSE = "M17.3 18.7a1 1 0 0 0 1.4-1.4L13.42 12l5.3-5.3a1 1 0 0 0-1.42-1.4L12 10.58l-5.3-5.3a1 1 0 0 0-1.4 1.42L10.58 12l-5.3 5.3a1 1 0 1 0 1.42 1.4L12 13.42l5.3 5.3Z";
 const FLAG = "M5 21V4m0 0h11.5l-2 4 2 4H5";
+const PULSE = "M3 12h4l3-7 4 14 3-7h4";
 
 const CategoryCollapseStore = findStoreLazy("CategoryCollapseStore") as { isCollapsed(id: string): boolean; };
 
@@ -527,9 +529,96 @@ function ChannelFilter({ guildId, onClose }: { guildId: string; onClose(): void;
     );
 }
 
+// Where agents work now (Stephane, 1 Nov: "I just want to have a clear view of what's going
+// on"): only the channels and threads where an agent is working, the ones the busy bar counts.
+// A channel shows with only its working threads, never the others, even when only its threads
+// are at work. A click opens one; the list stays until it is closed.
+function useWorking(guildId: string) {
+    const [ids, setIds] = useState(() => workingIn(guildId));
+    useEffect(() => {
+        const update = () => setIds(before => {
+            const now = workingIn(guildId);
+            return sameIds([...before].sort(), [...now].sort()) ? before : now;
+        });
+        update();
+        const off = onWorkingChange(update);
+        // Work ends without a signal: the list drops it once its typing has gone quiet.
+        const timer = setInterval(update, 2000);
+        return () => {
+            off();
+            clearInterval(timer);
+        };
+    }, [guildId]);
+    return ids;
+}
+
+interface WorkingRow { id: string; name: string; kind: Place["kind"]; working: boolean; thread: boolean; }
+
+function workingRows(guildId: string, ids: string[]): WorkingRow[] {
+    const places = allPlaces(guildId);
+    const order = new Map(places.map((p, i) => [p.id, i]));
+    const known = new Map(places.map(p => [p.id, p]));
+    const pos = (id: string) => order.get(id) ?? Number.MAX_SAFE_INTEGER;
+    const nameOf = (id: string) => known.get(id)?.name ?? ChannelStore.getChannel(id)?.name ?? id;
+    const threads = new Map<string, string[]>();
+    for (const id of ids) {
+        const channel = ChannelStore.getChannel(id);
+        if (!channel) continue;
+        const top = channel.isThread?.() ? channel.parent_id : id;
+        if (!threads.has(top)) threads.set(top, []);
+        if (top !== id) threads.get(top)!.push(id);
+    }
+    const rows: WorkingRow[] = [];
+    for (const top of [...threads.keys()].sort((a, b) => pos(a) - pos(b))) {
+        rows.push({ id: top, name: nameOf(top), kind: known.get(top)?.kind ?? "channel", working: ids.includes(top), thread: false });
+        for (const id of threads.get(top)!.sort((a, b) => pos(a) - pos(b))) {
+            rows.push({ id, name: nameOf(id), kind: "thread", working: true, thread: true });
+        }
+    }
+    return rows;
+}
+
+function WorkingNow({ guildId, onClose }: { guildId: string; onClose(): void; }) {
+    const ids = useWorking(guildId);
+    const rows = useMemo(() => workingRows(guildId, ids), [guildId, ids]);
+    const selected = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
+
+    useEffect(() => {
+        document.documentElement.classList.add("agentdisc-channel-filter");
+        return () => document.documentElement.classList.remove("agentdisc-channel-filter");
+    }, []);
+
+    return (
+        <div className="vc-filter vc-working">
+            <div className="vc-filter-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d={PULSE} {...line} /></svg>
+                <span className="vc-working-title">{ids.length ? `Agents at work: ${ids.length}` : "No agent at work"}</span>
+                <button type="button" className="vc-filter-close" title="Back to every channel" onClick={onClose}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CLOSE} /></svg>
+                </button>
+            </div>
+            <div className="vc-filter-list">
+                {rows.map(r => (
+                    <div
+                        key={r.id}
+                        className={"vc-filter-item" + (r.thread ? " vc-filter-thread" : "") + (r.id === selected ? " vc-filter-selected" : "") + (r.working ? "" : " vc-working-quiet")}
+                        onClick={() => NavigationRouter.transitionTo(`/channels/${guildId}/${r.id}`)}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fillRule="evenodd" d={ICONS[r.kind]} /></svg>
+                        <span className="vc-filter-name">{r.name}</span>
+                        {r.working && <span className="vc-working-dot" />}
+                    </div>
+                ))}
+                {!rows.length && <div className="vc-filter-none">No agent is working right now.</div>}
+            </div>
+        </div>
+    );
+}
+
 // The buttons above the channel list (Stephane, 29 Sept, then 1 and 6 Oct; one line of
 // squares since 12 Oct): show or hide every thread, clear every bookmark, close or open every
-// category, filter the channels, create a channel, add people. Every square keeps its place,
+// category, filter the channels, create a channel, add people, and since 1 Nov where agents work
+// now. Every square keeps its place,
 // greyed out when there is nothing to do, so the hand learns where each one is.
 function ToolSquare({ label, on, disabled, warn, onClick, children }: { label: string; on?: boolean; disabled?: boolean; warn?: boolean; onClick(): void; children: React.ReactNode; }) {
     return (
@@ -551,7 +640,9 @@ const line = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinec
 function ListTools({ guildId }: { guildId: string; }) {
     useListedChanges();
     const { folded, priority } = settings.use(["folded", "priority"]);
-    const [filterOpen, setFilterOpen] = useState(false);
+    // One list at a time under the squares: the filter or where agents work now.
+    const [open, setOpen] = useState<"filter" | "working" | null>(null);
+    const flip = (which: "filter" | "working") => setOpen(now => now === which ? null : which);
     const invite = useInvite(guildId);
 
     const withThreads: string[] = [];
@@ -578,7 +669,7 @@ function ListTools({ guildId }: { guildId: string; }) {
                 <ToolSquare label={anyOpen ? "Close every category" : "Open every category"} on={categories.length > 0 && anyOpen} disabled={!categories.length} onClick={() => FluxDispatcher.dispatch({ type: anyOpen ? "CATEGORY_COLLAPSE_ALL" : "CATEGORY_EXPAND_ALL", guildId })}>
                     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" {...line} />
                 </ToolSquare>
-                <ToolSquare label="Filter channels" on={filterOpen} onClick={() => setFilterOpen(v => !v)}>
+                <ToolSquare label="Filter channels" on={open === "filter"} onClick={() => flip("filter")}>
                     <path fill="currentColor" fillRule="evenodd" d={SEARCH} />
                 </ToolSquare>
                 <ToolSquare label="New channel (Ctrl+P)" onClick={() => openNewChannel()}>
@@ -588,8 +679,12 @@ function ListTools({ guildId }: { guildId: string; }) {
                     <circle cx="9" cy="8" r="3.5" {...line} />
                     <path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" {...line} />
                 </ToolSquare>
+                <ToolSquare label={open === "working" ? "Back to every channel" : "Where agents work now"} on={open === "working"} onClick={() => flip("working")}>
+                    <path d={PULSE} {...line} />
+                </ToolSquare>
             </div>
-            {filterOpen && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setFilterOpen(false)} />}
+            {open === "filter" && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setOpen(null)} />}
+            {open === "working" && <WorkingNow key={guildId} guildId={guildId} onClose={() => setOpen(null)} />}
         </div>
     );
 }

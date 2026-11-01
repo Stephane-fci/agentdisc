@@ -208,6 +208,33 @@ html.agentdisc-channel-filter .vc-list-tools ~ * {
     opacity: 0.6;
 }
 
+/* Where agents work now (1 Nov): the filter's list, a title in place of the text box. */
+.vc-working-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.vc-working .vc-filter-item:hover:not(.vc-filter-selected) {
+    background: var(--interactive-background-hover, rgb(255 255 255 / 6%));
+    color: var(--interactive-text-active);
+}
+
+.vc-working-quiet {
+    opacity: 0.6;
+}
+
+.vc-working-dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    margin-inline-start: auto;
+    border-radius: 50%;
+    background: #23a55a;
+}
+
 .vc-filter-none {
     padding: 10px;
     color: var(--text-muted, #949ba4);

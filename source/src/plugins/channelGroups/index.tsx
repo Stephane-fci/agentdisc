@@ -107,7 +107,103 @@ const typingCandidates = new Set<string>();
 let typingQueued = false;
 
 function keepVisible(id: string) {
-    return isChannelBookmark(id) || (isPluginEnabled("ChannelGroups") && typingShown.has(id));
+    return isChannelBookmark(id) || (isPluginEnabled("ChannelGroups") && (typingShown.has(id) || workingOnly && workingTop.has(id)));
+}
+
+// Where agents work now (Stephane, 1 Nov: "I just want to have a clear view of what's going
+// on", then "the look should be exactly the same"): the last square leaves in the channel list
+// only the channels where an agent is working or that hold a thread where one is, and under each
+// only its working threads, the ones the busy bar counts. The lines keep their look: bookmark
+// colours, the agents' photos and dots. Kept for this visit only.
+let workingOnly = false;
+let workingTop = new Set<string>();
+let workingThreads = new Set<string>();
+let workingKey = "";
+let stopWorkingWatch: (() => void) | null = null;
+const workingListeners = new Set<() => void>();
+
+function readWorking() {
+    const guildId = SelectedGuildStore.getGuildId();
+    const top = new Set<string>();
+    const threads = new Set<string>();
+    for (const id of guildId ? workingIn(guildId) : NONE) {
+        const channel = ChannelStore.getChannel(id);
+        if (!channel) continue;
+        if (channel.isThread?.()) {
+            threads.add(id);
+            top.add(channel.parent_id);
+        } else top.add(id);
+    }
+    const key = `${[...top].sort()}|${[...threads].sort()}`;
+    if (key === workingKey) return false;
+    workingTop = top;
+    workingThreads = threads;
+    workingKey = key;
+    return true;
+}
+
+function rebuildList() {
+    try {
+        const guildId = SelectedGuildStore.getGuildId();
+        if (guildId) ChannelListStore.agentdiscRefresh?.(guildId);
+        ChannelListStore.emitChange();
+    } catch (e) {
+        logger.warn("Could not redraw the channel list for the working view", e);
+    }
+    redrawList();
+}
+
+function refreshWorking() {
+    if (readWorking()) rebuildList();
+}
+
+function setWorkingOnly(on: boolean) {
+    if (on === workingOnly) return;
+    workingOnly = on;
+    workingKey = "";
+    stopWorkingWatch?.();
+    stopWorkingWatch = null;
+    if (on) {
+        const off = onWorkingChange(refreshWorking);
+        // Work ends without a signal: a line leaves once its agent's typing has gone quiet.
+        const timer = setInterval(refreshWorking, 2000);
+        const onGuild = () => {
+            workingKey = "";
+            refreshWorking();
+        };
+        SelectedGuildStore.addChangeListener(onGuild);
+        stopWorkingWatch = () => {
+            off();
+            clearInterval(timer);
+            SelectedGuildStore.removeChangeListener(onGuild);
+        };
+        refreshWorking();
+    } else {
+        workingTop = new Set();
+        workingThreads = new Set();
+        rebuildList();
+    }
+    workingListeners.forEach(fn => fn());
+}
+
+function useWorkingOnly() {
+    const [, bump] = useReducer((n: number) => n + 1, 0);
+    useEffect(() => {
+        workingListeners.add(bump);
+        return () => void workingListeners.delete(bump);
+    }, []);
+    return workingOnly;
+}
+
+// A category with nothing left to show has no title in the working view.
+function hideSection(guildChannels: any, section: number) {
+    if (!workingOnly) return false;
+    try {
+        const category = guildChannels?.getCategoryFromSection?.(section);
+        return typeof category?.isEmpty === "function" && category.isEmpty();
+    } catch {
+        return false;
+    }
 }
 
 function someoneTyping(channelId: string, guildId: string, me: string | undefined) {
@@ -322,6 +418,13 @@ function shownThreads(row: ChannelRow): string[] {
             listed.set(row.id, ids);
             notify();
         }
+        if (workingOnly) {
+            const working = ids.filter(id => workingThreads.has(id));
+            const key = `working:${working.join()}`;
+            let same = keptOnly.get(key);
+            if (!same) keptOnly.set(key, same = working);
+            return same;
+        }
         if (ids.length === 0 || !isFolded(row.id)) return ids;
 
         const selected = SelectedChannelStore.getChannelId();
@@ -349,7 +452,7 @@ function rowHeight(getRowHeight: Function) {
     try {
         const selected = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
         const parent = selected?.isThread?.() ? selected.parent_id : null;
-        const key = `${layoutVersion}:${parent && isFolded(parent) ? selected!.id : ""}`;
+        const key = `${layoutVersion}:${parent && isFolded(parent) ? selected!.id : ""}:${workingOnly ? workingKey : ""}`;
         let entry = heightFns.get(getRowHeight);
         if (entry?.key !== key) {
             entry = { key, fn: (section: number, row: number) => getRowHeight(section, row) };
@@ -529,92 +632,6 @@ function ChannelFilter({ guildId, onClose }: { guildId: string; onClose(): void;
     );
 }
 
-// Where agents work now (Stephane, 1 Nov: "I just want to have a clear view of what's going
-// on"): only the channels and threads where an agent is working, the ones the busy bar counts.
-// A channel shows with only its working threads, never the others, even when only its threads
-// are at work. A click opens one; the list stays until it is closed.
-function useWorking(guildId: string) {
-    const [ids, setIds] = useState(() => workingIn(guildId));
-    useEffect(() => {
-        const update = () => setIds(before => {
-            const now = workingIn(guildId);
-            return sameIds([...before].sort(), [...now].sort()) ? before : now;
-        });
-        update();
-        const off = onWorkingChange(update);
-        // Work ends without a signal: the list drops it once its typing has gone quiet.
-        const timer = setInterval(update, 2000);
-        return () => {
-            off();
-            clearInterval(timer);
-        };
-    }, [guildId]);
-    return ids;
-}
-
-interface WorkingRow { id: string; name: string; kind: Place["kind"]; working: boolean; thread: boolean; }
-
-function workingRows(guildId: string, ids: string[]): WorkingRow[] {
-    const places = allPlaces(guildId);
-    const order = new Map(places.map((p, i) => [p.id, i]));
-    const known = new Map(places.map(p => [p.id, p]));
-    const pos = (id: string) => order.get(id) ?? Number.MAX_SAFE_INTEGER;
-    const nameOf = (id: string) => known.get(id)?.name ?? ChannelStore.getChannel(id)?.name ?? id;
-    const threads = new Map<string, string[]>();
-    for (const id of ids) {
-        const channel = ChannelStore.getChannel(id);
-        if (!channel) continue;
-        const top = channel.isThread?.() ? channel.parent_id : id;
-        if (!threads.has(top)) threads.set(top, []);
-        if (top !== id) threads.get(top)!.push(id);
-    }
-    const rows: WorkingRow[] = [];
-    for (const top of [...threads.keys()].sort((a, b) => pos(a) - pos(b))) {
-        rows.push({ id: top, name: nameOf(top), kind: known.get(top)?.kind ?? "channel", working: ids.includes(top), thread: false });
-        for (const id of threads.get(top)!.sort((a, b) => pos(a) - pos(b))) {
-            rows.push({ id, name: nameOf(id), kind: "thread", working: true, thread: true });
-        }
-    }
-    return rows;
-}
-
-function WorkingNow({ guildId, onClose }: { guildId: string; onClose(): void; }) {
-    const ids = useWorking(guildId);
-    const rows = useMemo(() => workingRows(guildId, ids), [guildId, ids]);
-    const selected = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
-
-    useEffect(() => {
-        document.documentElement.classList.add("agentdisc-channel-filter");
-        return () => document.documentElement.classList.remove("agentdisc-channel-filter");
-    }, []);
-
-    return (
-        <div className="vc-filter vc-working">
-            <div className="vc-filter-box">
-                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d={PULSE} {...line} /></svg>
-                <span className="vc-working-title">{ids.length ? `Agents at work: ${ids.length}` : "No agent at work"}</span>
-                <button type="button" className="vc-filter-close" title="Back to every channel" onClick={onClose}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d={CLOSE} /></svg>
-                </button>
-            </div>
-            <div className="vc-filter-list">
-                {rows.map(r => (
-                    <div
-                        key={r.id}
-                        className={"vc-filter-item" + (r.thread ? " vc-filter-thread" : "") + (r.id === selected ? " vc-filter-selected" : "") + (r.working ? "" : " vc-working-quiet")}
-                        onClick={() => NavigationRouter.transitionTo(`/channels/${guildId}/${r.id}`)}
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fillRule="evenodd" d={ICONS[r.kind]} /></svg>
-                        <span className="vc-filter-name">{r.name}</span>
-                        {r.working && <span className="vc-working-dot" />}
-                    </div>
-                ))}
-                {!rows.length && <div className="vc-filter-none">No agent is working right now.</div>}
-            </div>
-        </div>
-    );
-}
-
 // The buttons above the channel list (Stephane, 29 Sept, then 1 and 6 Oct; one line of
 // squares since 12 Oct): show or hide every thread, clear every bookmark, close or open every
 // category, filter the channels, create a channel, add people, and since 1 Nov where agents work
@@ -640,9 +657,8 @@ const line = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinec
 function ListTools({ guildId }: { guildId: string; }) {
     useListedChanges();
     const { folded, priority } = settings.use(["folded", "priority"]);
-    // One list at a time under the squares: the filter or where agents work now.
-    const [open, setOpen] = useState<"filter" | "working" | null>(null);
-    const flip = (which: "filter" | "working") => setOpen(now => now === which ? null : which);
+    const [filterOpen, setFilterOpen] = useState(false);
+    const working = useWorkingOnly();
     const invite = useInvite(guildId);
 
     const withThreads: string[] = [];
@@ -669,7 +685,7 @@ function ListTools({ guildId }: { guildId: string; }) {
                 <ToolSquare label={anyOpen ? "Close every category" : "Open every category"} on={categories.length > 0 && anyOpen} disabled={!categories.length} onClick={() => FluxDispatcher.dispatch({ type: anyOpen ? "CATEGORY_COLLAPSE_ALL" : "CATEGORY_EXPAND_ALL", guildId })}>
                     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" {...line} />
                 </ToolSquare>
-                <ToolSquare label="Filter channels" on={open === "filter"} onClick={() => flip("filter")}>
+                <ToolSquare label="Filter channels" on={filterOpen} onClick={() => setFilterOpen(v => !v)}>
                     <path fill="currentColor" fillRule="evenodd" d={SEARCH} />
                 </ToolSquare>
                 <ToolSquare label="New channel (Ctrl+P)" onClick={() => openNewChannel()}>
@@ -679,12 +695,11 @@ function ListTools({ guildId }: { guildId: string; }) {
                     <circle cx="9" cy="8" r="3.5" {...line} />
                     <path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" {...line} />
                 </ToolSquare>
-                <ToolSquare label={open === "working" ? "Back to every channel" : "Where agents work now"} on={open === "working"} onClick={() => flip("working")}>
+                <ToolSquare label={working ? "Back to every channel" : "Only where agents work now"} on={working} onClick={() => setWorkingOnly(!working)}>
                     <path d={PULSE} {...line} />
                 </ToolSquare>
             </div>
-            {open === "filter" && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setOpen(null)} />}
-            {open === "working" && <WorkingNow key={guildId} guildId={guildId} onClose={() => setOpen(null)} />}
+            {filterOpen && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setFilterOpen(false)} />}
         </div>
     );
 }
@@ -842,6 +857,15 @@ export default definePlugin({
                     replace: "rowHeight:$self.rowHeight(this.getRowHeight),"
                 },
                 {
+                    // The working view: a category left empty loses its title and its divider.
+                    match: /(?<=(getSectionHeight|getSectionFooterHeight)=(\i)=>\{)/g,
+                    replace: "if($self.hideSection(this.props.guildChannels,$2))return 0;"
+                },
+                {
+                    match: /(?<=(renderSection|renderSectionFooter)=(\i)=>\{)/g,
+                    replace: "if($self.hideSection(this.props.guildChannels,$2.section))return null;"
+                },
+                {
                     // Opening a thread scrolls the list to it: Discord places it by its rank
                     // among all the channel's threads, folded ones included.
                     match: /(\i)=(\i)\.threadOffset\*(\i)\((\i)\)/,
@@ -882,10 +906,17 @@ export default definePlugin({
             // their channel in view in a closed category (Stephane, 7 Oct): with its threads
             // folded, the channel looked visible for no reason.
             find: "suggestedFavoriteChannelId;",
-            replacement: {
-                match: /(\i)\|\|(\i)\|\|(!\i\(\)\.isEmpty\(\i\))\|\|(\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
-                replace: "$1||$2||(!this.category.isCollapsed&&$3)||$4||$self.keepVisible(this.id)"
-            }
+            replacement: [
+                {
+                    match: /(\i)\|\|(\i)\|\|(!\i\(\)\.isEmpty\(\i\))\|\|(\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
+                    replace: "$1||$2||(!this.category.isCollapsed&&$3)||$4||$self.keepVisible(this.id)"
+                },
+                {
+                    // The working view keeps only the channels where agents work (or their threads do).
+                    match: /(getShownChannelIds\(\)\{return null==this\.shownChannelIds&&\(this\.shownChannelIds=\i\(\)\(this\.channels\)\.values\(\)\.filter\((\i)=>4===\2\.renderLevel)/,
+                    replace: "$1&&$self.inWorkingView($2.id)"
+                }
+            ]
         },
         {
             // No "More Active Threads" box when the mouse is on a channel line (Stephane, 19 Oct:
@@ -913,6 +944,8 @@ export default definePlugin({
     rowHeight,
     visibleOnly,
     keepVisible,
+    hideSection,
+    inWorkingView: (id: string) => !workingOnly || workingTop.has(id),
     hideTopLine,
     onlyHiddenTopLines,
 
@@ -973,6 +1006,7 @@ export default definePlugin({
     },
 
     stop() {
+        setWorkingOnly(false);
         stopWaits();
         for (const store of PRIORITY_STORES()) store?.removeChangeListener?.(queuePriority);
         TypingStore.removeChangeListener(queueTypingCheck);

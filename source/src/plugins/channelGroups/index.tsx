@@ -396,6 +396,7 @@ const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((
 // which agents are at work (Stephane, 30 Sept).
 export function useHiddenThreads(channelId: string, guildId: string | null | undefined): string[] {
     const { folded } = settings.use(["folded"]);
+    const working = useWorkingOnly();
     const selected = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
     const threads = useStateFromStores(
         [ActiveJoinedThreadsStore],
@@ -403,7 +404,10 @@ export function useHiddenThreads(channelId: string, guildId: string | null | und
         [guildId, channelId],
         sameIds
     );
-    if (!folded?.[channelId] || !isPluginEnabled("ChannelGroups")) return NONE;
+    // In the working view the working threads show under the channel, so their agents stay on
+    // their own lines and the channel line shows only who works in the channel itself (1 Nov:
+    // "The agent icon should be only on the threads that actually have some work done").
+    if (working || !folded?.[channelId] || !isPluginEnabled("ChannelGroups")) return NONE;
     return threads.filter(id => id !== selected);
 }
 

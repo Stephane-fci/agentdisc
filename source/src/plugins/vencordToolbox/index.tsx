@@ -22,7 +22,6 @@ import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { togglePriority, usePriority } from "@plugins/channelGroups";
 import { ChannelSectionStore, isHidden, isLeftPanelHidden, settings as panelSettings, toggleLeftPanel, toggleMembers, toggleServerList } from "@plugins/panelSwitches";
 import { Devs } from "@utils/constants";
 import { copyWithToast } from "@utils/discord";
@@ -32,6 +31,7 @@ import { ChannelStore, Menu, Popout, SelectedChannelStore, useEffect, useRef, us
 import type { PropsWithChildren } from "react";
 
 import { startBusyBar, stopBusyBar } from "./busyBar";
+import { BookmarkButton, PinButton, ThreadMarkButtons } from "./channelMarks";
 import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
 import { isFeedbackOn, onFeedbackChange, setFeedback } from "./feedback";
 import { LinksPanel } from "./links";
@@ -166,20 +166,6 @@ function TopIcon({ children }: PropsWithChildren) {
     );
 }
 
-// The priority flag: red while the channel or thread being read is marked.
-const FlagIcon = ({ on }: { on: boolean; }) => (
-    <TopIcon>
-        <path d="M5 21V4m0 0h11.5l-2 4 2 4H5" fill={on ? "#f23f43" : "none"} stroke={on ? "#f23f43" : "currentColor"} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-    </TopIcon>
-);
-
-function PriorityButton({ channelId }: { channelId: string; }) {
-    const on = usePriority(channelId);
-    return (
-        <HeaderBarIcon className="vc-toolbox-btn" onClick={() => togglePriority(channelId)} tooltip={on ? "Remove bookmark (Ctrl+B)" : "Bookmark (Ctrl+B)"} icon={() => <FlagIcon on={on} />} selected={on} />
-    );
-}
-
 const LinksIcon = () => (
     <TopIcon>
         <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
@@ -291,7 +277,10 @@ function PanelButtons() {
     const leftShown = !isLeftPanelHidden();
     return (
         <>
-            {inServer && channelId && isPluginEnabled("ChannelGroups") && <PriorityButton channelId={channelId} />}
+            {inServer && channelId && isPluginEnabled("ChannelGroups") && <>
+                {ChannelStore.getChannel(channelId)?.isThread?.() && <PinButton channelId={channelId} />}
+                <BookmarkButton channelId={channelId} />
+            </>}
             <FeedbackButton />
             <FindButton />
             {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
@@ -444,6 +433,15 @@ export default definePlugin({
         },
         // The channel's bar: AgentDisc's buttons before Discord's, the moved ones after.
         {
+            // A side-panel thread has a separate header. Use that header's channel,
+            // not SelectedChannelStore, which may still name the main channel.
+            find: '"Sidebar Overflow"',
+            replacement: {
+                match: /toolbar:(\i),("aria-label":.{0,150}?children:\(0,\i\.\i\)\(\{channel:(\i),[^}]{0,150}?inSidebar:!0)/g,
+                replace: "toolbar:[$self.ThreadMarkButtons($3),$1],$2"
+            }
+        },
+        {
             find: "toolbar:this.renderHeaderToolbar()",
             replacement: {
                 match: /toolbar:this\.renderHeaderToolbar\(\)/,
@@ -469,6 +467,7 @@ export default definePlugin({
 
     attachLongMessage,
     renderSidePanel,
+    ThreadMarkButtons: (channel: any) => <ErrorBoundary noop key="agentdisc-thread-marks"><ThreadMarkButtons channel={channel} /></ErrorBoundary>,
     isThread: (channel: any) => !!channel?.isThread?.(),
     isThreadId: (id: string) => !!ChannelStore.getChannel(id)?.isThread?.(),
     keepArrows,

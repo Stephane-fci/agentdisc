@@ -16,7 +16,7 @@ import { useInvite } from "@plugins/vencordToolbox/topBar";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
-import { ActiveJoinedThreadsStore, ChannelStore, ContextMenuApi, FluxDispatcher, GuildChannelStore, GuildStore, Menu, NavigationRouter, ReadStateStore, SelectedChannelStore, SelectedGuildStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
+import { ActiveJoinedThreadsStore, ChannelStore, ContextMenuApi, FluxDispatcher, GuildChannelStore, GuildStore, Menu, NavigationRouter, ReadStateStore, RestAPI, SelectedChannelStore, SelectedGuildStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
 
 import { categoryFamilies, type CategoryFamily, familyForName, moveAfterBookmarks, openNewChannel } from "./boxes";
 import { buildGroupCss, buildPriorityCss, GAP_ABOVE, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
@@ -45,6 +45,14 @@ const settings = definePluginSettings({
         type: OptionType.CUSTOM,
         default: {} as Record<string, true>
     },
+    pins: {
+        type: OptionType.CUSTOM,
+        default: {} as Record<string, true>
+    },
+    pinImport: {
+        type: OptionType.CUSTOM,
+        default: null as Record<string, true> | null
+    },
     // Servers where a new bookmark keeps its place (the AgentDisc menu, 19 Oct).
     keepPlace: {
         type: OptionType.CUSTOM,
@@ -69,6 +77,137 @@ function isPriority(id: string | null | undefined) {
 
 export function isBookmarked(id: string | null | undefined) {
     return isPriority(id);
+}
+
+// Pins remember threads; bookmarks describe today's work. The import takes one snapshot,
+// including IDs whose channel records have not arrived yet, and never runs again on new bookmarks.
+let pinning = false;
+let pinsStarted = false;
+let pinsLoading = false;
+let pinGeneration = 0;
+const pinAttempts = new Set<string>();
+let pinStyle: HTMLStyleElement | null = null;
+const openThreadHeaders = new Map<string, number>();
+
+// A sidebar header knows its thread even when Discord's main selection is its parent.
+export function holdOpenThread(id: string) {
+    openThreadHeaders.set(id, (openThreadHeaders.get(id) ?? 0) + 1);
+    pinsChanged();
+    return () => {
+        const remaining = (openThreadHeaders.get(id) ?? 1) - 1;
+        if (remaining) openThreadHeaders.set(id, remaining);
+        else openThreadHeaders.delete(id);
+        pinsChanged();
+    };
+}
+
+function isPinned(id: string) {
+    return settings.store.pins?.[id] === true;
+}
+
+function paintPins() {
+    if (!pinStyle) return;
+    const name = classes.line?.name.split(" ").map(c => `.${c}`).join("");
+    pinStyle.textContent = pinning && name ? Object.keys(settings.store.pins ?? {})
+        .filter(id => /^\d+$/.test(id))
+        .map(id => `[data-list-item-id="channels___${id}"] ${name}::before{content:"";display:inline-block;width:12px;height:12px;margin-inline-end:6px;vertical-align:middle;background:currentColor;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2' d='M9 3h6l-1 7 4 4v2H6v-2l4-4-1-7M12 16v6'/%3E%3C/svg%3E") center/contain no-repeat}`)
+        .join("\n") : "";
+}
+
+function pinsChanged() {
+    keptOnly.clear();
+    paintPins();
+    rebuildList();
+    notify();
+}
+
+function setPinning(on: boolean) {
+    pinning = on;
+    pinsChanged();
+}
+
+export function togglePin(id: string) {
+    if (!ChannelStore.getChannel(id)?.isThread?.()) return;
+    const pins = { ...settings.store.pins };
+    if (pins[id]) delete pins[id];
+    else pins[id] = true;
+    settings.store.pins = pins;
+    // A manual choice wins over an import still waiting for its other records.
+    const pending = { ...settings.store.pinImport };
+    delete pending[id];
+    settings.store.pinImport = pending;
+    pinsChanged();
+}
+
+function pinContextMenu(e: MouseEvent) {
+    if (!pinning || !(e.target instanceof Element)) return;
+    const selector = '[data-list-item-id^="channels___"]';
+    const wrapper = classes.line?.wrapper.split(" ").map(c => `.${c}`).join("");
+    const row = e.target.closest(selector) ?? (wrapper ? e.target.closest(wrapper)?.querySelector(selector) : null);
+    const id = row?.getAttribute("data-list-item-id")?.slice("channels___".length);
+    if (!id || !ChannelStore.getChannel(id)?.isThread?.()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    togglePin(id);
+}
+
+// Archived threads disappear from Discord's active-thread list after a reload. Fetch only
+// saved IDs missing from its channel store, through the signed-in user's normal read access.
+// Errors keep the pin/import for the next connection; they never erase a user's choice.
+async function restorePins() {
+    if (!pinsStarted || pinsLoading || !UserStore.getCurrentUser()) return;
+    pinsLoading = true;
+    const generation = pinGeneration;
+    let changed = false;
+    try {
+        if (settings.store.pinImport == null) settings.store.pinImport = { ...settings.store.priority };
+        const ids = new Set([...Object.keys(settings.store.pinImport), ...Object.keys(settings.store.pins ?? {})]);
+        for (const id of ids) {
+            if (!pinsStarted || generation !== pinGeneration) break;
+            let channel = ChannelStore.getChannel(id);
+            if (!channel && !pinAttempts.has(id)) {
+                pinAttempts.add(id);
+                try {
+                    const response = await RestAPI.get({ url: `/channels/${id}` });
+                    if (!pinsStarted || generation !== pinGeneration) break;
+                    if (response.body?.id === id) {
+                        FluxDispatcher.dispatch({ type: "LOAD_THREADS_SUCCESS", threads: [response.body] });
+                        channel = ChannelStore.getChannel(id);
+                        changed = true;
+                    }
+                } catch {
+                    logger.warn("Could not restore a saved thread; keeping it for the next connection", id);
+                }
+            }
+            if (channel && settings.store.pinImport?.[id]) {
+                if (channel.isThread()) settings.store.pins = { ...settings.store.pins, [id]: true };
+                const pending = { ...settings.store.pinImport };
+                delete pending[id];
+                settings.store.pinImport = pending;
+                changed = true;
+            }
+        }
+    } finally {
+        pinsLoading = false;
+        if (changed && pinsStarted && generation === pinGeneration) pinsChanged();
+    }
+}
+
+function queueRestorePins() {
+    // Stores can emit while Flux is dispatching; defer the read and any restoration dispatch.
+    queueMicrotask(() => void restorePins());
+}
+
+function reconnectPins() {
+    pinAttempts.clear();
+    queueRestorePins();
+}
+
+function pinnedThreads(parentId: string): string[] {
+    return Object.keys(settings.store.pins ?? {}).filter(id => {
+        const c = ChannelStore.getChannel(id);
+        return c?.isThread?.() && c.parent_id === parentId;
+    });
 }
 
 function bookmarksChanged(ids: string[]) {
@@ -439,6 +578,11 @@ export function usePriority(id: string | null | undefined) {
     return !!id && priority?.[id] === true;
 }
 
+export function usePinned(id: string) {
+    const { pins } = settings.use(["pins"]);
+    return pins?.[id] === true;
+}
+
 const priorityMenu: NavContextMenuPatchCallback = (children, { channel }: { channel?: { id: string; }; }) => {
     if (!channel) return;
     children.push(
@@ -480,11 +624,11 @@ function isFolded(channelId: string) {
 
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((id, i) => id === b[i]);
 
-// The open threads of a channel that its fold hides right now (all but the thread being
-// read). The channel line shows who is typing in them, so a folded channel still says
-// which agents are at work (Stephane, 30 Sept).
+// Hidden thread agents stay visible on their parent, both when folded and when pins
+// keep the open dropdown short. The working-only view shows its agents on their rows.
 export function useHiddenThreads(channelId: string, guildId: string | null | undefined): string[] {
-    const { folded } = settings.use(["folded"]);
+    settings.use(["folded", "pins", "priority"]);
+    useListedChanges();
     const working = useWorkingOnly();
     const selected = useStateFromStores([SelectedChannelStore], () => SelectedChannelStore.getChannelId());
     const threads = useStateFromStores(
@@ -496,18 +640,37 @@ export function useHiddenThreads(channelId: string, guildId: string | null | und
     // In the working view the working threads show under the channel, so their agents stay on
     // their own lines and the channel line shows only who works in the channel itself (1 Nov:
     // "The agent icon should be only on the threads that actually have some work done").
-    if (working || !folded?.[channelId] || !isPluginEnabled("ChannelGroups")) return NONE;
-    return threads.filter(id => id !== selected);
+    if (working || !isPluginEnabled("ChannelGroups")) return NONE;
+    const hasPins = pinnedThreads(channelId).length > 0;
+    return threads.filter(id => !normalThreadVisible(id, channelId, hasPins, selected));
+}
+
+function normalThreadVisible(id: string, parentId: string, hasPins: boolean, selected: string | null | undefined) {
+    // A pin never keeps a thread under a closed dropdown, and never hides one that its
+    // bookmark or selection keeps there: pins and bookmarks stay independent (3 Nov).
+    if (isFolded(parentId)) return id === selected || isPriority(id);
+    return pinning || !hasPins || id === selected || openThreadHeaders.has(id) || isPinned(id) || isPriority(id);
 }
 
 // Under a folded channel only the thread being read and priority threads stay, like
 // Discord's folded categories.
 const keptOnly = new Map<string, string[]>();
+function allThreads(row: ChannelRow): string[] {
+    const pins = pinnedThreads(row.id);
+    const selected = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
+    if (selected?.isThread?.() && selected.parent_id === row.id) pins.push(selected.id);
+    for (const id of openThreadHeaders.keys()) {
+        if (ChannelStore.getChannel(id)?.parent_id === row.id) pins.push(id);
+    }
+    return pins.length ? [...new Set([...(row.threadIds ?? NONE), ...pins])] : row.threadIds ?? NONE;
+}
+
 function shownThreads(row: ChannelRow): string[] {
     try {
-        const ids = row.threadIds ?? NONE;
+        const pins = pinnedThreads(row.id);
+        const ids = allThreads(row);
         const before = listed.get(row.id);
-        if (before !== ids && (before?.length ?? 0) + ids.length > 0) {
+        if (!sameIds(before ?? NONE, ids)) {
             listed.set(row.id, ids);
             notify();
         }
@@ -518,10 +681,8 @@ function shownThreads(row: ChannelRow): string[] {
             if (!same) keptOnly.set(key, same = working);
             return same;
         }
-        if (ids.length === 0 || !isFolded(row.id)) return ids;
-
         const selected = SelectedChannelStore.getChannelId();
-        const kept = ids.filter(id => id === selected || isPriority(id));
+        const kept = ids.filter(id => normalThreadVisible(id, row.id, pins.length > 0, selected));
         if (!kept.length) return NONE;
         const key = kept.join();
         let same = keptOnly.get(key);
@@ -545,7 +706,7 @@ function rowHeight(getRowHeight: Function) {
     try {
         const selected = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
         const parent = selected?.isThread?.() ? selected.parent_id : null;
-        const key = `${layoutVersion}:${parent && isFolded(parent) ? selected!.id : ""}:${workingOnly ? workingKey : ""}`;
+        const key = `${layoutVersion}:${parent ? selected!.id : ""}:${workingOnly ? workingKey : ""}`;
         let entry = heightFns.get(getRowHeight);
         if (entry?.key !== key) {
             entry = { key, fn: (section: number, row: number) => getRowHeight(section, row) };
@@ -572,11 +733,22 @@ function visibleOnly(_guildId: string, ids: string[]) {
     try {
         if (!isPluginEnabled("ChannelGroups") || !Array.isArray(ids)) return ids;
         const selected = SelectedChannelStore.getChannelId();
-        return ids.filter(id => {
+        const withPins = [...ids];
+        for (const id of new Set([...Object.keys(settings.store.pins ?? {}), ...openThreadHeaders.keys(), ...(selected ? [selected] : [])])) {
+            const pin = ChannelStore.getChannel(id);
+            if (!pin?.isThread?.() || withPins.includes(id)) continue;
+            const parentIndex = withPins.indexOf(pin.parent_id);
+            if (parentIndex < 0) continue;
+            let at = parentIndex + 1;
+            while (at < withPins.length && ChannelStore.getChannel(withPins[at])?.parent_id === pin.parent_id) at++;
+            withPins.splice(at, 0, id);
+        }
+        return withPins.filter(id => {
             const c = ChannelStore.getChannel(id);
             if (hiddenByFocus(c?.isThread?.() ? c.parent_id : id)) return false;
             if (!c?.isThread?.()) return true;
-            return !isFolded(c.parent_id) || id === selected || isPriority(id);
+            if (workingOnly) return workingThreads.has(id);
+            return normalThreadVisible(id, c.parent_id, pinnedThreads(c.parent_id).length > 0, selected);
         });
     } catch (e) {
         logger.warn("Could not leave out folded threads", e);
@@ -650,6 +822,7 @@ const CLOSE = "M17.3 18.7a1 1 0 0 0 1.4-1.4L13.42 12l5.3-5.3a1 1 0 0 0-1.42-1.4L
 const FLAG = "M5 21V4m0 0h11.5l-2 4 2 4H5";
 const PULSE = "M3 12h4l3-7 4 14 3-7h4";
 const EYE_OFF = "M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-2.6 3.3M6.6 6.6C3.9 8.3 2.5 12 2.5 12S6 18 12 18a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2";
+const PIN = "M9 3h6l-1 7 4 4v2H6v-2l4-4-1-7M12 16v6";
 
 const CategoryCollapseStore = findStoreLazy("CategoryCollapseStore") as { isCollapsed(id: string): boolean; };
 
@@ -739,6 +912,7 @@ function ToolSquare({ label, on, disabled, warn, onClick, onContextMenu, childre
             className={"vc-list-icon" + (on ? " vc-list-icon-on" : "") + (warn ? " vc-list-icon-warn" : "")}
             title={label}
             aria-label={label}
+            aria-pressed={on}
             disabled={disabled}
             onClick={onClick}
             onContextMenu={onContextMenu}
@@ -813,6 +987,9 @@ function ListTools({ guildId }: { guildId: string; }) {
                 >
                     <path d={EYE_OFF} {...line} />
                 </ToolSquare>
+                <ToolSquare label={pinning ? "Finish pinning threads (right-click a thread to pin or unpin)" : "Pin threads"} on={pinning} onClick={() => setPinning(!pinning)}>
+                    <path d={PIN} {...line} />
+                </ToolSquare>
             </div>
             {filterOpen && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setFilterOpen(false)} />}
         </div>
@@ -875,6 +1052,7 @@ let style: HTMLStyleElement | null = null;
 
 function apply() {
     if (style) style.textContent = buildGroupCss(classes);
+    paintPins();
     priorityKey = "";
     updatePriority();
 }
@@ -1023,6 +1201,11 @@ export default definePlugin({
             find: "suggestedFavoriteChannelId;",
             replacement: [
                 {
+                    // Include restored pins in the offset used when Discord scrolls to a thread.
+                    match: /(\i)\.channels\[(\i)\.id\]\.threadIds\.indexOf\((\i)\)/,
+                    replace: "$self.allThreads($1.channels[$2.id]).indexOf($3)"
+                },
+                {
                     match: /(\i)\|\|(\i)\|\|(!\i\(\)\.isEmpty\(\i\))\|\|(\i\.\i\.getMentionCount\(this\.id\)>0)(?=\?\{renderLevel:4)/,
                     replace: "$1||$2||(!this.category.isCollapsed&&$3)||$4||$self.keepVisible(this.id)"
                 },
@@ -1057,6 +1240,7 @@ export default definePlugin({
     ],
 
     shownThreads,
+    allThreads,
     rowHeight,
     visibleOnly,
     keepVisible,
@@ -1082,7 +1266,7 @@ export default definePlugin({
         try {
             const row: ChannelRow | undefined = guildChannels.getChannelFromSectionRow(place.section, place.row)?.channel;
             const shown = row ? shownThreads(row) : NONE;
-            const rank = row ? shown.indexOf(row.threadIds[place.threadOffset]) : -1;
+            const rank = row ? shown.indexOf(allThreads(row)[place.threadOffset]) : -1;
             if (rank < 0) return place.threadOffset * line;
             return (classes.group ? GAP_ABOVE : 0) + line + rank * (line - (classes.line ? THREAD_TRIM : 0));
         } catch {
@@ -1107,6 +1291,17 @@ export default definePlugin({
     ),
 
     start() {
+        pinsStarted = true;
+        pinGeneration++;
+        if (settings.store.pinImport == null) settings.store.pinImport = { ...settings.store.priority };
+        pinStyle = document.createElement("style");
+        pinStyle.id = "agentdisc-thread-pins";
+        (document.head ?? document.documentElement).append(pinStyle);
+        document.addEventListener("contextmenu", pinContextMenu, true);
+        ChannelStore.addChangeListener(queueRestorePins);
+        UserStore.addChangeListener(queueRestorePins);
+        FluxDispatcher.subscribe("CONNECTION_OPEN", reconnectPins);
+        queueRestorePins();
         refreshLists(Object.keys(settings.store.priority ?? {}));
         style = document.createElement("style");
         style.id = "agentdisc-channel-groups";
@@ -1122,6 +1317,17 @@ export default definePlugin({
     },
 
     stop() {
+        pinsStarted = false;
+        openThreadHeaders.clear();
+        pinGeneration++;
+        pinning = false;
+        pinAttempts.clear();
+        document.removeEventListener("contextmenu", pinContextMenu, true);
+        ChannelStore.removeChangeListener(queueRestorePins);
+        UserStore.removeChangeListener(queueRestorePins);
+        FluxDispatcher.unsubscribe("CONNECTION_OPEN", reconnectPins);
+        pinStyle?.remove();
+        pinStyle = null;
         setWorkingOnly(false);
         stopWaits();
         for (const store of PRIORITY_STORES()) store?.removeChangeListener?.(queuePriority);

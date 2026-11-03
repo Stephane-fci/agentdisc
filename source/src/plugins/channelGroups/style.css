@@ -46,6 +46,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px 8px 4px;
+    overflow-x: auto;
 }
 
 .vc-list-icon {
@@ -64,6 +65,11 @@
     cursor: pointer;
 }
 
+.vc-list-icon:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
 .vc-list-icon:hover:not(:disabled),
 .vc-list-icon-on {
     background: color-mix(in oklab, #5865f2 28%, transparent);
@@ -78,11 +84,6 @@
 .vc-list-icon-warn:hover:not(:disabled) {
     background: color-mix(in oklab, #f23f43 30%, transparent);
     color: #f23f43;
-}
-
-.vc-list-icon:disabled {
-    opacity: 0.35;
-    cursor: default;
 }
 
 /* The filter: while it holds text, only the matching channels show in the panel. */

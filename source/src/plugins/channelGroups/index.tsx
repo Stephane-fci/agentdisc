@@ -112,14 +112,13 @@ function isPinned(id: string) {
 
 function paintPins() {
     if (!pinStyle) return;
-    const name = classes.line?.name.split(" ").map(c => `.${c}`).join("");
-    pinStyle.textContent = pinning && name ? Object.keys(settings.store.pins ?? {})
+    pinStyle.textContent = pinning ? Object.keys(settings.store.pins ?? {})
         .filter(id => /^\d+$/.test(id))
         .map(id => {
-            const target = `[data-list-item-id="channels___${id}"] ${name}`;
-            // Discord stacks the name's children vertically. Keep the pin out of that
-            // flow, with a small reserved space, so it cannot create another text line.
-            return `${target}{position:relative;padding-inline-end:18px;box-sizing:border-box}${target}::before{content:"";position:absolute;inset-inline-end:0;top:50%;transform:translateY(-50%);pointer-events:none;display:block;width:12px;height:12px;background:currentColor;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2' d='M9 3h6l-1 7 4 4v2H6v-2l4-4-1-7M12 16v6'/%3E%3C/svg%3E") center/contain no-repeat}`;
+            const target = `[data-list-item-id="channels___${id}"]`;
+            // Reserve the end of the whole row, after the name AND agent/clock area.
+            // Absolute placement keeps every pin aligned without adding a text line.
+            return `${target}{position:relative;padding-inline-end:24px!important;box-sizing:border-box}${target}::before{content:"";position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);pointer-events:none;display:block;width:12px;height:12px;background:currentColor;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2' d='M9 3h6l-1 7 4 4v2H6v-2l4-4-1-7M12 16v6'/%3E%3C/svg%3E") center/contain no-repeat}`;
         })
         .join("\n") : "";
 }

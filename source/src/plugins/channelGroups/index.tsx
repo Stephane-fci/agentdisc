@@ -112,13 +112,14 @@ function isPinned(id: string) {
 
 function paintPins() {
     if (!pinStyle) return;
-    pinStyle.textContent = pinning ? Object.keys(settings.store.pins ?? {})
+    const top = classes.line?.linkTop.split(" ").map(c => `.${c}`).join("");
+    pinStyle.textContent = pinning && top ? Object.keys(settings.store.pins ?? {})
         .filter(id => /^\d+$/.test(id))
         .map(id => {
-            const target = `[data-list-item-id="channels___${id}"]`;
-            // Reserve the end of the whole row, after the name AND agent/clock area.
-            // Absolute placement keeps every pin aligned without adding a text line.
-            return `${target}{position:relative;padding-inline-end:24px!important;box-sizing:border-box}${target}::before{content:"";position:absolute;inset-inline-end:6px;top:50%;transform:translateY(-50%);pointer-events:none;display:block;width:12px;height:12px;background:currentColor;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2' d='M9 3h6l-1 7 4 4v2H6v-2l4-4-1-7M12 16v6'/%3E%3C/svg%3E") center/contain no-repeat}`;
+            const target = `[data-list-item-id="channels___${id}"] ${top}`;
+            // This is Discord's visible horizontal name-and-accessories row. The outer
+            // navigation element is not a reliable layout or colour owner.
+            return `${target}::after{content:"";display:block;flex:0 0 12px;width:12px;height:12px;align-self:center;margin-inline-start:6px;pointer-events:none;background:var(--interactive-text-active,#dbdee1);mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='2' d='M9 3h6l-1 7 4 4v2H6v-2l4-4-1-7M12 16v6'/%3E%3C/svg%3E") center/contain no-repeat}`;
         })
         .join("\n") : "";
 }
@@ -1076,7 +1077,7 @@ const LOOKUPS = {
     group: ["container", "spine", "spineBorder", "invertedSpine"]
 } as const;
 const USED = {
-    line: ["wrapper", "typeThread", "link", "unread", "modeSelected", "name", "icon"],
+    line: ["wrapper", "typeThread", "link", "linkTop", "unread", "modeSelected", "name", "icon"],
     group: ["container", "spine", "spineBorder", "invertedSpine"]
 } as const;
 

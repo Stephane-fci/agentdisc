@@ -15,7 +15,7 @@ export const GAP_BELOW = 8; // space under its threads
 export const GROUP_SPACE = GAP_ABOVE + GAP_BELOW;
 
 export interface GroupClasses {
-    line?: Record<"wrapper" | "typeThread" | "link" | "unread" | "modeSelected" | "name" | "icon", string>;
+    line?: Record<"wrapper" | "typeThread" | "link" | "linkTop" | "unread" | "modeSelected" | "name" | "icon", string>;
     group?: Record<"container" | "spine" | "spineBorder" | "invertedSpine", string>;
 }
 

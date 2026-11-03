@@ -651,9 +651,9 @@ export function useHiddenThreads(channelId: string, guildId: string | null | und
 }
 
 function normalThreadVisible(id: string, parentId: string, hasPins: boolean, selected: string | null | undefined) {
-    // A pin never keeps a thread under a closed dropdown, and never hides one that its
-    // bookmark or selection keeps there: pins and bookmarks stay independent (3 Nov).
-    if (isFolded(parentId)) return id === selected || isPriority(id);
+    // While editing pins, a closed dropdown keeps its pins available to unpin.
+    // Normal mode keeps only the existing bookmark/selection exceptions.
+    if (isFolded(parentId)) return id === selected || isPriority(id) || pinning && isPinned(id);
     return pinning || !hasPins || id === selected || openThreadHeaders.has(id) || isPinned(id) || isPriority(id);
 }
 

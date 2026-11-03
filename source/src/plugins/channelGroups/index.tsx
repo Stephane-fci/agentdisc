@@ -20,6 +20,7 @@ import { ActiveJoinedThreadsStore, ChannelStore, ContextMenuApi, FluxDispatcher,
 
 import { categoryFamilies, type CategoryFamily, familyForName, moveAfterBookmarks, openNewChannel } from "./boxes";
 import { buildGroupCss, buildPriorityCss, GAP_ABOVE, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
+import { createThreadOrdering } from "./threadOrder";
 import { askSoon, plannedChecks, startWaits, stopWaits } from "./waits";
 
 // AgentDisc channel groups (Stephane, 29 Sept): a channel's threads sit closer together
@@ -48,6 +49,10 @@ const settings = definePluginSettings({
     pins: {
         type: OptionType.CUSTOM,
         default: {} as Record<string, true>
+    },
+    threadOrder: {
+        type: OptionType.CUSTOM,
+        default: {} as Record<string, string[]>
     },
     pinImport: {
         type: OptionType.CUSTOM,
@@ -660,6 +665,13 @@ function normalThreadVisible(id: string, parentId: string, hasPins: boolean, sel
 // Under a folded channel only the thread being read and priority threads stay, like
 // Discord's folded categories.
 const keptOnly = new Map<string, string[]>();
+const threadOrdering = createThreadOrdering({
+    read: () => settings.store.threadOrder,
+    write: value => { settings.store.threadOrder = value; },
+    channel: id => ChannelStore.getChannel(id),
+    changed: pinsChanged
+});
+
 function allThreads(row: ChannelRow): string[] {
     const pins = pinnedThreads(row.id);
     const selected = ChannelStore.getChannel(SelectedChannelStore.getChannelId());
@@ -667,7 +679,7 @@ function allThreads(row: ChannelRow): string[] {
     for (const id of openThreadHeaders.keys()) {
         if (ChannelStore.getChannel(id)?.parent_id === row.id) pins.push(id);
     }
-    return pins.length ? [...new Set([...(row.threadIds ?? NONE), ...pins])] : row.threadIds ?? NONE;
+    return threadOrdering.sort(row.id, [...new Set([...(row.threadIds ?? NONE), ...pins])]);
 }
 
 function shownThreads(row: ChannelRow): string[] {
@@ -738,7 +750,7 @@ function visibleOnly(_guildId: string, ids: string[]) {
     try {
         if (!isPluginEnabled("ChannelGroups") || !Array.isArray(ids)) return ids;
         const selected = SelectedChannelStore.getChannelId();
-        const withPins = [...ids];
+        const withPins = [...new Set(ids)];
         for (const id of new Set([...Object.keys(settings.store.pins ?? {}), ...openThreadHeaders.keys(), ...(selected ? [selected] : [])])) {
             const pin = ChannelStore.getChannel(id);
             if (!pin?.isThread?.() || withPins.includes(id)) continue;
@@ -748,7 +760,24 @@ function visibleOnly(_guildId: string, ids: string[]) {
             while (at < withPins.length && ChannelStore.getChannel(withPins[at])?.parent_id === pin.parent_id) at++;
             withPins.splice(at, 0, id);
         }
-        return withPins.filter(id => {
+        const siblings = new Map<string, string[]>();
+        for (const id of withPins) {
+            const channel = ChannelStore.getChannel(id);
+            if (!channel?.isThread?.()) continue;
+            const ids = siblings.get(channel.parent_id) ?? [];
+            ids.push(id);
+            siblings.set(channel.parent_id, ids);
+        }
+        const positions = new Map<string, number>();
+        for (const [parent, ids] of siblings) siblings.set(parent, threadOrdering.sort(parent, ids));
+        const ordered = withPins.map(id => {
+            const channel = ChannelStore.getChannel(id);
+            if (!channel?.isThread?.()) return id;
+            const at = positions.get(channel.parent_id) ?? 0;
+            positions.set(channel.parent_id, at + 1);
+            return siblings.get(channel.parent_id)![at];
+        });
+        return ordered.filter(id => {
             const c = ChannelStore.getChannel(id);
             if (hiddenByFocus(c?.isThread?.() ? c.parent_id : id)) return false;
             if (!c?.isThread?.()) return true;
@@ -1296,6 +1325,7 @@ export default definePlugin({
     ),
 
     start() {
+        threadOrdering.start();
         pinsStarted = true;
         pinGeneration++;
         if (settings.store.pinImport == null) settings.store.pinImport = { ...settings.store.priority };
@@ -1322,6 +1352,7 @@ export default definePlugin({
     },
 
     stop() {
+        threadOrdering.stop();
         pinsStarted = false;
         openThreadHeaders.clear();
         pinGeneration++;

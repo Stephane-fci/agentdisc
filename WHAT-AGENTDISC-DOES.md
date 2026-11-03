@@ -20,6 +20,10 @@ A flag button in the channel bar, or Ctrl+B, bookmarks the channel or thread you
 
 In a server you own, a channel you bookmark moves up to sit right under the other bookmarked channels of its list (or to the top of its list when none is bookmarked); it stays in its category, or out of any. Moving a channel changes the order for everyone in that server, so the AgentDisc menu has a switch for each server you own, "Move a new bookmark under the others in this server", to keep new bookmarks where they are. A bookmarked channel stays visible in a closed category, and a bookmarked thread stays visible when its channel's threads are folded away, pinned or not. The flag square above the channel list removes every bookmark at once; it is red while there are bookmarks.
 
+## Thread order
+
+Opening a thread keeps it in the same place. Drag a thread above or below another thread in its channel to change the order, in normal mode or pinning mode. A thin line shows where it will land. The order is saved on this computer and survives reloads. New threads join the list without reshuffling the threads you have already arranged. Dragging does not move a thread into another channel or change the server's order for other people.
+
 ## Thread pins
 
 The pin square above the channel list turns pinning mode on and off. While it is on, right-click a thread to pin it, or unpin it if it is already pinned. Small pins show which threads you kept. Channels, dropdowns and bookmarks keep working normally. Turn pinning mode off to hide the small pins and restore the usual right-click menu.

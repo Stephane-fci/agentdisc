@@ -36,6 +36,7 @@
 /* The tools above the channel list (12 Oct): one line of squares, each always in its place. */
 .vc-list-tools {
     flex: 0 0 auto;
+    min-width: 0;
     display: flex;
     flex-direction: column;
 }
@@ -44,25 +45,34 @@
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 6px;
+    min-width: 0;
+    gap: min(6px, 1.5%);
     padding: 8px 8px 4px;
-    overflow-x: auto;
 }
 
 .vc-list-icon {
     position: relative;
     display: flex;
-    flex: 0 0 auto;
+    flex: 0 1 32px;
     align-items: center;
     justify-content: center;
     width: 32px;
-    height: 32px;
+    min-width: 0;
+    height: auto;
+    aspect-ratio: 1;
     padding: 0;
     border: none;
     border-radius: var(--radius-sm, 8px);
     background: color-mix(in oklab, #5865f2 14%, transparent);
     color: var(--channels-default);
     cursor: pointer;
+}
+
+.vc-list-icon > svg {
+    width: 56.25%;
+    height: auto;
+    aspect-ratio: 1;
+    flex: none;
 }
 
 .vc-list-icon:disabled {

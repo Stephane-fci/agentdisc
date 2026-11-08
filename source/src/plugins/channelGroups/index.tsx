@@ -500,7 +500,7 @@ function refreshLists(ids: string[]) {
 
 // What is happening in a marked line, the strongest first (css.ts): an agent typing there
 // (or, for a folded channel, in one of its hidden threads, whose dots show on the channel
-// line), something unread (for a waiting line, in the line itself only), a check an agent
+// line), something unread in the line itself (never in its hidden threads), a check an agent
 // has planned there or in a hidden thread, else quiet.
 function priorityState(id: string): PriorityItem {
     const me = UserStore.getCurrentUser()?.id;
@@ -515,10 +515,12 @@ function priorityState(id: string): PriorityItem {
     const item = (state: PriorityState, next?: string): PriorityItem => ({ id, state, next });
     if (lines.some(l => Object.keys(TypingStore.getTypingUsers(l) ?? {}).some(u => u !== me))) return item("green");
     const planned = lines.flatMap(l => plannedChecks(l) ?? []);
-    // A waiting line turns red only for new messages in itself: the folded threads of a busy
-    // channel are nearly always partly unread and held it red for good (Stephane, 18 Oct:
-    // "I see no blue ... and Business to Build is still orange").
-    if ((planned.length ? [id] : lines).some(l => ReadStateStore.hasUnread(l))) return item("red");
+    // A line turns red only for new messages in itself: the folded threads of a busy channel
+    // are nearly always partly unread and held it red after he had read it (Stephane, 18 Oct:
+    // "I see no blue ... and Business to Build is still orange"; 8 Nov: "I read what's in it
+    // so technically the color should be yellow not red"). New messages in a hidden thread
+    // show on the channel's fold arrow, which turns brighter.
+    if (ReadStateStore.hasUnread(id)) return item("red");
     if (planned.length) return item("blue", planned.reduce((a, b) => Date.parse(a) <= Date.parse(b) ? a : b));
     return item("yellow");
 }

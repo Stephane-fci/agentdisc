@@ -308,45 +308,99 @@ html.agentdisc-channel-filter .vc-list-tools ~ * {
     border-color: color-mix(in oklab, #5865f2 60%, transparent);
 }
 
-/* Activities (9 Nov): the line above the list while an activity is chosen. */
-.vc-activity-line {
+/* The Channels pop-up (9 Nov): one row per category, one tick per activity, several allowed. */
+.agentdisc-acts {
+    width: min(760px, 94vw);
+    max-height: 76vh;
+}
+
+.agentdisc-acts-top {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 2px 8px;
-    min-width: 0;
-    padding: 0 10px 6px;
-    font-size: 12px;
-    line-height: 16px;
-    color: var(--text-muted, #949ba4);
+    justify-content: space-between;
+    gap: 12px;
+    padding-right: 12px;
 }
 
-.vc-activity-dot {
-    flex: 0 0 8px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--vc-activity);
-}
-
-.vc-activity-text {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-normal, #dbdee1);
-    font-weight: 600;
-}
-
-.vc-activity-link {
-    padding: 0;
+.agentdisc-acts-done {
+    margin-top: 12px;
+    padding: 4px 14px;
     border: 0;
-    background: none;
-    font: inherit;
-    color: var(--vc-activity);
+    border-radius: 6px;
+    background: var(--brand-500, #5865f2);
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
 }
 
-.vc-activity-link:hover {
-    text-decoration: underline;
+.agentdisc-acts-scroll {
+    min-height: 0;
+    overflow: auto;
+    padding: 8px 12px 4px;
+}
+
+.agentdisc-acts-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: var(--text-default, #dbdee1);
+    font-size: 13px;
+}
+
+.agentdisc-acts-table td,
+.agentdisc-acts-table th {
+    padding: 5px 4px;
+    text-align: center;
+}
+
+.agentdisc-acts-table tbody tr:hover {
+    background: var(--interactive-background-hover, rgb(255 255 255 / 4%));
+}
+
+.agentdisc-acts-head {
+    width: 64px;
+    color: var(--text-muted, #949ba4);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 13px;
+    vertical-align: bottom;
+}
+
+.agentdisc-acts-dot {
+    display: block;
+    width: 8px;
+    height: 8px;
+    margin: 0 auto 4px;
+    border-radius: 50%;
+}
+
+.agentdisc-acts-table .agentdisc-acts-name {
+    max-width: 220px;
+    overflow: hidden;
+    font-weight: 600;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.agentdisc-acts-tick {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 2px solid color-mix(in srgb, var(--agentdisc-act) 60%, transparent);
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+}
+
+.agentdisc-acts-tick-on {
+    border-color: var(--agentdisc-act);
+    background: var(--agentdisc-act);
+}
+
+.agentdisc-acts-note {
+    padding: 6px 14px 12px;
+    color: var(--text-muted, #949ba4);
+    font-size: 12px;
 }

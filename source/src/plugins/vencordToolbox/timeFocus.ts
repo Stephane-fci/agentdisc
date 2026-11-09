@@ -160,9 +160,9 @@ export function timeProblem() {
     return problem;
 }
 
-// The activity whose channels the list shows: the chosen one, never Break.
+// The activity whose channels the list shows: the one recording, never Break.
 export function focusActivity(): Activity | null {
-    const a = state?.selected ?? null;
+    const a = state?.running?.activity ?? null;
     return a && a !== "break" ? a : null;
 }
 

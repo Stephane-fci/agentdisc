@@ -12,14 +12,14 @@ import { definePluginSettings, Settings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { onWorkingChange, workingIn } from "@plugins/vencordToolbox/busyBar";
 import { allPlaces, find, ICONS, type Place } from "@plugins/vencordToolbox/channelSearch";
-import { ACTIVITIES as TIME_ACTIVITIES, COLOURS as TIME_COLOURS, focusActivity, LABELS as TIME_LABELS, onTimeChange } from "@plugins/vencordToolbox/timeFocus";
+import { focusActivity, LABELS as TIME_LABELS, onTimeChange, WORK as TIME_WORK } from "@plugins/vencordToolbox/timeFocus";
 import { useInvite } from "@plugins/vencordToolbox/topBar";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { filters, findStoreLazy, mapMangledCssClasses, waitFor } from "@webpack";
 import { ActiveJoinedThreadsStore, ChannelStore, ContextMenuApi, FluxDispatcher, GuildChannelStore, GuildStore, Menu, NavigationRouter, ReadStateStore, RestAPI, SelectedChannelStore, SelectedGuildStore, TypingStore, useEffect, useMemo, useReducer, UserStore, useState, useStateFromStores } from "@webpack/common";
 
-import { activityOf, clearActivityCache, hasAssignments, hidesCategory, keepsChannel, keepsThread, outsideLines, ownPlace, type Place as ActivityPlace, setCategoryPlace, setChannelPlace, setShowAll, showingAll, unassignedChannels } from "./activity";
+import { activitiesOf, clearActivityCache, hidesCategory, keepsChannel, keepsThread, ownPlaces, type Place as ActivityPlace, setCategoryPlaces, setChannelPlaces } from "./activity";
 import { categoryFamilies, type CategoryFamily, familyForName, moveAfterBookmarks, openNewChannel } from "./boxes";
 import { buildGroupCss, buildPriorityCss, GAP_ABOVE, GROUP_SPACE, GroupClasses, PriorityItem, PriorityState, THREAD_TRIM } from "./css";
 import { createThreadOrdering } from "./threadOrder";
@@ -81,12 +81,6 @@ const settings = definePluginSettings({
     activityMap: {
         type: OptionType.CUSTOM,
         default: {} as Record<string, unknown>,
-        onChange: () => activityChanged()
-    },
-    // "Show all": the activity it was chosen in, so another activity filters again.
-    activityShowAll: {
-        type: OptionType.CUSTOM,
-        default: null as string | null,
         onChange: () => activityChanged()
     }
 });
@@ -410,24 +404,22 @@ function focusChanged() {
     rebuildList();
 }
 
-// The chosen activity, its map or Show all changed: the list is built again, and the open
-// conversation's "outside" mark follows.
+// The recording activity or the activity map changed: the list is built again. Opening a
+// conversation outside the activity keeps it, and its channel, in the list (activity.ts).
 let activityKey = "";
 function activityChanged() {
     clearActivityCache();
-    paintOutside();
     rebuildList();
     notify();
 }
 
 function onTimeState() {
-    const key = `${focusActivity() ?? ""}|${showingAll()}`;
+    const key = focusActivity() ?? "";
     if (key === activityKey) return;
     activityKey = key;
     activityChanged();
 }
 
-// Opening a conversation outside the activity keeps it, and its channel, in the list.
 let lastOpen: string | null = null;
 function onOpenChange() {
     const open = SelectedChannelStore.getChannelId() ?? null;
@@ -435,21 +427,10 @@ function onOpenChange() {
     lastOpen = open;
     if (!focusActivity()) return;
     clearActivityCache();
-    paintOutside();
     rebuildList();
 }
 
-let outsideStyle: HTMLStyleElement | null = null;
 let stopTimeWatch: (() => void) | null = null;
-function paintOutside() {
-    if (!outsideStyle) return;
-    const a = focusActivity();
-    const top = classes.line?.linkTop.split(" ").map(c => `.${c}`).join("");
-    outsideStyle.textContent = a && top ? outsideLines().map(id => {
-        const row = `[data-list-item-id="channels___${id}"]`;
-        return `${row}{outline:1px dashed ${TIME_COLOURS[a]};outline-offset:-2px;border-radius:6px}${row} ${top}::before{content:"outside";order:9;flex:0 0 auto;margin-inline-start:6px;padding:0 5px;border-radius:8px;font-size:10px;line-height:15px;font-weight:600;color:${TIME_COLOURS[a]};border:1px solid ${TIME_COLOURS[a]}}`;
-    }).join("\n") : "";
-}
 
 function FocusMenu({ guildId, families }: { guildId: string; families: CategoryFamily[]; }) {
     const { hiddenFamilies } = settings.use(["hiddenFamilies"]);
@@ -1018,64 +999,31 @@ function ToolSquare({ label, on, disabled, warn, onClick, onContextMenu, childre
 
 const line = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-// Right-click a category, channel or thread: which activity it belongs to (9 Nov). "Follow" takes
-// the place's own choice away, so it follows its channel, category or server again.
+// Right-click a category, channel or thread: which activities it belongs to (9 Nov; several since
+// his "add one category to different categories"). With nothing ticked it follows its channel,
+// category or server again.
 const activityMenu: NavContextMenuPatchCallback = (children, { channel }: { channel?: { id: string; guild_id?: string; }; }) => {
     const record = channel?.id ? ChannelStore.getChannel(channel.id) : null;
     if (!record?.guild_id) return;
     const guildId = record.guild_id;
-    const own = ownPlace(record.id);
+    const own = ownPlaces(record.id);
+    const set = (list: ActivityPlace[]) => record.type === CATEGORY ? setCategoryPlaces(guildId, record.id, list) : setChannelPlaces(guildId, record.id, list);
+    const flip = (p: ActivityPlace) => set(own.includes(p) ? own.filter(x => x !== p) : [...own, p]);
+    const now = activitiesOf(record.id);
+    const names = now.map(p => p === "always" ? "always visible" : TIME_LABELS[p]).join(", ");
     const follows = record.isThread?.() ? "Follow its channel" : record.type === CATEGORY ? "Follow the server" : "Follow its category";
-    const set = (place: ActivityPlace | null) => record.type === CATEGORY ? setCategoryPlace(guildId, record.id, place) : setChannelPlace(guildId, record.id, place);
-    const now = activityOf(record.id);
     children.push(
         <Menu.MenuGroup>
-            <Menu.MenuItem id="agentdisc-activity" label={`Activity: ${now ? now === "always" ? "always visible" : TIME_LABELS[now] : "not assigned"}`}>
-                <Menu.MenuRadioItem id="agentdisc-activity-follow" group="agentdisc-activity" label={follows} checked={!own} action={() => set(null)} />
-                {TIME_ACTIVITIES.filter(a => a !== "break").map(a => (
-                    <Menu.MenuRadioItem key={a} id={`agentdisc-activity-${a}`} group="agentdisc-activity" label={TIME_LABELS[a]} checked={own === a} action={() => set(a)} />
+            <Menu.MenuItem id="agentdisc-activity" label={`Activities: ${names || "none"}`}>
+                <Menu.MenuCheckboxItem id="agentdisc-activity-follow" label={follows} checked={!own.length} action={() => set([])} />
+                {TIME_WORK.map(a => (
+                    <Menu.MenuCheckboxItem key={a} id={`agentdisc-activity-${a}`} label={TIME_LABELS[a]} checked={own.includes(a)} action={() => flip(a)} />
                 ))}
-                <Menu.MenuRadioItem id="agentdisc-activity-always" group="agentdisc-activity" label="Always visible" checked={own === "always"} action={() => set("always")} />
+                <Menu.MenuCheckboxItem id="agentdisc-activity-always" label="Always visible" checked={own.includes("always")} action={() => flip("always")} />
             </Menu.MenuItem>
         </Menu.MenuGroup>
     );
 };
-
-// The line above the list while an activity is chosen: which activity the list shows, Show all
-// (the timer is not touched), and how many channels are not assigned yet.
-let openAssign: (() => void) | null = null;
-export function onAssignRequest(fn: () => void) {
-    openAssign = fn;
-    return () => { if (openAssign === fn) openAssign = null; };
-}
-
-function ActivityLine({ guildId }: { guildId: string; }) {
-    settings.use(["activityMap", "activityShowAll"]);
-    const [, redraw] = useReducer((n: number) => n + 1, 0);
-    useEffect(() => onTimeChange(redraw), []);
-    const a = focusActivity();
-    if (!a) return null;
-    const assigned = hasAssignments(guildId);
-    const all = showingAll();
-    const loose = assigned ? unassignedChannels(guildId).length : 0;
-    const colour = TIME_COLOURS[a];
-    return (
-        <div className="vc-activity-line" style={{ "--vc-activity": colour } as React.CSSProperties}>
-            <span className="vc-activity-dot" aria-hidden="true" />
-            {!assigned
-                ? <span className="vc-activity-text">Nothing here belongs to an activity yet.</span>
-                : all
-                    ? <span className="vc-activity-text">Every channel</span>
-                    : <span className="vc-activity-text">Only {TIME_LABELS[a]}</span>}
-            {assigned && <button type="button" className="vc-activity-link" onClick={() => setShowAll(!all)}>{all ? `Only ${TIME_LABELS[a]}` : "Show all"}</button>}
-            {(!assigned || loose > 0) && openAssign && (
-                <button type="button" className="vc-activity-link" title="Choose which activity these channels belong to" onClick={() => openAssign?.()}>
-                    {assigned ? `${loose} not assigned` : "Assign"}
-                </button>
-            )}
-        </div>
-    );
-}
 
 function ListTools({ guildId }: { guildId: string; }) {
     useListedChanges();
@@ -1144,7 +1092,6 @@ function ListTools({ guildId }: { guildId: string; }) {
                     <path d={PIN} {...line} />
                 </ToolSquare>
             </div>
-            <ActivityLine guildId={guildId} />
             {filterOpen && <ChannelFilter key={guildId} guildId={guildId} onClose={() => setFilterOpen(false)} />}
         </div>
     );
@@ -1207,7 +1154,6 @@ let style: HTMLStyleElement | null = null;
 function apply() {
     if (style) style.textContent = buildGroupCss(classes);
     paintPins();
-    paintOutside();
     priorityKey = "";
     updatePriority();
 }
@@ -1474,9 +1420,6 @@ export default definePlugin({
         TypingStore.addChangeListener(queueTypingCheck);
         FluxDispatcher.subscribe("TYPING_START", onTypingStart);
         for (const part of Object.keys(LOOKUPS) as (keyof typeof LOOKUPS)[]) lookUp(part);
-        outsideStyle = document.createElement("style");
-        outsideStyle.id = "agentdisc-activity-outside";
-        (document.head ?? document.documentElement).append(outsideStyle);
         stopTimeWatch = onTimeChange(onTimeState);
         SelectedChannelStore.addChangeListener(onOpenChange);
         apply();
@@ -1487,8 +1430,6 @@ export default definePlugin({
         stopTimeWatch?.();
         stopTimeWatch = null;
         SelectedChannelStore.removeChangeListener(onOpenChange);
-        outsideStyle?.remove();
-        outsideStyle = null;
         activityKey = "";
         threadOrdering.stop();
         pinsStarted = false;

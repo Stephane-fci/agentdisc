@@ -1196,25 +1196,31 @@ svg.agentdisc-copy-sign {
     font-size: 12.5px;
 }
 
-/* The day scrolls by itself under the buttons; Ctrl and the wheel over it zoom its hours. */
+/* The day: FullCalendar's day view (dayCalendar.ts) filling the room under the buttons. It scrolls by
+   itself; − and + or Ctrl and the wheel over it zoom its hours. The library's own look is reset to
+   Discord's colours, in dark and light. */
 .agentdisc-today-day {
+    position: relative;
+    display: flex;
     flex: 1 1 auto;
+    flex-direction: column;
     min-width: 0;
     min-height: 120px;
-    overflow: hidden auto;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
+}
+
+.agentdisc-today-calendar {
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .agentdisc-today-day-note {
-    position: sticky;
-    bottom: 0;
-    padding: 4px 0;
-    background: var(--background-base-lowest, #0b0b0d);
+    flex: 0 0 auto;
+    padding: 4px 0 0;
 }
 
 .agentdisc-today-allday {
     display: flex;
+    flex: 0 0 auto;
     flex-wrap: wrap;
     gap: 4px;
     margin: 0 0 6px 30px;
@@ -1228,115 +1234,181 @@ svg.agentdisc-copy-sign {
     font-size: 11px;
 }
 
-.agentdisc-today-line {
+.agentdisc-day {
+    --fc-border-color: var(--border-subtle, rgb(255 255 255 / 7%));
+    --fc-page-bg-color: transparent;
+    --fc-neutral-bg-color: transparent;
+    --fc-today-bg-color: transparent;
+    --fc-now-indicator-color: #f23f43;
+    --fc-event-text-color: #fff;
+
     position: relative;
-}
-
-.agentdisc-today-hour {
-    position: absolute;
-    left: 30px;
-    right: 0;
-    border-top: 1px solid var(--border-subtle, rgb(255 255 255 / 6%));
-    pointer-events: none;
-}
-
-.agentdisc-today-hour span {
-    position: absolute;
-    top: -7px;
-    left: -30px;
-    width: 24px;
-    font-size: 10px;
-    line-height: 12px;
-    text-align: right;
-    color: var(--text-muted, #949ba4);
-}
-
-.agentdisc-today-item {
-    position: absolute;
-    box-sizing: border-box;
-    overflow: hidden;
-    padding: 1px 5px;
-    border: 0;
-    border-radius: 4px;
+    height: 100%;
+    color: var(--text-default, #dbdee1);
     font-family: inherit;
     font-size: 10.5px;
     line-height: 13px;
-    text-align: left;
+}
+
+.agentdisc-day .fc-scrollgrid,
+.agentdisc-day .fc-scrollgrid td,
+.agentdisc-day .fc-scrollgrid th {
+    border-right: 0;
+    border-left: 0;
+}
+
+.agentdisc-day .fc-scrollgrid {
+    border-top: 0;
+}
+
+.agentdisc-day .fc-timegrid-slot {
+    height: var(--agentdisc-day-slot, 18px);
+}
+
+.agentdisc-day .fc-timegrid-slot-minor {
+    border-top-style: none;
+}
+
+.agentdisc-day .fc-timegrid-slot-label {
+    color: var(--text-muted, #949ba4);
+    font-size: 10px;
+    vertical-align: top;
+}
+
+.agentdisc-day .fc-scroller {
+    overscroll-behavior: contain;
+}
+
+/* Every block across the whole width: the library puts overlapping blocks side by side; here they lie
+   on top of each other by kind, the plan behind, recorded time above it, the selected block above
+   both, appointments (an outline and a name tab) always on top and letting clicks through. */
+.agentdisc-day .fc-timegrid-event-harness {
+    right: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    inset-inline: 0 !important;
+}
+
+.agentdisc-day .fc-timegrid-event-harness[data-kind="plan"] {
+    z-index: 1 !important;
+}
+
+.agentdisc-day .fc-timegrid-event-harness[data-kind="piece"],
+.agentdisc-day .fc-timegrid-event-harness[data-kind="running"] {
+    z-index: 2 !important;
+}
+
+.agentdisc-day .fc-timegrid-event-harness:has(.agentdisc-day-selected) {
+    z-index: 5 !important;
+}
+
+.agentdisc-day .fc-timegrid-event-harness[data-kind="appt"] {
+    z-index: 6 !important;
+    pointer-events: none;
+}
+
+.agentdisc-day .fc-timegrid-col-events {
+    margin: 0 2px;
+}
+
+.agentdisc-day .fc-timegrid-event {
+    border-radius: 4px;
+    font-size: 10.5px;
+}
+
+.agentdisc-day .fc-timegrid-event-harness-inset .fc-timegrid-event {
+    box-shadow: none;
+}
+
+.agentdisc-day .fc-timegrid-event .fc-event-main {
+    padding: 1px 5px;
+}
+
+.agentdisc-day-plan {
+    border-width: 0 0 0 3px !important;
+}
+
+.agentdisc-day .agentdisc-day-plan .fc-event-main {
+    color: var(--text-muted, #b5bac1);
+}
+
+.agentdisc-day-appt {
+    border: 2px solid var(--text-strong, #f2f3f5) !important;
+    background: none !important;
+    pointer-events: none;
+}
+
+.agentdisc-day .agentdisc-day-appt .fc-event-main {
+    padding: 0;
+}
+
+.agentdisc-day-free {
+    opacity: 0.55;
+}
+
+.agentdisc-day-inner {
+    position: relative;
+    height: 100%;
+}
+
+.agentdisc-day-name {
+    display: block;
+    overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
 
-.agentdisc-today-item span {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Every block across the whole width: the plan faint behind, what he did solid on top, his
-   appointments an outline over both with their name on the right. */
-.agentdisc-today-plan,
-.agentdisc-today-done,
-.agentdisc-today-appt {
-    left: 32px;
-    right: 2px;
-    touch-action: none;
-    user-select: none;
-}
-
-.agentdisc-today-plan {
-    z-index: 1;
-    border-left: 3px solid color-mix(in srgb, var(--agentdisc-act) 70%, transparent);
-    background: color-mix(in srgb, var(--agentdisc-act) 16%, transparent);
-    color: var(--text-muted, #949ba4);
-    cursor: grab;
-}
-
-.agentdisc-today-done {
-    z-index: 2;
-    background: var(--agentdisc-act);
-    color: #fff;
-    cursor: grab;
-}
-
-.agentdisc-today-appt {
-    z-index: 3;
-    padding: 0;
-    border: 2px solid var(--text-strong, #f2f3f5);
-    background: none;
-    color: var(--text-strong, #f2f3f5);
-    pointer-events: none;
-}
-
-/* Only the name tab takes a click (to zoom to it); through the outline, the blocks below stay in reach. */
-.agentdisc-today-appt .agentdisc-today-item-name {
+.agentdisc-day-tab {
     position: absolute;
     top: 0;
     right: 0;
     max-width: 60%;
+    overflow: hidden;
     padding: 0 5px 1px;
     border-bottom-left-radius: 4px;
     background: var(--text-strong, #f2f3f5);
     color: var(--background-base-lowest, #111214);
+    white-space: nowrap;
+    text-overflow: ellipsis;
     pointer-events: auto;
     cursor: pointer;
 }
 
-.agentdisc-today-appt-free {
-    opacity: 0.55;
-}
-
 /* Drawn inside the block, so the panel's edge never cuts it. */
-.agentdisc-today-selected {
+.agentdisc-day-selected {
     outline: 2px solid var(--text-strong, #f2f3f5);
     outline-offset: -2px;
 }
 
-.agentdisc-today-dragging,
-.agentdisc-today-dragging .agentdisc-today-item {
-    cursor: grabbing;
+.agentdisc-day-running .fc-event-resizer-end {
+    display: none;
 }
 
-.agentdisc-today-item-times {
+/* A block shorter than its grip: the solid bar is its real length, the faint rest is only there to be
+   grabbed. */
+.agentdisc-day .fc-timegrid-event:has(.agentdisc-day-short) {
+    border-style: dashed !important;
+    background: var(--background-mod-strong, rgb(255 255 255 / 8%)) !important;
+}
+
+.agentdisc-day .fc-timegrid-event:has(.agentdisc-day-short) .fc-event-main {
+    padding: 0;
+}
+
+.agentdisc-day-true {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+}
+
+.agentdisc-day-short .agentdisc-day-name {
+    position: relative;
+    padding: 1px 4px 0 6px;
+    color: var(--text-default, #dbdee1);
+}
+
+.agentdisc-day-times {
     position: absolute;
     top: 1px;
     right: 4px;
@@ -1351,66 +1423,45 @@ svg.agentdisc-copy-sign {
     cursor: text;
 }
 
-/* The edges that change a block's start or end: a slim grip, shown while the mouse is on the block. */
-.agentdisc-today-edge {
+.fc-event-mirror .agentdisc-day-times {
+    cursor: grabbing;
+}
+
+/* The zoom control sits in the hours' column, where it never covers a block. */
+.agentdisc-day-zoom {
     position: absolute;
-    left: 0;
-    right: 0;
-    height: 7px;
-    cursor: ns-resize;
+    bottom: 6px;
+    left: 2px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
-.agentdisc-today-edge-top {
-    top: -2px;
-}
-
-.agentdisc-today-edge-bottom {
-    bottom: -2px;
-}
-
-.agentdisc-today-edge::after {
-    content: "";
-    position: absolute;
-    left: 50%;
+.agentdisc-day .agentdisc-day-zoom button {
     width: 22px;
-    height: 3px;
-    margin-left: -11px;
-    border-radius: 2px;
-    background: rgb(255 255 255 / 75%);
-    opacity: 0;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--border-subtle, rgb(255 255 255 / 15%));
+    border-radius: 5px;
+    background: var(--background-base-low, #1e1f22);
+    color: var(--text-default, #dbdee1);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 16px;
+    cursor: pointer;
 }
 
-.agentdisc-today-edge-top::after {
-    top: 3px;
-}
-
-.agentdisc-today-edge-bottom::after {
-    bottom: 3px;
-}
-
-.agentdisc-today-selected .agentdisc-today-edge::after {
-    opacity: 1;
-}
-
-.agentdisc-today-item:hover .agentdisc-today-edge::after {
-    opacity: 1;
-}
-
-.agentdisc-today-now {
-    position: absolute;
-    left: 32px;
-    right: 0;
-    z-index: 4;
-    height: 0;
-    border-top: 2px solid #f23f43;
-    pointer-events: none;
+.agentdisc-day .agentdisc-day-zoom button:hover {
+    color: var(--interactive-text-active, #fff);
 }
 
 .agentdisc-today-corrector {
     position: absolute;
-    left: 34px;
+    top: 4px;
     right: 4px;
-    z-index: 5;
+    left: 34px;
+    z-index: 20;
     display: flex;
     flex-direction: column;
     gap: 6px;

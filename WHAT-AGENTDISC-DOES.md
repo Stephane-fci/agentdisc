@@ -46,7 +46,7 @@ The right panel is made of six parts: Board, Ideas, Team, Connections, Calendar 
 
 The Today part of the right panel is a time tracker you drive yourself: seven buttons, Clients & leads, Videos & visibility, Own business, Workout, Learning, Hobbies and Break. A click on a button starts recording it; a click on the one recording stops it; a click on another one switches. The button that records shows it, with its time. Nothing else starts or stops your time: not opening Discord, not a channel, not an idle computer, not a calendar, not an agent. One timer serves all your Discord tabs and survives a refresh or a restart. While another part fills the panel, a slim strip under the panel's buttons shows what records, and a click on it stops it.
 
-Under the buttons is today, on one line of hours: what you planned shows see-through, what you recorded shows solid, and your appointments show in full colour beside it, with a red line at the current time. Forgot to stop or start? Click the recorded block to set its real times, or to remove it.
+Under the buttons is today, on a line of hours that scrolls by itself and opens on the current time, with a red line at that time. Every block takes the whole width: what you planned lies faint behind, what you recorded is solid on top, and your appointments are an outline over both, with their name in a small tab. Ctrl and the mouse wheel over the day zoom its hours around the mouse; the panel keeps its size, and the zoom is kept for next time. Click a block to zoom to it and see its times. Drag it to move it, or drag its top or bottom edge to change its start or end, in five-minute steps; click its times to type them instead, or to remove the block. Recorded time stops at the pieces next to it and at the current time, so it never overlaps; while an activity records, only its start can move. Planned blocks move in the AgentDisc Plan calendar. Your appointments are only shown, never moved.
 
 The Channels button opens a pop-up with one row per category of the server (its archives come with it) and one tick per activity. A category can belong to several activities, for example your agents' category for Clients & leads and for Learning; "Always" shows it whatever records. A right-click on a single channel or thread gives it its own choice. While an activity records, the channel list shows only that activity's channels, in every server where something is ticked; the channel you have open always stays. While nothing records, or on Break, you see every channel. The panel keeps its width whatever it shows.
 
@@ -54,7 +54,7 @@ Google Calendar is optional and needs a small calendar service on a server of yo
 
 ## Zoom one area
 
-Ctrl and the mouse wheel over the chat, the channel list, the server list, Team or Calendar make that area bigger or smaller, and only that one; each keeps its zoom. "Reset the zoom of every area" in the AgentDisc menu puts them all back. Elsewhere, Ctrl and the wheel zoom the whole page as usual. The board, the ideas page and the map of connections zoom by themselves.
+Ctrl and the mouse wheel over the chat, the channel list, the server list, Team or Calendar make that area bigger or smaller, and only that one; each keeps its zoom. "Reset the zoom of every area" in the AgentDisc menu puts them all back. Elsewhere, Ctrl and the wheel zoom the whole page as usual. The board, the ideas page, the map of connections and Today's day zoom by themselves.
 
 ## Connections and calendar
 

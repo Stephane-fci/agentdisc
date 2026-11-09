@@ -1098,14 +1098,15 @@ svg.agentdisc-copy-sign {
     contain: inline-size;
 }
 
-.agentdisc-today {
+.agentdisc-today,
+.agentdisc-part > .agentdisc-side.agentdisc-today {
     container-type: inline-size;
     display: flex;
     flex-direction: column;
     gap: 10px;
     min-width: 0;
     padding: 10px 10px 12px;
-    overflow: hidden auto;
+    overflow: hidden;
     font-size: 13px;
     color: var(--text-default, #dbdee1);
 }
@@ -1195,8 +1196,21 @@ svg.agentdisc-copy-sign {
     font-size: 12.5px;
 }
 
+/* The day scrolls by itself under the buttons; Ctrl and the wheel over it zoom its hours. */
 .agentdisc-today-day {
+    flex: 1 1 auto;
     min-width: 0;
+    min-height: 120px;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+}
+
+.agentdisc-today-day-note {
+    position: sticky;
+    bottom: 0;
+    padding: 4px 0;
+    background: var(--background-base-lowest, #0b0b0d);
 }
 
 .agentdisc-today-allday {
@@ -1258,42 +1272,133 @@ svg.agentdisc-copy-sign {
     text-overflow: ellipsis;
 }
 
-/* What was planned: see-through, the whole width. */
-.agentdisc-today-plan {
-    left: 30px;
-    right: 0;
-    z-index: 1;
-    border-left: 3px solid color-mix(in srgb, var(--agentdisc-act) 70%, transparent);
-    background: color-mix(in srgb, var(--agentdisc-act) 14%, transparent);
-    color: var(--text-muted, #949ba4);
+/* Every block across the whole width: the plan faint behind, what he did solid on top, his
+   appointments an outline over both with their name on the right. */
+.agentdisc-today-plan,
+.agentdisc-today-done,
+.agentdisc-today-appt {
+    left: 32px;
+    right: 2px;
+    touch-action: none;
+    user-select: none;
 }
 
-/* What he did: solid, on the left. */
+.agentdisc-today-plan {
+    z-index: 1;
+    border-left: 3px solid color-mix(in srgb, var(--agentdisc-act) 70%, transparent);
+    background: color-mix(in srgb, var(--agentdisc-act) 16%, transparent);
+    color: var(--text-muted, #949ba4);
+    cursor: grab;
+}
+
 .agentdisc-today-done {
-    left: 30px;
-    right: 42%;
     z-index: 2;
     background: var(--agentdisc-act);
     color: #fff;
-    cursor: pointer;
+    cursor: grab;
 }
 
-/* His appointments: full colour, on the right. */
 .agentdisc-today-appt {
-    left: 60%;
-    right: 0;
     z-index: 3;
+    padding: 0;
+    border: 2px solid var(--text-strong, #f2f3f5);
+    background: none;
+    color: var(--text-strong, #f2f3f5);
+    pointer-events: none;
+}
+
+/* Only the name tab takes a click (to zoom to it); through the outline, the blocks below stay in reach. */
+.agentdisc-today-appt .agentdisc-today-item-name {
+    position: absolute;
+    top: 0;
+    right: 0;
+    max-width: 60%;
+    padding: 0 5px 1px;
+    border-bottom-left-radius: 4px;
     background: var(--text-strong, #f2f3f5);
     color: var(--background-base-lowest, #111214);
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 .agentdisc-today-appt-free {
     opacity: 0.55;
 }
 
+/* Drawn inside the block, so the panel's edge never cuts it. */
+.agentdisc-today-selected {
+    outline: 2px solid var(--text-strong, #f2f3f5);
+    outline-offset: -2px;
+}
+
+.agentdisc-today-dragging,
+.agentdisc-today-dragging .agentdisc-today-item {
+    cursor: grabbing;
+}
+
+.agentdisc-today-item-times {
+    position: absolute;
+    top: 1px;
+    right: 4px;
+    padding: 0 5px;
+    border: 0;
+    border-radius: 4px;
+    background: rgb(0 0 0 / 35%);
+    color: #fff;
+    font-family: inherit;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    cursor: text;
+}
+
+/* The edges that change a block's start or end: a slim grip, shown while the mouse is on the block. */
+.agentdisc-today-edge {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 7px;
+    cursor: ns-resize;
+}
+
+.agentdisc-today-edge-top {
+    top: -2px;
+}
+
+.agentdisc-today-edge-bottom {
+    bottom: -2px;
+}
+
+.agentdisc-today-edge::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 22px;
+    height: 3px;
+    margin-left: -11px;
+    border-radius: 2px;
+    background: rgb(255 255 255 / 75%);
+    opacity: 0;
+}
+
+.agentdisc-today-edge-top::after {
+    top: 3px;
+}
+
+.agentdisc-today-edge-bottom::after {
+    bottom: 3px;
+}
+
+.agentdisc-today-selected .agentdisc-today-edge::after {
+    opacity: 1;
+}
+
+.agentdisc-today-item:hover .agentdisc-today-edge::after {
+    opacity: 1;
+}
+
 .agentdisc-today-now {
     position: absolute;
-    left: 30px;
+    left: 32px;
     right: 0;
     z-index: 4;
     height: 0;
@@ -1303,7 +1408,6 @@ svg.agentdisc-copy-sign {
 
 .agentdisc-today-corrector {
     position: absolute;
-    top: 4px;
     left: 34px;
     right: 4px;
     z-index: 5;

@@ -112,6 +112,12 @@ export const settings = definePluginSettings({
         description: "Right panel: the parts switched on; empty follows the earlier one-view choice",
         hidden: true
     },
+    timelineScale: {
+        type: OptionType.NUMBER,
+        default: 72,
+        description: "Right panel, Today: how tall an hour is on the day line, set with Ctrl and the mouse wheel over it",
+        hidden: true
+    },
     rightPanelSizes: {
         type: OptionType.STRING,
         default: "",

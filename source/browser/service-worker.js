@@ -1,3 +1,6 @@
+// AgentDisc time and focus (9 Nov 2026): the timer's one owner for every Discord tab.
+importScripts("time-worker.js");
+
 chrome.commands.onCommand.addListener(async (command) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 

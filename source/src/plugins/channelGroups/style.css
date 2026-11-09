@@ -307,3 +307,46 @@ html.agentdisc-channel-filter .vc-list-tools ~ * {
 .agentdisc-namebox-select:focus {
     border-color: color-mix(in oklab, #5865f2 60%, transparent);
 }
+
+/* Activities (9 Nov): the line above the list while an activity is chosen. */
+.vc-activity-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    min-width: 0;
+    padding: 0 10px 6px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-activity-dot {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--vc-activity);
+}
+
+.vc-activity-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-normal, #dbdee1);
+    font-weight: 600;
+}
+
+.vc-activity-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--vc-activity);
+    cursor: pointer;
+}
+
+.vc-activity-link:hover {
+    text-decoration: underline;
+}

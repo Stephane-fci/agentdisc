@@ -43,6 +43,7 @@ import { startChannelShortcuts, stopChannelShortcuts } from "./shortcuts";
 import { startSideData, stopSideData } from "./sideData";
 import { renderSidePanel, startPanelModes, startRightPanelWidth, stopPanelModes, stopRightPanelWidth } from "./sidePanel";
 import { isHiddenInTeam, toggleHiddenInTeam } from "./teamList";
+import { startTime, stopTime } from "./timeFocus";
 import { keepArrows, keepInvite, renderArrows, renderServerIcon, setTrailing, useTrailing } from "./topBar";
 import { startZoomAreas, stopZoomAreas } from "./zoomAreas";
 
@@ -507,6 +508,7 @@ export default definePlugin({
         startBoard();
         startPanelModes();
         startZoomAreas();
+        startTime();
     },
 
     stop() {
@@ -519,6 +521,7 @@ export default definePlugin({
         stopPanelModes();
         stopZoomAreas();
         stopBoard();
+        stopTime();
         setFeedback(false);
     },
 

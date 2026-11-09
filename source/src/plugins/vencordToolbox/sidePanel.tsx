@@ -6,12 +6,15 @@
 
 import { Settings, useSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { onAssignRequest } from "@plugins/channelGroups";
 import { showMembers } from "@plugins/panelSwitches";
 import { ChannelStore, NavigationRouter, useEffect, useReducer, useRef, useState } from "@webpack/common";
 
 import { attachSlot, type BoardRole, detachSlot, focusIdeas, hasBoard, hasBoardHere, onBoardFound, onBoardViews, setFrameLast, showBoard } from "./missionBoard";
 import { type DayInfo, dayKey, linksOf, pairsAmong, type PlaceName, placeName, useSideData } from "./sideData";
 import { setPeopleOnly, stopTeamList } from "./teamList";
+import { useTimeState } from "./timeFocus";
+import { RunningControl, showTodaySection, TodayContent } from "./timePanel";
 
 // The right panel (Stephane, 7 Oct), above the member list like Obsidian's side panel:
 //   1. a map of the channels linked from this channel, this channel in the middle; a
@@ -500,10 +503,12 @@ function FrameSlot({ role, guildId, channelId, threadId, last }: { role: BoardRo
 // where the board is set up for this server (30 Oct: a server with no board offers neither, and
 // the layout he saved stays as it is for the servers that have one), and Ideas only once the
 // board says it has that page.
-export type Part = "board" | "ideas" | "team" | "connections" | "calendar";
-const PARTS: Part[] = ["board", "ideas", "team", "connections", "calendar"];
-const LABELS: Record<Part, string> = { board: "Board", ideas: "Ideas", team: "Team", connections: "Connections", calendar: "Calendar" };
+//   Today     his activity timer, his day and week, his plan (9 Nov 2026, timePanel.tsx)
+export type Part = "today" | "board" | "ideas" | "team" | "connections" | "calendar";
+const PARTS: Part[] = ["board", "ideas", "team", "connections", "calendar", "today"];
+const LABELS: Record<Part, string> = { today: "Today", board: "Board", ideas: "Ideas", team: "Team", connections: "Connections", calendar: "Calendar" };
 const TITLES: Record<Part, string> = {
+    today: "Your activity timer, your day, week and plan",
     board: "This channel's board",
     ideas: "Drop an idea (Ctrl+J)",
     team: "The members of this server (a right-click on one hides them here)",
@@ -563,6 +568,22 @@ function boardOffersIdeas() {
 
 // Ctrl+J: Ideas switched on (the other parts stay), the right panel opened if needed, and the
 // cursor in the idea box.
+// "Assign" from the line above the channel list: Today opens on its Channels tab.
+export function openTodayChannels() {
+    showMembers();
+    const layout = readLayout();
+    if (!layout.on.includes("today")) saveLayout({ ...layout, on: [...layout.on, "today"] });
+    showTodaySection("channels");
+}
+
+// While Today is not shown, a slim strip under the panel's buttons keeps the activity and its
+// controls in view (the running time, Pause and Stop), so the timer is never out of reach.
+function TimeStrip() {
+    const s = useTimeState();
+    if (!s || !(s.running || s.selected || s.paused)) return null;
+    return <RunningControl compact />;
+}
+
 export function openIdeas() {
     if (!hasBoardHere()) return false;
     showMembers();
@@ -771,6 +792,7 @@ function RightPanel({ channel, threadId }: { channel: any; threadId: string | nu
             <div className="agentdisc-own agentdisc-panel-bar" ref={ref}>
                 <ResizeHandle />
                 <ModeBar layout={layout} shown={shown} board={board} ideas={ideas} />
+                {!shown.includes("today") && <TimeStrip />}
             </div>
             {shown.flatMap((p, i) => [
                 i > 0 ? <Divider key={`line-${p}`} order={orderOf(i) - 2} above={shown[i - 1]} below={p} layout={layout} /> : null,
@@ -778,6 +800,7 @@ function RightPanel({ channel, threadId }: { channel: any; threadId: string | nu
                 p === "team" ? null : (
                     <div key={p} className={`agentdisc-own agentdisc-part agentdisc-part-${p}`} style={{ order: orderOf(i), flexGrow: grow(layout, p) }} {...dropTarget(p)}>
                         {p === "calendar" ? <CalendarContent channel={channel} />
+                            : p === "today" ? <TodayContent guildId={channel.guild_id} />
                             : p === "connections" ? <ConnectionsContent channel={channel} />
                                 : <FrameSlot role={p} guildId={channel.guild_id} channelId={channel.id} threadId={threadId} last={p === last} />}
                     </div>
@@ -792,6 +815,7 @@ let unhook: (() => void)[] = [];
 
 export function startPanelModes() {
     unhook = [
+        onAssignRequest(openTodayChannels),
         onBoardViews(views => {
             const next = views.join(",");
             if (Settings.plugins.VencordToolbox.boardViews !== next) Settings.plugins.VencordToolbox.boardViews = next;

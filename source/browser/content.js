@@ -48,12 +48,29 @@ document.addEventListener(
                 send({ action: "agentdiscBookmarks", ids: event.data.ids, guilds: event.data.guilds }).catch(() => {});
             }
 
+            if (event.data.type === 'AGENTDISC_TIME' && typeof event.data.cmd === 'string') {
+                const seq = event.data.seq;
+                send({ action: "agentdiscTime", cmd: event.data.cmd, args: event.data.args || {} })
+                    .then(answer => window.postMessage({ type: "AGENTDISC_TIME_ANSWER", seq, answer: answer || { ok: false, error: "AgentDisc was reloaded; refresh Discord." } }, location.origin))
+                    .catch(() => window.postMessage({ type: "AGENTDISC_TIME_ANSWER", seq, answer: { ok: false, error: "AgentDisc was reloaded; refresh Discord." } }, location.origin));
+            }
+
             if (event.data.type === 'AGENTDISC_WAITS' && Array.isArray(event.data.ids)) {
                 const seq = event.data.seq;
                 send({ action: "agentdiscWaits", ids: event.data.ids.slice(0, 60), guilds: event.data.guilds })
                     .then(waits => { if (waits) window.postMessage({ type: "AGENTDISC_WAITS_ANSWER", seq, waits }, location.origin); })
                     .catch(() => {});
             }
+        }
+
+        // AgentDisc time and focus (9 Nov 2026): his clicks go to the background part, the one
+        // owner of the timer; every change it saves reaches every Discord tab at once.
+        if (chrome.storage && chrome.storage.onChanged) {
+            chrome.storage.onChanged.addListener((changes, area) => {
+                if (area === "local" && changes.agentdiscTime && changes.agentdiscTime.newValue) {
+                    window.postMessage({ type: "AGENTDISC_TIME_STATE", state: changes.agentdiscTime.newValue }, location.origin);
+                }
+            });
         }
 
         window.addEventListener('message', onPageMessage, false);

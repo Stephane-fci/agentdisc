@@ -2,9 +2,9 @@
     "manifest_version": 2,
     "minimum_chrome_version": "91",
 
-    "name": "Vencord Web",
-    "description": "The cutest Discord mod now in your browser",
-    "author": "Vendicated",
+    "name": "AgentDisc",
+    "description": "Discord in the browser, set up for working with agents: typing dots on threads, panel switches and themes. Built on Vencord (GPL-3.0).",
+    "author": "Stephane Franceschini, built on Vencord by Vendicated",
     "homepage_url": "https://github.com/Vendicated/Vencord",
     "icons": {
         "128": "icon.png"

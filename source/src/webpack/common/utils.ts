@@ -103,12 +103,19 @@ export interface ToastOptions {
 }
 
 interface ToastsExports {
-    showToast: (data: ToastData) => void;
+    showToast: (data: {
+        text: string;
+        toastKey: string;
+        variant: "default" | "success" | "critical";
+        position: "top" | "bottom";
+        duration?: number;
+        __dangerouslyRenderContent?: () => React.ReactNode;
+    }) => void;
     popToast(): void;
 }
 
-const ToastsExports = mapMangledModuleLazy(".currentToastMap.has(", {
-    showToast: filters.byCode(".currentToastMap.has("),
+const ToastsExports = mapMangledModuleLazy(".currentToastMap.get(", {
+    showToast: filters.byCode(".currentToastMap.get(", "setState"),
     popToast: filters.byCode(".delete(")
 });
 
@@ -126,7 +133,14 @@ export const Toasts = {
     Position: ToastPosition,
     genId: () => (Math.random() || Math.random()).toString(36).slice(2),
 
-    show: ToastsExports.showToast,
+    show: ({ message, id, type, options }: ToastData) => ToastsExports.showToast({
+        text: message,
+        toastKey: id,
+        variant: type === ToastType.SUCCESS ? "success" : type === ToastType.FAILURE ? "critical" : "default",
+        position: options?.position === ToastPosition.BOTTOM ? "bottom" : "top",
+        duration: options?.duration,
+        __dangerouslyRenderContent: options?.component == null ? undefined : () => options.component
+    }),
     pop: ToastsExports.popToast,
     create: createToast,
 };

@@ -111,13 +111,13 @@ interface ToastsExports {
         duration?: number;
         __dangerouslyRenderContent?: () => React.ReactNode;
     }) => void;
-    popToast(): void;
 }
 
-const ToastsExports = mapMangledModuleLazy(".currentToastMap.get(", {
-    showToast: filters.byCode(".currentToastMap.get(", "setState"),
-    popToast: filters.byCode(".delete(")
-});
+// Discord's notice function, found by its own code (the way Vencord finds it since
+// 10 Nov 2026); the separate close function no longer comes with it, and nothing used it.
+const ToastsExports = {
+    showToast: findByCodeLazy(".currentToastMap.get(", "setState") as ToastsExports["showToast"]
+};
 
 export function createToast(message: string, type: string, options?: ToastOptions): ToastData {
     return {
@@ -141,7 +141,6 @@ export const Toasts = {
         duration: options?.duration,
         __dangerouslyRenderContent: options?.component == null ? undefined : () => options.component
     }),
-    pop: ToastsExports.popToast,
     create: createToast,
 };
 

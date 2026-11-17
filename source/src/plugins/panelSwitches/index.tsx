@@ -23,6 +23,21 @@ import { ComponentDispatch, FluxDispatcher, Menu, useStateFromStores } from "@we
 
 const logger = new Logger("PanelSwitches");
 
+// Unlike saved panel settings, sessionStorage belongs to this tab and survives its
+// reload. Consume the launch marker so switching the mode off also survives reload.
+const MINIMAL_KEY = "agentdisc-minimal";
+let minimal = false;
+
+function setMinimal(on: boolean) {
+    minimal = on;
+    try {
+        sessionStorage.setItem(MINIMAL_KEY, on ? "1" : "0");
+    } catch {
+        // The shortcut still works if the browser refuses tab storage.
+    }
+    apply();
+}
+
 export const ChannelSectionStore = findStoreLazy("ChannelSectionStore") as {
     getState(): { isMembersOpen: boolean; };
 };
@@ -148,6 +163,7 @@ export const settings = definePluginSettings({
 type Panel = "serverList" | "channelList" | "channelHeader" | "notices";
 
 export function isHidden(panel: Panel) {
+    if (minimal) return true;
     const s = settings.store;
     const own = {
         serverList: s.hideServerList,
@@ -168,7 +184,10 @@ function buildCss() {
     if (L) {
         const servers = isHidden("serverList");
         const channels = isHidden("channelList");
-        if (channels) {
+        if (minimal) {
+            // Remove the whole column, including its invisible hover target.
+            rules.push(`${sel(L.sidebar)},${sel(L.guilds)},${sel(L.panels)},${sel(L.sidebarResizeHandle)}{display:none!important}`);
+        } else if (channels) {
             // A hidden channel list slides back over the chat while the mouse is at the
             // left edge (on the server list, or on a thin strip when that is hidden too),
             // and goes away again a moment after the mouse leaves.
@@ -208,13 +227,13 @@ function buildCss() {
     // next to the server name and into the channel's bar (vencordToolbox/topBar.tsx).
     if (L && T) {
         rules.push(
-            `${sel(L.base)},${sel(L.base)}[data-fullscreen=true]{grid-template-rows:[top] ${BUSY_BAR_HEIGHT}px [titleBarEnd] min-content [noticeEnd] 1fr [end]!important;padding-top:0!important}`,
+            `${sel(L.base)},${sel(L.base)}[data-fullscreen=true]{grid-template-rows:[top] ${minimal ? 0 : BUSY_BAR_HEIGHT}px [titleBarEnd] min-content [noticeEnd] 1fr [end]!important;padding-top:0!important}`,
             `${sel(T.bar)}{display:none!important}`
         );
     }
 
     if (C && isHidden("channelHeader")) {
-        rules.push(`html:not(.agentdisc-searching) ${sel(C.chat)} ${sel(C.title)}{display:none!important}`);
+        rules.push(`html${minimal ? "" : ":not(.agentdisc-searching)"} ${sel(C.chat)} ${sel(C.title)}{display:none!important}`);
     }
 
     if (isHidden("notices")) {
@@ -230,6 +249,12 @@ function buildCss() {
     }
     if (s.hideMessageButtons) rules.push(".vc-message-button{display:none!important}");
     if (s.hideAppTag && B) rules.push(`${sel(B.botTag.split(" ")[0])}:not(${sel(B.botTagOP.split(" ")[0])}){display:none!important}`);
+
+    if (minimal) {
+        rules.push(
+            "#agentdisc-busy-host,html [data-agentdisc-side-host],html [class*=\"membersWrap_\"]{display:none!important}"
+        );
+    }
 
     return rules.join("\n");
 }
@@ -379,6 +404,14 @@ export function toggleLeftPanel() {
 }
 
 function onKeyDown(e: KeyboardEvent) {
+    // Use the letter, not its physical position (M moves on AZERTY). AltGr typing
+    // can also report Ctrl+Alt, so it must not switch the mode.
+    if (e.key.toLowerCase() === "m" && e.ctrlKey && e.altKey && !e.getModifierState("AltGraph") && !e.shiftKey && !e.metaKey && !e.repeat) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setMinimal(!minimal);
+        return;
+    }
     // Discord's own search shortcut also brings a hidden channel header back.
     if (e.code === "KeyF" && (e.ctrlKey || e.metaKey) && !e.altKey && isHidden("channelHeader")) setSearching(true);
     if (e.code !== "KeyF" || !e.ctrlKey || !e.altKey || e.shiftKey || e.metaKey || e.repeat) return;
@@ -463,6 +496,15 @@ export default definePlugin({
     },
 
     start() {
+        try {
+            minimal = sessionStorage.getItem(MINIMAL_KEY) === "1";
+        } catch {
+            minimal = false;
+        }
+        if (location.hash === "#agentdisc-minimal") {
+            setMinimal(true);
+            history.replaceState(history.state, "", location.pathname + location.search);
+        }
         style = document.createElement("style");
         style.id = "agentdisc-panel-switches";
         (document.head ?? document.documentElement).append(style);
@@ -482,5 +524,6 @@ export default definePlugin({
         setSearching(false);
         style?.remove();
         style = null;
+        minimal = false;
     }
 });

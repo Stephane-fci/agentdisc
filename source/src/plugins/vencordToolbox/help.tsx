@@ -17,6 +17,7 @@ const SHORTCUTS: [string, string][] = [
     ["Ctrl+K", "Put this channel in its category: the one with the same emoji (or, with no emoji, the one whose name it holds), never an archive; or take it out, under the other channels above the categories"],
     ["Shift twice", "Feedback mode on or off; each tap on Ctrl: the paragraph, the sentence, a piece of it (up to a comma or colon)"],
     ["Shift + ← / →", "Hide or show the left panel (servers and channels) / the right panel; while typing, Shift with the arrows still selects text"],
+    ["Ctrl+Alt+M", "Minimal game window on or off: only chat and the message box, no left-edge panels; kept for this tab only"],
     ["Ctrl+J", "Drop an idea: the right panel's Ideas part switched on, the cursor in its box (where the mission board is set up)"],
     ["Ctrl + mouse wheel", "Over the chat, the channel list, the server list, Team or Calendar: zoom that area alone, kept (the AgentDisc menu resets them all); the board, the ideas and the map zoom by themselves"],
     ["Ctrl+H", "This window"],

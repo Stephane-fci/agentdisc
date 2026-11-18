@@ -1,0 +1,7 @@
+{
+  "name": "co.sfrance.agentdisc.game_chat",
+  "description": "Open the current AgentDisc channel as a game chat window",
+  "path": "host.bat",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://jjhlicnmjdacfcedgepakpfchocpkmck/"]
+}

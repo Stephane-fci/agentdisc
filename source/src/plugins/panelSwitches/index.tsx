@@ -404,9 +404,7 @@ export function toggleLeftPanel() {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-    // Use the letter, not its physical position (M moves on AZERTY). AltGr typing
-    // can also report Ctrl+Alt, so it must not switch the mode.
-    if (e.key.toLowerCase() === "m" && e.ctrlKey && e.altKey && !e.getModifierState("AltGraph") && !e.shiftKey && !e.metaKey && !e.repeat) {
+    if (e.code === "F9" && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && !e.repeat) {
         e.preventDefault();
         e.stopImmediatePropagation();
         setMinimal(!minimal);

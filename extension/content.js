@@ -74,6 +74,15 @@ document.addEventListener(
         }
 
         window.addEventListener('message', onPageMessage, false);
+
+        // A real header-button click only, not a script-generated page message.
+        // The background derives the channel from Chrome's sending-tab record.
+        document.addEventListener('click', event => {
+            if (!event.isTrusted || window.top !== window || !event.target?.closest?.('[data-agentdisc-game-chat]')) return;
+            send({ action: "agentdiscGameChat" })
+                .then(answer => window.postMessage({ type: "AGENTDISC_GAME_CHAT_ANSWER", answer: answer || { ok: false, error: "Reload AgentDisc and refresh this Discord page, then try again." } }, location.origin))
+                .catch(() => window.postMessage({ type: "AGENTDISC_GAME_CHAT_ANSWER", answer: { ok: false, error: "Reload AgentDisc and refresh this Discord page, then try again." } }, location.origin));
+        }, true);
     },
     { once: true }
 );

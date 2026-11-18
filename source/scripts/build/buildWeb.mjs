@@ -190,7 +190,7 @@ if (!process.argv.includes("--skip-extension")) {
     await Promise.all([
         appendCssRuntime,
         // AgentDisc: THIRD-PARTY-NOTICES.md carries the MIT notices of FullCalendar and Preact, which the bundle includes.
-        buildExtension("chromium-unpacked", ["modifyResponseHeaders.json", "content.js", "manifest.json", "icon.png", "icon-16.png", "icon-32.png", "icon-48.png", "icon-128.png", "service-worker.js", "time-worker.js", "THIRD-PARTY-NOTICES.md"]),
+        buildExtension("chromium-unpacked", ["modifyResponseHeaders.json", "content.js", "manifest.json", "icon.png", "icon-16.png", "icon-32.png", "icon-48.png", "icon-128.png", "service-worker.js", "time-worker.js", "game-chat-worker.js", "THIRD-PARTY-NOTICES.md"]),
         buildExtension("firefox-unpacked", ["background.js", "content.js", "manifestv2.json", "icon.png", "THIRD-PARTY-NOTICES.md"]),
     ]);
 

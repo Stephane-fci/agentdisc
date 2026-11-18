@@ -34,6 +34,7 @@ import { startBusyBar, stopBusyBar } from "./busyBar";
 import { BookmarkButton, PinButton, ThreadMarkButtons } from "./channelMarks";
 import { startFindShortcut, stopFindShortcut, useFind } from "./channelSearch";
 import { isFeedbackOn, onFeedbackChange, setFeedback } from "./feedback";
+import { GameChatButton } from "./gameChat";
 import { LinksPanel } from "./links";
 import { attachLongMessage } from "./longMessage";
 import { renderPopout } from "./menu";
@@ -293,6 +294,7 @@ function PanelButtons() {
             {channelId && <LinksButton channelId={channelId} guildId={guildId} />}
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleServerList} tooltip={serversShown ? "Hide servers" : "Show servers"} icon={ServersIcon} selected={serversShown} />
             <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleLeftPanel} tooltip={leftShown ? "Hide the left panel (Shift + ←)" : "Show the left panel (Shift + ←)"} icon={LeftPanelIcon} selected={leftShown} />
+            <GameChatButton HeaderIcon={HeaderBarIcon} />
             {channelType != null && !NO_MEMBER_LIST.has(channelType) && (
                 <HeaderBarIcon className="vc-toolbox-btn" onClick={toggleMembers} tooltip={membersShown ? "Hide the right panel (Shift + →)" : "Show the right panel (Shift + →)"} icon={MembersIcon} selected={membersShown} />
             )}

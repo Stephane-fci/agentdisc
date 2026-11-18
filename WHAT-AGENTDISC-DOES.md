@@ -108,7 +108,7 @@ The server list and member list also have their own buttons in the channel bar (
 
 Ctrl+Alt+F switches "chat only" on and off: it hides the server list, channel list and member list at once (or everything except the chat, a choice in the settings, on the PanelSwitches cog).
 
-Ctrl+Alt+M switches the minimal game window on and off. Only the chat and message box remain, and moving the mouse to the left edge opens nothing. This mode stays in this tab after a reload; other windows and saved panel choices stay as they are. Add `#agentdisc-minimal` to a Discord channel address to start in this mode. The marker is removed after opening, so the shortcut can switch the mode off and keep it off after a reload.
+Ctrl+Shift+F9 switches the minimal game window on and off. Only the chat and message box remain, and moving the mouse to the left edge opens nothing. This mode stays in this tab after a reload; other windows and saved panel choices stay as they are. Add `#agentdisc-minimal` to a Discord channel address to start in this mode. The marker is removed after opening, so the shortcut can switch the mode off and keep it off after a reload.
 
 ## Theme
 

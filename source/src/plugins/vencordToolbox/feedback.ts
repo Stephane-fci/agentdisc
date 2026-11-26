@@ -42,6 +42,11 @@ let ctrlSwitched = false;
 let hovered: Range | null = null;
 let frame = 0;
 let lastMove: MouseEvent | null = null;
+// Windows can activate Chrome just before it delivers the click that activated it.
+// Keep that click out of feedback mode, as well as a press received before focus.
+const FOCUS_CLICK_MS = 100;
+let focusedAt = -Infinity;
+let activatingClick = false;
 const listeners = new Set<(on: boolean) => void>();
 
 export function isFeedbackOn() {
@@ -157,19 +162,39 @@ function pieceAt(x: number, y: number, size: Size): Range | null {
 
 function onMove(e: MouseEvent) {
     lastMove = e;
-    if (frame) return;
+    if (!document.hasFocus() || frame) return;
     frame = requestAnimationFrame(() => {
         frame = 0;
-        const m = lastMove!;
-        hovered = pieceAt(m.clientX, m.clientY, size);
-        paint(hovered);
+        repaint();
     });
 }
 
 function repaint() {
-    if (!lastMove) return;
-    hovered = pieceAt(lastMove.clientX, lastMove.clientY, size);
+    hovered = on && document.hasFocus() && lastMove ? pieceAt(lastMove.clientX, lastMove.clientY, size) : null;
     paint(hovered);
+}
+
+function onFocus() {
+    focusedAt = performance.now();
+    document.documentElement.classList.toggle("agentdisc-feedback-on", on);
+    repaint();
+}
+
+function onBlur() {
+    document.documentElement.classList.remove("agentdisc-feedback-on");
+    ctrlSwitched = false;
+    focusedAt = -Infinity;
+    activatingClick = false;
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    hovered = null;
+    paint(null);
+}
+
+function onMouseDown(e: MouseEvent) {
+    if (e.button !== 0) return;
+    activatingClick = !document.hasFocus() || performance.now() - focusedAt < FOCUS_CLICK_MS;
+    focusedAt = -Infinity;
 }
 
 function messageBoxHasText() {
@@ -200,6 +225,10 @@ export function quoteCard(title: string, link: string) {
 
 function onClick(e: MouseEvent) {
     if (e.button !== 0) return;
+    const activating = activatingClick;
+    activatingClick = false;
+    focusedAt = -Infinity;
+    if (activating || !document.hasFocus()) return;
     const target = e.target as HTMLElement | null;
     if (!target?.closest?.(CONTENT)) return;
     // Discord's copy button on a text block stays a button.
@@ -216,6 +245,8 @@ function onClick(e: MouseEvent) {
 }
 
 function onKey(e: KeyboardEvent) {
+    // A keyboard return (including releasing Alt after Alt+Tab) is ready to quote.
+    focusedAt = -Infinity;
     if (e.key === "Escape" && on) setFeedback(false);
     if (e.key === "Control") {
         if (e.repeat || e.altKey || e.shiftKey || e.metaKey) return;
@@ -231,6 +262,7 @@ function onKey(e: KeyboardEvent) {
 }
 
 function onKeyUp(e: KeyboardEvent) {
+    focusedAt = -Infinity;
     if (e.key === "Control") ctrlSwitched = false;
 }
 
@@ -239,17 +271,29 @@ export function setFeedback(want: boolean) {
     on = want;
     size = 0;
     ctrlSwitched = false;
-    document.documentElement.classList.toggle("agentdisc-feedback-on", on);
+    focusedAt = -Infinity;
+    activatingClick = false;
+    document.documentElement.classList.toggle("agentdisc-feedback-on", on && document.hasFocus());
     if (on) {
         document.addEventListener("mousemove", onMove, true);
+        document.addEventListener("mousedown", onMouseDown, true);
         document.addEventListener("click", onClick, true);
         document.addEventListener("keydown", onKey, true);
         document.addEventListener("keyup", onKeyUp, true);
+        window.addEventListener("focus", onFocus);
+        window.addEventListener("blur", onBlur);
+        repaint();
     } else {
         document.removeEventListener("mousemove", onMove, true);
+        document.removeEventListener("mousedown", onMouseDown, true);
         document.removeEventListener("click", onClick, true);
         document.removeEventListener("keydown", onKey, true);
         document.removeEventListener("keyup", onKeyUp, true);
+        window.removeEventListener("focus", onFocus);
+        window.removeEventListener("blur", onBlur);
+        if (frame) cancelAnimationFrame(frame);
+        frame = 0;
+        lastMove = null;
         hovered = null;
         paint(null);
     }
